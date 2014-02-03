@@ -1,0 +1,3 @@
+#include bochsrc-common
+
+gdbstub: enabled=1, port=$GDB_PORT, text_base=0, data_base=0, bss_base=0

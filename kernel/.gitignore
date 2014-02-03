@@ -1,0 +1,17 @@
+# cscope
+cscope.files
+cscope.in.out
+cscope.out
+cscope.po.out
+
+# kernel binaries
+kernel.bin
+symbols.dbg
+weenix.dbg
+weenix.img
+weenix.iso
+
+gdb-commands
+
+# Empty target stuff
+empty-target

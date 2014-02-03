@@ -1,0 +1,3 @@
+[submodule "bochs"]
+	path = bochs
+	url = ssh://ssh.cs.brown.edu//course/cs169/vm/bochs/.git

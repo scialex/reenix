@@ -1,0 +1,108 @@
+#!/bin/bash
+
+USAGE="Usage: $0 [OPTION]...
+-h --help            Display this help dialog.
+-m --machine <arg>   Run on the specified machine. The default is
+                     'qemu', which is also currently the only supported
+                     machine.
+-d --debug <arg>     Run with debugging support. 'gdb' is the only
+                     valid argument.
+-n --new-disk        Use a fresh copy of the hard disk image.
+"
+
+# XXX hardcoding these temporarily -- should be read from the makefiles
+GDB_TMP_INIT=inittmp.gdb
+KERN_DIR=kernel
+ISO_IMAGE=weenix.iso
+SYMBOLS=weenix.dbg
+GDB_COMM_INIT=commands.gdb
+GDB_INIT=init.gdb
+GDBCOMM=gdb-commands
+QEMU=qemu-system-i386
+QEMU_FLAGS="-d int -k en-us -boot order=dca"
+if ! which $QEMU; then
+	QEMU=qemu
+	if ! which $QEMU; then
+		echo "Unable to find qemu." >&2
+		exit 2
+	fi
+fi
+
+# If we're on qemu version > 1.0, add the -no-kvm flag to avoid errors
+# qemu >= 1.1 uses -machine accel=... and thus kvm is off by default
+if $QEMU -version | grep "version 1.0"; then
+	QEMU_FLAGS+=" -no-kvm"
+fi
+
+GDB=gdb
+GDB_PORT=1234
+GDB_TERM=xterm
+MEMORY=32
+
+cd $(dirname $0)
+
+TEMP=$(getopt -o hm:d:n --long help,machine:,debug:,new-disk -n "$0" -- "$@")
+if [ $? != 0 ] ; then
+	exit 2
+fi
+
+machine=qemu
+dbgmode="run"
+newdisk=
+eval set -- "$TEMP"
+while true ; do
+	case "$1" in
+		-h|--help) echo "$USAGE" >&2 ; exit 0 ;;
+		-n|--new-disk) newdisk=1 ; shift ;;
+		-m|--machine) machine="$2" ; shift 2 ;;
+		-d|--debug) dbgmode="$2" ; shift 2 ;;
+		--) shift ; break ;;
+		*) echo "Argument error." >&2 ; exit 2 ;;
+	esac
+done
+
+GDB_FLAGS="-x $GDB_TMP_INIT -s $KERN_DIR/$SYMBOLS -x $GDB_COMM_INIT -x $GDB_INIT"
+rm -f "$GDB_COMM_INIT"
+cat "$KERN_DIR/$GDBCOMM" | grep "\.gdb$" | while read file
+do
+	echo "source $file" >> "$GDB_COMM_INIT"
+done
+# XXX disabled until gdb version checks are written
+## cat "$KERN_DIR/$GDBCOMM" | grep "\.py$" | while read file
+## do
+## 	echo "source $file" >> "$GDB_COMM_INIT"
+## done
+
+case $machine in
+	qemu)
+		if [[ -n "$newdisk" || ! ( -f disk0.img ) ]]; then
+			cp -f user/disk0.img disk0.img
+		fi
+
+		case $dbgmode in
+			run)
+				$QEMU $QEMU_FLAGS -m "$MEMORY" -cdrom "$KERN_DIR/$ISO_IMAGE" -hda disk0.img -serial stdio
+				;;
+			gdb)
+				# Build the gdb initialization script
+				echo "target remote localhost:$GDB_PORT" > $GDB_TMP_INIT
+				echo "python sys.path.append(\"$(pwd)\")" >> $GDB_TMP_INIT
+
+				$GDB_TERM -e $QEMU $QEMU_FLAGS -m "$MEMORY" -cdrom "$KERN_DIR/$ISO_IMAGE" disk0.img -serial stdio -s -S -daemonize
+				$GDB $GDB_FLAGS
+				;;
+			*)
+				echo "'$dbgmode' is an unknown debug mode for the '$machine' machine type." >&2
+				echo "Valid modes: gdb" >&2
+				echo "$USAGE" >&2
+				exit 1
+				;;
+		esac
+		;;
+	*)
+		echo "'$machine' is an unknown machine type." >&2
+		echo "Valid machines: qemu" >&2
+		echo "$USAGE" >&2
+		exit 1
+		;;
+esac

@@ -1,0 +1,146 @@
+#!/bin/bash
+
+SCRIPT_DIR=$PWD/$(dirname $0)
+
+TARGET=i686-elf
+
+BINUTILS_VER=2.21.1
+BINUTILS_URL="http://ftp.gnu.org/gnu/binutils/binutils-${BINUTILS_VER}.tar.bz2"
+BINUTILS_MD5="bde820eac53fa3a8d8696667418557ad"
+BINUTILS_TAR="binutils-${BINUTILS_VER}.tar.gz"
+BINUTILS_DIR="binutils-${BINUTILS_VER}"
+
+GCC_CORE_VER=4.6.1
+GCC_CORE_URL="http://ftp.gnu.org/gnu/gcc/gcc-${GCC_CORE_VER}/gcc-core-${GCC_CORE_VER}.tar.gz"
+GCC_CORE_MD5="746cc8383a01b4c1ad97c213cfd502f0"
+GCC_CORE_TAR="gcc-core-${GCC_CORE_VER}.tar.gz"
+GCC_CORE_DIR="gcc-${GCC_CORE_VER}"
+
+LIBICONV_VER=1.13
+LIBICONV_URL="http://ftp.gnu.org/gnu/libiconv/libiconv-${LIBICONV_VER}.tar.gz"
+LIBICONV_MD5="048032a3032ebd182150bdee30a5d533"
+LIBICONV_TAR="libiconv-${LIBICONV_VER}.tar.gz"
+LIBICONV_DIR="libiconv-${LIBICONV_VER}"
+
+MPFR_VER=3.0.1
+MPFR_URL="http://ftp.gnu.org/gnu/mpfr/mpfr-${MPFR_VER}.tar.gz"
+MPFR_MD5="e9c191fc46a4f5741f8a0a11ab33b8bf"
+MPFR_TAR="mpfr-${MPFR_VER}.tar.gz"
+MPFR_DIR="mpfr-${MPFR_VER}"
+
+GMP_VER=5.0.2
+GMP_URL="http://ftp.gnu.org/gnu/gmp/gmp-${GMP_VER}.tar.gz"
+GMP_MD5="87e73447afdc2ca5cefd987da865da51"
+GMP_TAR="gmp-${GMP_VER}.tar.gz"
+GMP_DIR="gmp-${GMP_VER}"
+
+USAGE="Usage: $0 [OPTION]...
+-b --buildir <dir>   The working directory for the compilation.
+-p --prefix <dir>    The directory where the compiler will be installed.
+                     This should be an absolute path.
+-j --jobs <num>      Passed throught to 'make' with the -j options.
+"
+
+TEMP=$(getopt -o hb:p:j: --long help,buildir:,prefix:,jobs: -n "$0" -- "$@")
+if [ $? != 0 ] ; then
+	exit 2
+fi
+
+jobs=1
+buildir=$SCRIPT_DIR/build
+prefix=$SCRIPT_DIR/usr
+eval set -- "$TEMP"
+while true ; do
+	case "$1" in
+		-h|--help) echo "$USAGE" >&2 ; exit 0 ;;
+		-b|--buildir) buildir=$2 ; shift 2 ;;
+		-p|--prefix) prefix=$2 ; shift 2 ;;
+		-j|--jobs) jobs=$2 ; shift 2 ;;
+		--) shift ; break ;;
+		*) echo "Argument error." >&2 ; exit 2 ;;
+	esac
+done
+
+function download {
+	local url=$1
+	local dest=$2
+	local md5=$3
+	local tmp=$(mktemp)
+
+	echo "$md5  $dest" > $tmp
+	md5sum -c "$tmp" >/dev/null 2>/dev/null
+	if [[ 0 -ne $? ]]; then
+		wget "$url" -O "$dest"
+		md5sum -c "$tmp" >/dev/null 2>/dev/null
+		if [[ 0 -ne $? ]]; then
+			echo "error: $url: checksum mismatch" >&2
+			exit 1
+		fi
+	fi
+}
+
+mkdir -p $buildir
+pushd $buildir >/dev/null
+
+download "$BINUTILS_URL" "$BINUTILS_TAR" "$BINUTILS_MD5"
+download "$GCC_CORE_URL" "$GCC_CORE_TAR" "$GCC_CORE_MD5"
+download "$LIBICONV_URL" "$LIBICONV_TAR" "$LIBICONV_MD5"
+download "$MPFR_URL" "$MPFR_TAR" "$MPFR_MD5"
+download "$GMP_URL" "$GMP_TAR" "$GMP_MD5"
+
+echo "Extracting binutils..."
+rm -rf $BINUTILS_DIR
+tar xvf $BINUTILS_TAR >/dev/null
+
+echo "Extracting gcc-core..."
+rm -rf $GCC_CORE_DIR
+tar xvf $GCC_CORE_TAR >/dev/null
+
+echo "Extracting libiconv..."
+rm -rf $LIBICONV_DIR
+tar xvf $LIBICONV_TAR >/dev/null
+mv $LIBICONV_DIR $GCC_CORE_DIR/libiconv
+
+echo "Extracting mpfr..."
+rm -rf $MPFR_DIR
+tar xvf $MPFR_TAR >/dev/null
+mv $MPFR_DIR $GCC_CORE_DIR/libmpfr
+
+echo "Extracting gmp..."
+rm -rf $GMP_DIR
+tar xvf $GMP_TAR >/dev/null
+mv $GMP_DIR $GCC_CORE_DIR/libgmp
+
+popd >/dev/null
+
+echo "Building binutils..."
+pushd "$buildir/$BINUTILS_DIR" >/dev/null
+./configure --target="$TARGET" --prefix="$prefix" --disable-nls
+if [[ 0 -ne $? ]]; then
+	exit 1
+fi
+make -j $jobs all
+if [[ 0 -ne $? ]]; then
+	exit 1
+fi
+make -j $jobs install
+if [[ 0 -ne $? ]]; then
+	exit 1
+fi
+popd >/dev/null
+
+echo "Building gcc..."
+pushd "$buildir/$GCC_CORE_DIR" >/dev/null
+export PATH="$prefix/bin:$PATH"
+./configure --target="$TARGET" --prefix="$prefix" --disable-nls --enable-languages=c --without-headers
+if [[ 0 -ne $? ]]; then
+	exit 1
+fi
+make -j $jobs all-gcc
+if [[ 0 -ne $? ]]; then
+	exit 1
+fi
+make -j $jobs install-gcc
+if [[ 0 -ne $? ]]; then
+	exit 1
+fi

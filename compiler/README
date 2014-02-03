@@ -1,0 +1,8 @@
+This directory contains the install script which downloads,
+configures, compiles, and installs the supported gcc compiler
+and binutils for building weenix. Use the --prefix flag to
+set the installation prefix. If you are developing on
+a network drive you may want to use the --buildir flag to
+speed up the installation by compiling gcc in a local directory.
+If your machine has multiple cores you can use the -j flag,
+it will be passed through to all 'make' instances.

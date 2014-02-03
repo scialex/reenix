@@ -1,0 +1,7 @@
+#!/bin/sh
+
+cd $(dirname $0) >/dev/null
+SCRIPT_DIR=$(pwd)
+cd - >/dev/null
+
+python "$SCRIPT_DIR/tools/fsmaker/sh.py" "$@"

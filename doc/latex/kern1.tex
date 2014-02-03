@@ -1,0 +1,69 @@
+\chapter{Processes and Threads}
+\label{kern1}
+
+\section{Introduction}
+
+This assignment, colloquially referred to as ``Kernel 1,'' will provide the basic building blocks for the Weenix operating system: threads, processes, and synchronization primitives. These objects are implemented fully in kernel code, and interactions with user-level processes and threads will not be possible until you implement virtual memory in a later assignment.
+
+Writing an operating system can be complicated, so much of the code to do basic kernel operations such as memory allocation and page table management has already been written. These are either beyond the scope of the project or are too time consuming for too little value. While modifications to the support code are fully possible, significant changes to the provided interfaces make errors far more likely and make it harder to ask for help. However, it is important for you to be able to take ownership of the code. Though it is usually too time-consuming to write the entire system from scratch, by the end of the project, you should have a good (if high-level) understanding of all the code involved. This will certainly be true by VM, which will involve putting the final touches on the kernel.
+
+At the end of this first assignment, the kernel will be able to run several threads and processes concurrently in kernel mode. It is important to emphasize that a strong test suite is critical. For this assignment, test code must be added directly into the boot sequence for the kernel, but in later assignments there will be several additional ways to add tests in a cleaner, more modular way.
+
+\section{Kernel Memory Management}
+
+As mentioned above, this has been fully implemented for you, but take a moment to look around \texttt{include/kernel/mm/kmalloc.h}, \texttt{include/kernel/mm/slab.h} and \texttt{kernel/mm/slab.c} to familiarize yourself with the memory management interface. The functions \texttt{kmalloc()} and \texttt{kfree()} exist as kernel-space workalikes for the standard library \texttt{malloc()} and \texttt{free()} functions. However, these should be used sparingly (for example, for incidental memory usage during testing). Most of the kernel memory management you will be doing using the \texttt{slab\_allocators}. A slab allocator, as used in Solaris and Linux, works like a cache for memory chunks of a particular size. This reduces both the loss of memory through fragmentation and the overhead from manipulating the heap directly. Refer to \texttt{include/kernel/mm/slab.h} for the slab allocation and freeing functions you will be using.
+
+\section{Boot Sequence}
+
+Most of the boot sequence is handled by the support code. The last thing the boot loader does is execute the function \texttt{kmain()}, which initializes the support subsystems and then calls \texttt{bootstrap()}.
+
+At this point, we are still in the boot sequence, which means that we do not have a thread context in which to properly execute. We cannot block, and we cannot execute user code. The goal of \texttt{bootstrap()} is to set up the first kernel thread and process, which together are called the idle process, and execute its main routine. This should be a piece of cake once you have implemented threads and the scheduler.
+
+The idle process performs further initialization and starts the init process. For now, all of your test code should be run in the init process. When your operating system is nearly complete, it will execute a binary program in user mode, but for now, be content to put together your own testing system for threads and processes in kernel mode.
+
+\section{Processes and Threads}
+
+Weenix is capable of running multiple processes and threads. There are a few important things to note about the Weenix threading model.
+\begin{itemize}
+    \item There is no kernel mode preemption in Weenix (all threads run until they explicitly yield control of the processor). It is possible (but not required) to implement user mode preemption. Think about why this is much easier to do.
+    \item Weenix is only running on one processor, so synchronization primitives don't require atomic compare-and-swap instructions or memory barriers.
+    \item Each process only has one thread associated with it, however the threading code is actually structured so that it would be easy to have multiple threads per process. For example, each process keeps a list of its threads, even though that list currently never has more than one entry. If a function seems unnecessary to you, think of it in the context of multiple threads per process. For instance, when exiting a thread, you must alert the process that one of its threads exited, even though each process should only ever have one thread.
+\end{itemize}
+
+The lifecycle of threads and processes is relatively straightforward. When a process is created, a thread should be added to it and the process should be made runnable by adding its thread to the run queue. If a process exits and it still has child processes, it should reassign those children to the init process, which, after performing some system setup, will sit in a loop collecting orphaned processes. When a thread attempts to exit the current process, the process code must cancel any other threads in the same process (and join with them, if there are multiple) so that they can do any cleanup necessary for their current tasks. Once each thread finishes cleaning up its current task, it makes a call to the process code to indicate it is exiting so that the process can do any final cleanup on the thread data structure.
+
+Once all its threads have exited, a process can exit and one of its ancestors (either its parent or the init process) will call \texttt{do\_waitpid()} and clean it up fully. The reason for this somewhat odd deallocation system is that some elements of the process and thread data structures can only be cleaned up from another thread's context. During this assignment, you should determine what these items are, and clean up everything else in the process as quickly as possible. Also note that processes which are children of the idle process will not be cleaned up using this method; they are dealt with separately.
+
+As a side note, you will be using linked lists extensively throughout Weenix. By this point, you may have looked at the code and seen that some data structures contain list objects or link objects. We provide you with a circular doubly-linked list implementation where the links are stored inside of the objects that are in the list (hence the link fields inside the objects). Most of this list implementation is provided as a set of macros which can be found in the codebase. You even get a couple of neat list iteration ``primitives'' that look like they're straight out of your favorite scripting language!
+
+The trickiest parts of this segment are \texttt{do\_waitpid()} and \texttt{proc\_kill\_all()}, not because they are conceptually difficult, but because it is very easy to accidentally introduce bugs that you will discover much later. As such, you should test the edge cases of these functions early and often throughout the development of your operating system.
+
+\section{Scheduler}
+
+Once you have created processes and threads, you will need a way to run these threads and switch between them. In most operating systems, you must worry about thread priorities or quality of service assurances, which requires wait queue as well as run queue optimizations, but the scheduler for Weenix consists only of first-in-first-out queues, a function to switch between the contexts of two threads, and a few higher-level functions to abstract away the details of the queues from the caller.
+
+In particular, there is a single run queue from which threads are dequeued (only when the running thread yields control explicitly) and switched onto the processor. There are also many wait queues in the system, most of which will be used as a part of some mutex. When a thread reaches the front of its wait queue, it can be woken up, which involves putting it on the run queue, waiting for it to reach the head of the run queue, and then being switched onto the processor by some other thread running the switching routine.
+
+Switching between threads is the most tricky code to write in this area, and should be done carefully so as not to interact poorly with hardware interrupts. In order to write a correct switch function, you must take the first thread off of the run queue, set the global variables for current thread and current process to point at the new thread and its process, then switch into the new context, all with interrupts blocked (using the interrupt priority level, or IPL). If the run queue is empty, it's possible that all otherwise-runnable threads are waiting for hardware interrupts, so you must have a way to check this as well. Don't forget that hardware interrupts, when not masked, can occur between any two code instructions.
+
+% TODO review of the IPL high/low difference?
+
+\section{Synchronization Primitives}
+
+Since the kernel is multi-threaded, we need some way to ensure that certain critical paths are not executed simultaneously by multiple threads. Once your scheduling functions work, you should be able to implement synchronization primitives as well. The only synchronization primitive used in Weenix is the mutex, whose implementation uses a single FIFO thread queue, although you may also implement condition variables, semaphores, barriers, etc. if you wish to use them.
+
+\section{Testing}
+
+It is your responsibility to think of boundary conditions which could potentially cause problems in your kernel. Test code is an important part of software development, and if you cannot demonstrate that your kernel works properly, we will assume that it does not.
+
+As mentioned earlier, you should run all your test code from the init process's main function (for lack of a better location), although you can add a new file to hold your tests. To be in the best shape possible before moving on, you should be able to test all of the following situations.
+\begin{itemize}
+    \item Run several threads and processes concurrently. Devise a way to show that multiple threads are running and that they are working properly.
+    \item Demonstrate that threads and processes exit cleanly.
+    \item Ensure all the edge cases of \texttt{do\_waitpid()} work correctly.
+    \item Try exiting your kernel both by running \texttt{proc\_kill\_all()} and by allowing all threads to terminate normally.
+    \item Demonstrate that the synchronization primitives work.
+    \item Create several child processes and force them to terminate out of order, making sure they are cleaned up properly.
+\end{itemize}
+Keep in mind that this is not an exhaustive list, but that you should certainly be able to demonstrate each of these tests passing by the end of this assignment.
+

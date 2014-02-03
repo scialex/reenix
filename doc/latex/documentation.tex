@@ -1,0 +1,55 @@
+\documentclass{book}
+%\usepackage{html} % for latex2html commands
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{appendix}
+\usepackage{tikz}
+\usepackage{verbatim}
+
+\title{\bf Weenix}
+% TODO replace with appropriate title page directives:
+\author{Brown University Department of Computer Science \\ Authored by \textit{Operating Systems} Teaching Assistant Staff \\ Edited by Dan Kimmel and J. Rassi}
+
+%
+% links:
+% define \wlink to abstract over \hyperref (html hyperref uses different syntax)
+% note that "%begin{latexonly}" is a construct for latex2html, not a commented-out command
+%
+
+%begin{latexonly}
+\usepackage{hyperref}
+%end{latexonly}
+
+%\begin{htmlonly}
+%\newcommand{\wlink}[2]{\hyperref[hyper][#1]{#2}}
+%\end{htmlonly}
+%begin{latexonly}
+\newcommand{\wlink}[2]{\hyperref[#1]{#2}}
+%end{latexonly}
+
+%begin{latexonly}
+\hypersetup{colorlinks, linkcolor=gray, urlcolor=gray}
+%end{latexonly}
+
+%
+% document body
+%
+
+\begin{document}
+    \maketitle
+    \tableofcontents
+	\part{Introduction}
+        \include{weenix_os}
+        \include{project_management}
+    \part{Assignments}
+        \include{kern1}
+        \include{kern2}
+        \include{vfs}
+        \include{s5fs}
+        \include{vm}
+    \part{Appendices}
+        \appendix
+        \include{extra_asgn}
+        \include{tools}
+        \include{debugging}
+\end{document}

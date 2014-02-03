@@ -1,0 +1,70 @@
+\chapter{Drivers}
+
+\label{kern2}
+
+\section{Introduction}
+Now that you have processes and threads working properly, you can begin writing the device drivers for terminals, disks, and the memory devices \texttt{/dev/zero} and \texttt{/dev/null}. The code you will write for this part is in the \texttt{drivers/} directory. 
+
+There are two different types of devices: block devices and character devices. The disk devices you will be writing are block devices, while the terminals and memory devices are character devices. These are similar because they share the same interface, but there are significant differences in their implementation. In order to make the relationships between devices easier to manage we use some magic.
+
+\section{Object-Oriented C}
+As you look through the struct definitions of the different devices in the header files, you should notice that the structs for more specific types of devices (e.g. ttys and disks, referred to as the sub-struct from here on) contain the structures for the generic devices (e.g. block and byte devices, referred to as the super-struct) as fields. These are not pointers; they occupy memory that is part of the sub-struct. This way, we can use memory offsets to cast both from sub-struct to super-struct, and vice versa. So, given a pointer to the struct of a byte device which you know is a terminal device, just subtract the size of the rest of the terminal device struct and you have a pointer to the beginning of the terminal device struct. There is a macro provided for the purpose of doing these pointer conversions called \texttt{CONTAINER\_OF}. In many cases, a more specific macro is defined using \texttt{CONTAINER\_OF} which converts from a super-struct to a specific sub-struct (for an example, see \texttt{bd\_to\_tty} in \texttt{drivers/tty/tty.c}).
+
+You should also notice that one of the fields in the device structs is a pointer to a struct containing only function pointers. The generic device types (e.g. block and character devices) each specify that they expect certain operations to be available (e.g. \texttt{read()} and \texttt{write()}). This function pointer struct contains pointers to the functions which implement the expected operations so that we can perform the correct type of operation without actually knowing what type of device struct we are working with. The definitions of these function pointer structs are in the C source files of their respective types. Essentially, we are manually implementing a simple virtual function table (which is how C++ implements polymorphism). 
+
+\section{TTY Device}
+% TODO make it more obvious that there are two independent codepaths interacting here. One is from the process that calls read() on a TTY device, which then yields until there is enough content or the buffer is cooked by a newline or Ctrl-D key being pressed. The second is the interrupt handler that runs when a key is pressed, which must add a character to the buffer and cook the buffer if a newline or Ctrl-D character was typed.
+
+Each tty device is represented by a \texttt{tty\_device\_t} struct. A tty consists of a driver and a line discipline. The driver is what interfaces directly with the hardware (keyboard and screen), while the line discipline interfaces with the user (by buffering and formatting their tty I/O). In Weenix, the main purpose of the tty subsystem is to glue together the low level driver and the high level line discipline. The advantage of this is that when a program wants to perform an I/O operation on a tty, it does not need to know the specifics of the hardware or the line discipline. All of these implementation details are abstracted away and dealt with by the functions in \texttt{drivers/tty/tty.c}.
+
+Once you have a working virtual file system (after VFS) you will access the terminals through files, specifically in the files \texttt{/dev/tty0}, \texttt{/dev/tty1}, etc. Then you can read and write to the terminals using the \texttt{do\_read} and \texttt{do\_write} functions. Until then, you will need to use the \texttt{bytedev\_lookup} function to get devices and then explicitly call the device's read/write functions in order to test your code. A convenient way to do this is by using the kernel shell. For more details, see the testing section at the end of this chapter. 
+
+\subsection{Line Discipline}
+The line discipline is the high-level part of the tty. It provides the terminal semantics you are used to. Essentially, there are two things the line discipline is responsible for -- buffering input it receives and telling the tty what characters to print. Buffering input is what allows users to edit a line in a terminal before pressing enter, or, as we call it, cooking the buffer. The buffer for a line discipline is split into two sections, raw and cooked, so that the buffer can be filled circularly. Before a circularly-contiguous segment of the buffer is cooked, the user is able to edit it by editing the current line of text on the screen. When the user presses enter, that segment of the buffer is cooked, a newline is echoed, and the text becomes available to the running program via the read system call. This is why the read system does not return until it receives a newline when reading from a terminal. For simplicity, do not store more input than you can put in the primary buffer (even though you could theoretically use the buffer that the waiting program provided as well).
+
+The other important job of the line discipline is telling the tty which characters to echo. After all, when you type into a terminal, the characters you press appear on the screen. From the user's perspective, this all happens automatically. From your perspective (you being a kernel hacker), this must be done manually from the tty and the line discipline. The line discipline is also responsible for performing any required processing on characters which will be output to the tty via the write system call. In Weenix, the only characters that are not just echoed are the newline, backspace, and Ctrl+D characters.
+
+The line discipline interface is located in \texttt{drivers/tty/ldisc.h}, and the default implementation of a line discipline, which is the only one you will be implementing, is located in \texttt{drivers/tty/n\_tty.c}. (It is named \texttt{N\_TTY} because that is the name of the default line discipline in the Linux kernel.) 
+
+\subsection{TTY Driver}
+The tty driver is the low level part of the tty, and is responsible for communicating with hardware. When a key is pressed, the appropriate tty driver is notified. If a handler was registered with the driver via the \texttt{register\_callback\_handler} function, the key press is sent off to the handler. In our case, the tty subsystem registers the \texttt{tty\_global\_driver\_callback} function with the driver, which calls the line discipline's \texttt{receive\_char} method. Then, after any high level processing, any characters which need to be displayed on the screen are sent directly to the driver via the \texttt{provide\_char} function.
+
+The tty driver is already implemented for you. For anyone feeling adventurous, feel free to take a look at \texttt{drivers/tty/keyboard.c}, \texttt{drivers/tty/screen.c}, and \texttt{drivers/tty/virtterm.c}. 
+
+\section{Disk Device Driver}
+A \texttt{block\_device} is associated with each disk device. This structure contains information about what threads are waiting to perform I/O operations on the disk, any necessary synchronization primitives, the device ID, and any other information required by the ATA protocol. In Weenix, you can assume that all disk blocks are page-sized. We have defined the \texttt{BLOCK\_SIZE} macro for you to be the same size as the size of a page of memory; use it instead of a hard-coded value. 
+
+\section{Memory Devices}
+You will also be writing two memory devices, a data sink and source. These will not really be necessary until VFS. Still, these fit will with the other device drivers so they are included in this part of the assignment.
+
+If you have played around with a Linux/UNIX machine, you might be familiar with /dev/null and /dev/zero. These are both files that represent memory devices. Writing to \texttt{/dev/null} will always succeed (the data is discarded), while reading from it will return \texttt{EOF} immediately. Writing to\texttt{/dev/zero} is the same as writing to \texttt{/dev/null}, but reading any amount from \texttt{/dev/zero} will always return as many zero bytes (\texttt{'\textbackslash0'}) as you tried to read. The former is a data sink and the later is a data source. The low level drivers for both of these will be implemented in \texttt{drivers/memdevs.c}. 
+
+\section{Testing}
+As always, it is important to stress test your terminal code.
+\begin{itemize}
+    \item Have two threads read from the same terminal, which will cause each thread to read every other line. If you're not sure why this is, ask.
+    \item Make sure that you can input and output more data than can be held in the internal terminal buffer.
+    \item Ensure that you can have two threads simultaneously writing to the same terminal.
+    \item Stress test your disk code. This will not be needed until the S5FS assignment, but it is a good idea to make sure it works now.
+    \item Make sure that you can have multiple threads reading, writing, and verifying data from multiple disk blocks.
+    \item Think of ways that you can write to a disk and display the data stored there.
+    \item Note that Weenix does not currently support Caps Lock
+\end{itemize}
+ It is very important that you get this code working flawlessly, since it can be a constant source of headaches later on if you don't. Note that the disk driver only works with page-aligned data, so you should use \texttt{page\_alloc()} to allocate the memory used in your test cases, not \texttt{kmalloc()}.
+
+Since you should now have a functional tty, you should try using the kernel shell to test it out. Once you are confident in your tty code, try implementing your own kshell commands to run further kernel tests. Below is what to add to \texttt{initproc\_run} (\texttt{\#include "test/kshell/kshell.h"} at the top of \texttt{kernel/main/kmain.c}):
+\begin{verbatim}
+     /* Add some commands to the shell */
+    kshell_add_command("test1", test1, "tests something...");
+    kshell_add_command("test2", test2, "tests something else...");
+ 
+    /* Create a kshell on a tty */
+    int err = 0;
+    kshell_t *ksh = kshell_create(ttyid);
+    KASSERT(ksh && "did not create a kernel shell as expected");
+ 
+    /* Run kshell commands until user exits */
+    while ((err = kshell_execute_next(ksh)) > 0);
+    KASSERT(err == 0 && "kernel shell exited with an error\n");
+    kshell_destroy(ksh);
+\end{verbatim}

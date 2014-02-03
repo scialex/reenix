@@ -1,0 +1,124 @@
+\chapter{Virtual File System}
+\label{vfs}
+
+
+\section{Introduction}
+
+The virtual file system, known as the ``VFS,'' provides a common interface between the operating system kernel and the various file systems. The VFS interface allows one to add many different types of file systems to one's kernel and access them through the same UNIX-style interface: one can access one's MS-DOS files via the \texttt{vfat} file system just as easily as one would access various device drivers through the \texttt{dev} file system, kernel internal information through the \texttt{proc} file system or standard on-disk files through the \wlink{s5fs}{S5FS} file system. For instance, here are three examples of writing to a ``file'':
+\begin{verbatim}
+$ cat foo.txt > /home/bar.txt
+$ cat foo.txt > /dev/tty0
+$ cat foo.txt > /proc/123/mem\end{verbatim}
+All of these commands look very similar, but their effect is vastly different. The first command writes the contents of \texttt{foo.txt} into a file on disk via the local file system. The second command writes the contents to a terminal via the device file system. The third command writes the contents of \texttt{foo.txt} into the address space of process 123.
+
+Polymorphism is an important design property of VFS.  Generic calls to VFS such as \texttt{read()} and \texttt{write()}, are implemented on a per-file system basis.  Before we explain how the VFS works we will address how these ``objects'' are implemented in C.
+
+\subsection{Constructors}
+
+File systems are represented by a special type (a \texttt{fs\_t} struct) which needs to be initialized according to its specific file system type. Thus for each file system, there is a routine that initializes file system specific fields of the struct. The convention we use in Weenix for these ``constructors'' is to have a function called \texttt{<fsname>\_mount()} which takes in a \texttt{fs\_t} object. Note that the \texttt{fs\_t} to be initialized is passed in to the function, not returned by the function, allowing us to leave the job of allocating and freeing space for the struct up to the caller. This is pretty standard in C. Additionally, some objects have a corresponding ``destructor'' \texttt{<fsname>\_umount()}. Construction does the expected thing with data members, initializing them to some well-defined value. Destruction (if the destructor exists) is necessary to clean up any other data structures that were set up by the construction (such as freeing allocated memory, or reducing the reference count on a vnode).
+
+\subsection{Virtual Functions}
+
+Virtual functions (functions which are defined in some ``superclass'' but may be ``overridden'' by some subclass specific definition) are implemented in the Weenix VFS via a struct of function pointers. Every file system type has its own function implementing each of the file system operations. Our naming convention for these functions is to prefix the function's generic name with the file system type, so for example the \texttt{read()} function for the \texttt{s5fs} file system would be called \texttt{s5fs\_read()}. Every file system type has a struct of type \texttt{fs\_ops\_t} which lists all of the operations which can be performed on that file system. In the constructor for the file system, pointers to these \texttt{fs\_ops\_t} are added to the \texttt{fs\_t} struct being initialized. One can then call these functions through the pointers, and you have instant polymorphism.
+
+\subsection{Overview}
+
+This section describes how the VFS structures work together to create the virtual file system.
+
+% As shown in the figure below, TODO make figure?
+Each process has a file descriptor table associated with it (the \texttt{proc\_t} field \texttt{p\_files}). Elements in the array are pointers to open file objects (\texttt{file\_t} structs) in a system-wide list of all \texttt{file\_t} objects that are currently in use by any process. You can think of this as the system file table discussed in the ``Operating Systems Design'' lectures.
+% TODO remove this reference for non-Brown readers?
+Each process's array is indexed by the file descriptors the process has open. If a file descriptor is not in use, the pointer for that entry is \texttt{NULL}. Otherwise, it must point to a valid \texttt{file\_t}. Note that multiple processes or even different file descriptor entries in the same process can point to the same \texttt{file\_t} in the system file table. Each \texttt{file\_t} contains a pointer to an active \texttt{vnode\_t}. Once again, multiple system file table entries can point to the same \texttt{vnode\_t}. You can think of the list of all active \texttt{vnote\_t}s as the active inode table discussed in the ``Operating Systems Design'' lectures.
+% TODO remove this reference for non-Brown readers?
+Through the \texttt{vnode\_t} function pointers you communicate with the underlying file system to manage the file the vnode represents.
+
+With all of these pointers sitting around it becomes hard to tell when we can clean up our allocated \texttt{vnode\_t}s and \texttt{file\_t}s. This is where reference counting comes in.
+
+% TODO Vfs-fig-2.jpg here
+
+\subsubsection{Reference Counting}
+
+As discussed in the overview of VFS, there are a lot of pointers to \texttt{vnode\_t}s and \texttt{file\_t}s, but we need to make sure that once all of the pointers to a structure disappear, the structure is cleaned up, otherwise we will leak resources! To this end \texttt{vnode\_t} and \texttt{file\_t} both have reference counts associated with them. This reference count tells Weenix when a structure is no longer in use and should be cleaned up.
+
+Rather than allocating space for these structures directly, the \texttt{*get()} functions described below look up the structures in system tables and create new entries if the appropriate ones do not already exist. Similarly, rather than directly cleaning these structures up, Weenix uses the \texttt{*put()} functions to decrement reference counts and perform cleanup when necessary. Other systems in Weenix use these functions together with the \texttt{*ref()} functions to manage reference counts properly.
+
+For every new pointer to a \texttt{vnode\_t} or a \texttt{file\_t}, it may be necessary to increment the reference count with the appropriate \texttt{*ref()} method if the new pointer will outlive the pointer it was copied from. For example, a process's current directory pointer outlasts the method in which that pointer is copied from the filesystem, so you must use \texttt{vref()} on the \texttt{vnode\_t} the filesystem gives you to ensure the \texttt{vnode\_t} won't be deallocated prematurely.
+
+Keeping reference counts correct is one of the toughest parts of the virtual file system. In order to make sure it is being done correctly, some sanity checking is done at shutdown time to make sure that all reference counts make sense. If they do not, the kernel will panic, alerting you to bugs in your file system. Below we discuss a few complications with this system.
+
+\subsubsection{Resident Page References}
+
+% TODO it seems best to wait until S5FS for this discussion. should we integrate this with the "Caching" section there?
+
+Because reading and writing data on a disk can be expensive operations to initiate, disk drivers do them in large chunks (usually block-sized). File systems take advantage of this by caching data blocks in memory so that future reads can access the data without going back to disk and future writes can be performed in the cache (which is much faster than writing directly to the disk, see the documentation on paging for information on how changes to the cache get propagated to the disk). In Weenix, this caching is done by \texttt{mmobj\_t}s. Every time a block is cached, it has a pointer to the vnode that ``owns'' its data (and therefore adds to the vnode's reference count). The \texttt{vn\_nrespages} field of the \texttt{vnode\_t} structure keeps track of how many cached blocks belonging to the vnode are currently resident in memory. Therefore when \texttt{vn\_refcount - vn\_nrespages = 0} the only pointers to a vnode are its cached blocks so Weenix \emph{could} safely uncache all blocks belonging to that vnode and then cleanup the vnode; however, this is not the most efficient behavior.
+
+It is possible that even if Weenix is not currently using a vnode it will need the vnode again in the near future. It would be a waste to uncache all of the data already read into memory. Therefore the \texttt{vput()} will actually keep the vnode and all of its cached data in memory (if the pageout daemon decides to clean up all of the cached data before any new references to the vnode are created, dropping the vnode's reference count to zero, then the vnode will still be properly cleaned up). However this brings up another complication. If a file is deleted from disk (fully unlinked) \emph{and} the vnode is only being referenced by cached pages, then it is impossible for the VFS system to ever reference that vnode again, so the call to \texttt{vput()} should uncache all pages and clean up the vnode. For this reason the fs\_ops\_t structure provides a \texttt{query\_vnode} function which \texttt{vput()} uses to ask the file system implementation if a file has been deleted.
+
+\subsubsection{Mount Point References}
+
+% TODO move this to the appendix -- it's not part of the assignment specification
+If mounting is implemented then the vnode's structure contains a field \texttt{vn\_mount} which points either to the vnode itself or to the root vnode of a file system mounted at this vnode. If the reference count of a vnode were incremented due to this self-reference then the vnode would never be cleaned up because its reference count would always be at least 1 greater than the number of cached data blocks. Therefore the Weenix convention is that the \texttt{vn\_mount} pointer does not cause the reference count of the vnode it is pointing to to be incremented. This is true even if \texttt{vn\_mount} is not a self-reference, but instead points to the root of another file system. This behavior is acceptable because the \texttt{fs\_t} structure always keeps a reference to the root of its file system. Therefore the root of a mounted file system will never be cleaned up.
+
+It is important to note that the \texttt{vn\_mtpt} pointer in \texttt{fs\_t} \emph{does} increment the reference count on the vnode where the file system is mounted. This is because the mount point's vnode's \texttt{vn\_mount} field is what keeps track of which file system is mounted at that vnode. If the vnode where to be cleaned up while a file system is mounted on it Weenix would lose the data in \texttt{vn\_mount}. By incrementing the reference count on the mount point's vnode Weenix ensures that the mount point's vnode will not be cleaned up as long as there is another file system mounted on it.
+
+\subsubsection{Mounting}
+
+Before a file can be accessed, the file system containing the file must be ``mounted'' (a scary-sounding term for setting a couple of pointers). In standard UNIX, a superuser can use the system call \texttt{mount()} to do this. In your Weenix there is only one file system, and it will be mounted internally at bootstrap time.
+
+The virtual file system is initialized by a call to \texttt{vfs\_init()} by the idle process. This in turn calls \texttt{mountproc()} to mount the file system of type \texttt{VFS\_ROOTFS\_TYPE}. In the final implementation of Weenix the root file system type will be \texttt{s5fs}, but since you have not implemented that yet you will be using \texttt{ramfs}, which is an in-memory file system that provides all of the operations of a S5FS except those that deal with pages (also, \texttt{ramfs} files are limited to a single page in size).
+
+The mounted file system is represented by a \texttt{fs\_t} structure that is dynamically allocated at mount time.
+
+Note that you do not have to handle mounting a file system on top of an existing file system, or deal with mount point issues, but you may implement it for fun if you so desire, see the additional features section.
+
+\subsection{Getting Started}
+
+The virtual file system (VFS) is an interface providing a clearly defined link between the operating system kernel and the various file systems. The VFS makes it simple to add many different file systems to your kernel and give them a single UNIX-style interface: with a VFS, you can play music by writing to \texttt{/dev/audio}, you can list your processes by reading \texttt{/proc/}, and things you don't want to see to \texttt{/dev/null}. Linux supports lots of different file systems -- e.g. users who don't want to copy all of their Windows files over to a Linux file system can keep them safely on an NTFS partition.
+
+In this assignment, as before, we will be giving you a bunch of header files and method declarations. You will supply most of the implementation. You will be working in the \texttt{fs/} module in your source tree. You will be manipulating the kernel data structures for files (\texttt{file\_t} and \texttt{vnode\_t}) by writing much of UNIX's system call interface. We will be providing you with a simple in-memory file system for testing (\texttt{ramfs}). You will also need to write the special files to interact with devices.
+
+Remember to turn the \texttt{VFS} project on in \texttt{Config.mk} and \texttt{make clean} your project before you try to run your changes.
+
+The following is a brief check-list of all the features which you will be adding to Weenix in this assignment.
+
+\begin{itemize}
+\item Setting up the file system: \texttt{fs/vfs.c - fs/vnode.c - fs/file.c}
+\item The \texttt{ramfs} file system: \texttt{fs/ramfs/ramfs.c} (provided in the support code)
+\item Path name to vnode conversion: \texttt{fs/namev.c}
+\item Opening files: \texttt{fs/open.c}
+\item VFS syscall implementation: \texttt{fs/vfs\_syscall.c}
+\end{itemize}
+
+Make sure to read \texttt{include/fs/vnode.h}, \texttt{include/fs/file.h}, and \texttt{include/fs/vfs.h}.
+
+You can wait until the VM project to implement the special file functions which operate on pages.
+
+% TODO \section{How to Deal with Errors}
+
+\section{The \texttt{ramfs} File System}
+
+The \texttt{ramfs} file system is an extremely simple file system that provides a basic implementation of all the file system operations except those that operate on a page level. There is no need for the page operations until VM, by which point you will have implemented S5FS. Note that \texttt{ramfs} files also cannot exceed one page in size. All of the code for \texttt{ramfs} is provided for you.
+
+\section{Pathname to \texttt{vnode} Conversion}
+
+At this point you will have a file system mounted, but still no way to convert a pathname into the vnode associated with the file at that path. This is where the \texttt{fs/namev.c} functions come into play.
+
+There are multiple functions which work together to implement all of our name-to-vnode conversion needs. There is a summary in the source code comments. Keeping track of vnode reference counts can be tricky here, make sure you understand exactly when reference counts are being changed. Copious commenting and \wlink{Debugging}{debug statements} will serve you well.
+
+\section{Opening Files}
+
+These functions allow you to actually open files in a process. When you have open files you should have some sort of protection mechanism so that one process cannot delete a file that another process is using. You can do that either here or in the S5 layer. Although the choice is up to you, it is somewhat easier to do it in the S5 layer and not worry about it here.
+
+\section{System Calls}
+
+At this point you have mounted your \texttt{ramfs}, can look up paths in it, and open files. Now you want to write the code that will allow you to interface with your file system from user space. When a user space program makes a call to \texttt{read()}, your \texttt{do\_read()} function will eventually be called. Thus you must be vigilant in checking for any and all types of errors that might occur (after all you are dealing with ``user'' input now) and return the appropriate error code.
+
+Note that for each of these functions, we provide to you a list of error conditions you must handle.  It is Weenix convention that you will handle error conditions by returning \texttt{-errno} if there is an error (not \texttt{-1} as will eventually be returned to the user). A return value less than zero is assumed to be an error. You should read corresponding system call man pages for hints on the implementation of these functions. This may look like a lot of functions, but you write one system call, the rest seem much easier. Pay attention to the comments, and use \wlink{Debugging}{debug statements}.
+% TODO add note about always checking return values from subroutines, along the lines of the similar comment in the s5 section?
+
+\section{Testing}
+
+You should have lots of good test code. What does this mean? It means that you should be able to demonstrate fairly clearly -- via TTY I/O and \wlink{Debugging}{debug statements} -- that you have successfully implemented as much as possible without having S5FS yet. Moreover, you want to be sure that your reference counts are correct (when your Weenix shuts down, \texttt{vfs\_shutdown()} will check reference counts and panic if something is wrong). Note that you \emph{must} make sure you are actually shutting down cleanly (i.e. see the ``Weenix halted cleanly'' message), otherwise this check might not have happened successfully. Basically, convince \emph{yourself} that this works and get ready for the next assignment -- implementing the real file system.
+
+% TODO add description of vfstest here
+ 

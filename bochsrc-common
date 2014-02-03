@@ -1,0 +1,41 @@
+# This is a Bochs configuration file. For explenation of various
+# configuration options and to see all valid options refer to the
+# example configuration file of a Bochs installation.
+
+# Processor and Memory Configuration
+cpu: count=1, reset_on_triple_fault=1, ignore_bad_msrs=1, msrs="msrs.def"
+memory: guest=$MEMORY, host=$MEMORY
+
+# Hard disk and boot CD settings
+ata0: enabled=1, ioaddr1=0x1f0, ioaddr2=0x3f0, irq=14
+ata1: enabled=1, ioaddr1=0x170, ioaddr2=0x370, irq=15
+ata2: enabled=0, ioaddr1=0x1e8, ioaddr2=0x3e0, irq=11
+ata3: enabled=0, ioaddr1=0x168, ioaddr2=0x360, irq=9
+ata0-master: type=disk, mode=flat, path=disk0.img, cylinders=$DISK_BLOCKS, heads=2, spt=4
+ata1-master: type=cdrom, path=$KERN_DIR/$ISO_IMAGE, status=inserted
+i440fxsupport: enabled=1
+boot: cdrom
+
+# Keyboard and Mouse Settings
+keyboard_serial_delay: 250
+keyboard_paste_delay: 50000
+keyboard_mapping: enabled=0, map=
+mouse: enabled=0
+
+# BIOS and display settings
+romimage: file=$BXSHARE/BIOS-bochs-latest 
+vgaromimage: file=$BXSHARE/VGABIOS-lgpl-latest
+vga: extension=vbe
+vga_update_interval: 100000
+private_colormap: enabled=0
+
+# Logging settings
+log: $LOG_FILE
+debugger_log: -
+panic: action=ask
+error: action=report
+info: action=report
+debug: action=ignore
+
+# Bochs specific debugging settings
+port_e9_hack: enabled=1

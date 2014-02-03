@@ -1,0 +1,4 @@
+#include bochsrc-common
+
+magic_break: enabled=1
+debug_symbols: file=$KERN_DIR/$BSYMBOLS
