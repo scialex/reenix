@@ -1,16 +1,18 @@
 CFLAGS    := -ffreestanding
+RSFLAGS   :=
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 # XXX should have --omagic?
 
 include ../Global.mk
 
 CFLAGS    += -D__KERNEL__
+RSFLAGS   += --cfg __KERNEL__
 
 ###
 
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
 SRCDIR    := main boot util drivers/disk drivers/tty drivers mm proc fs/ramfs fs/s5fs fs vm api test test/kshell entry test/vfstest
-SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]))
+SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) $(wildcard $(dr)/*.rs))
 OBJS      := $(addsuffix .o,$(basename $(SRC)))
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
@@ -68,6 +70,10 @@ $(GDBCOMM): $(SCRIPTS)
 	@ echo "  Creating gdb command list..."
 	@ $(foreach script, $(SCRIPTS), echo $(abspath $(script)) >> $(dir $(script))$(shell basename $(dir $(script))).gdbcomm; )
 	@ cat */*.gdbcomm > $@
+
+%.o: %.rs
+	@ echo "  Compiling \"kernel/$<\"..."
+	$(RUST) --emit=obj $(RSFLAGS) $< -o $@
 
 %.o: %.c 
 	@ echo "  Compiling \"kernel/$<\"..."
