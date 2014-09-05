@@ -19,3 +19,5 @@ disk0.vmdk
 *.bak
 *.orig
 *.nfs*
+cscope.out
+tags
