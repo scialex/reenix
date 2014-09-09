@@ -126,6 +126,7 @@ bootstrap(int arg1, void *arg2)
 {
         /* necessary to finalize page table information */
         pt_template_init();
+        kmain2();
 
         NOT_YET_IMPLEMENTED("PROCS: bootstrap");
 

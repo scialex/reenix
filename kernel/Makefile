@@ -1,5 +1,5 @@
 CFLAGS    := -ffreestanding
-RSFLAGS   :=
+RSFLAGS   ?=
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 # XXX should have --omagic?
 
@@ -11,9 +11,10 @@ RSFLAGS   += --cfg __KERNEL__
 ###
 
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
-SRCDIR    := main boot util drivers/disk drivers/tty drivers mm proc fs/ramfs fs/s5fs fs vm api test test/kshell entry test/vfstest
-SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) $(wildcard $(dr)/*.rs))
-OBJS      := $(addsuffix .o,$(basename $(SRC)))
+SRCDIR    := . main boot util drivers/disk drivers/tty drivers mm proc fs/ramfs fs/s5fs fs vm api test test/kshell entry test/vfstest
+#SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.S) $(wildcard $(dr)/*.rs))
+SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
+OBJS      := $(addsuffix .o,$(basename $(SRC))) main.o
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
 # List of prebuilt modules that do not include the source
@@ -71,7 +72,8 @@ $(GDBCOMM): $(SCRIPTS)
 	@ $(foreach script, $(SCRIPTS), echo $(abspath $(script)) >> $(dir $(script))$(shell basename $(dir $(script))).gdbcomm; )
 	@ cat */*.gdbcomm > $@
 
-%.o: %.rs
+#-include out.mk
+main.o: reenix.rs main/mod.rs
 	@ echo "  Compiling \"kernel/$<\"..."
 	$(RUST) --emit=obj $(RSFLAGS) $< -o $@
 

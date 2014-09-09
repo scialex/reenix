@@ -82,6 +82,14 @@ stage3:
 		mov		%ax, %ds
 		mov		%ax, %ss
 		mov		%ax, %es
+        /* TODO Rust annoyingly checks this against %esp to see if we are out of stack
+         * TODO space. We don't want this because we don't yet have the ability to allocate
+         * TODO more stack space. We will just set it to 0 so the test always passes and
+         * TODO fix this later. A better solution would be to have this set during ctx switch
+         * TODO and then we could actually make use of it (since by then we would have the
+         * TODO ability to allocate more stack space).
+         */
+        movl    $0, %gs:0x30
 		movl	$0x10000, %esp
 
 		mov		$0xa000, %esi
