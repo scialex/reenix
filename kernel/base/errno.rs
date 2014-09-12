@@ -4,45 +4,30 @@
 //!
 //!
 
-#![feature(macro_rules)]
-#![allow(missing_doc)]
-
-use core::num::{abs, Int};
+use core::option::*;
+use core::num::{FromPrimitive, abs};
+use core::default::Default;
 
 macro_rules! errnos (
-    ($(($n:id, $v:expr, $ex:expr)),+) => ({
-        $(
-        pub static $n : i32 = $v;
-        )*
-
-        mod results {
-            $(
-                pub static $n : Result<(),i32> = Err($v);
-             )*
+    ($(($n:ident, $v:expr, $ex:expr)),+) => (
+        #[deriving(PartialEq, Eq, Show, FromPrimitive)]
+        #[repr(i32)]
+        pub enum Errno {
+            $( $n = $v,)*
         }
 
-        pub fn to_str<T: Int>(e: T) -> &'static str {
-            match (abs(e)) {
-                $(
-                    $v => { return stringify!($n); }
-                )+
-                    _ => { return "EUNKNOWN"; }
+        pub fn to_explanation(e: i32) -> &'static str {
+            let x : Option<Errno> = FromPrimitive::from_int(abs(e) as int);
+            match x {
+              $(Some($n) => $ex,)*
+                None => "Unknown error code",
             }
         }
-
-        pub fn to_explanation<T: Int>(e: T) -> &'static str {
-            match (abs(e)) {
-                $(
-                    $v => { return $ex; }
-                )+
-                    _ => { return "Unknown error code"; }
-            }
-        }
-    })
+    )
 )
 
 errnos!(
-    (EOK,               0, "No error occured"),
+    (EOK,               0, "No error occured!"),
     (EPERM,             1, "Operation not permitted"),
     (ENOENT,            2, "No such file or directory"),
     (ESRCH,             3, "No such process"),
@@ -135,7 +120,7 @@ errnos!(
     (ENOPROTOOPT,      92, "Protocol not available"),
     (EPROTONOSUPPORT,  93, "Protocol not supported"),
     (ESOCKTNOSUPPORT,  94, "Socket type not supported"),
-    (EOPNOTSUPP,       95, "Operation not supported on transport endpoint"),
+    (ENOTSUP,          95, "Operation not supported on transport endpoint"),
     (EPFNOSUPPORT,     96, "Protocol family not supported"),
     (EAFNOSUPPORT,     97, "Address family not supported by protocol"),
     (EADDRINUSE,       98, "Address already in use"),
@@ -173,11 +158,16 @@ errnos!(
 
     /*, for robust mutexes */
     (EOWNERDEAD,      130, "Owner died"),
-    (ENOTRECOVERABLE, 131, "State not recoverable"),
-);
+    (ENOTRECOVERABLE, 131, "State not recoverable")
+)
+
+impl Default for Errno {
+    #[inline] fn default() -> Errno { EOK }
+}
+
+
 
 /* added by dap from Linux */
-pub static EDEADLOCK : i32 = EDEADLK;
-
-pub static ENOTSUP : i32 =  EOPNOTSUPP;
-pub static EWOULDBLOCK : i32 = EAGAIN;
+pub static EDEADLOCK : Errno = EDEADLK;
+pub static EOPNOTSUPP : Errno =  ENOTSUP;
+pub static EWOULDBLOCK : Errno = EAGAIN;
