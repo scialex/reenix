@@ -12,10 +12,13 @@ extern crate core;
 extern crate libc;
 
 pub use errno::*;
+use bitflags;
+pub use debug::dbg_mode;
 
 mod errno;
 
 pub mod debug;
+pub mod io;
 
 pub mod kernel {
     //! The linker script will initialize these symbols. Note

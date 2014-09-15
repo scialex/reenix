@@ -17,3 +17,16 @@ pub mod main;
 pub extern "C" fn __morestack() {
     ()
 }
+
+#[lang="eh_personality"]
+fn eh_personality() {
+    ()
+}
+#[lang="stack_exhausted"]
+fn stack_exhausted() {
+    ()
+}
+#[lang="begin_unwind"]
+fn begin_unwind() {
+    ()
+}

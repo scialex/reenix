@@ -14,8 +14,11 @@ HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
 SRCDIR    := . main boot util drivers/disk drivers/tty drivers mm proc fs/ramfs fs/s5fs fs vm api test test/kshell entry test/vfstest
 #SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.S) $(wildcard $(dr)/*.rs))
 SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
-OBJS      := $(addsuffix .o,$(basename $(SRC))) main.o
+OBJS      := $(addsuffix .o,$(basename $(SRC))) reenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
+
+MODULE_DIRS := base
+BUILT_MODULES := $(foreach dr, $(MODULE_DIRS), libs/lib$(dr).rlib)
 
 # List of prebuilt modules that do not include the source
 PREBUILT  :=
@@ -26,6 +29,7 @@ else
     MAKEISO := genisoimage
 endif
 
+HIDE ?= @
 SYMBOLS   := weenix.dbg
 BSYMBOLS  := symbols.dbg
 KERNEL    := kernel.bin
@@ -33,11 +37,19 @@ IMAGE     := weenix.img
 ISO_IMAGE := weenix.iso
 GDBCOMM   := gdb-commands
 
+define mod-rule
+libs/lib$(1).rlib : $$(wildcard $(1)/**/*.rs) $$(foreach l,$(2), libs/lib$$(l).rlib)
+	$(HIDE) $(RUST) $(RSFLAGS) --crate-type=rlib -L libs $(1)/lib.rs --out-dir libs
+endef
+
+$(eval $(call mod-rule,base,))
+
 .PHONY: all cscope clean
 
 %.a:
 	touch $@
 
+.DEFAULT_GOAL := all
 all: $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 
 $(SYMBOLS): $(OBJS) $(PREBUILT)
@@ -73,17 +85,22 @@ $(GDBCOMM): $(SCRIPTS)
 	@ cat */*.gdbcomm > $@
 
 #-include out.mk
-main.o: reenix.rs main/mod.rs
-	@ echo "  Compiling \"kernel/$<\"..."
-	$(RUST) --emit=obj $(RSFLAGS) $< -o $@
+#main.o: reenix.rs main/mod.rs
+#	@ echo "  Compiling \"kernel/$<\"..."
+#	$(RUST) --emit=obj $(RSFLAGS) $< -o $@
 
-%.o: %.c 
+reenix.a : reenix.rs main/mod.rs $(BUILT_MODULES)
 	@ echo "  Compiling \"kernel/$<\"..."
-	@ $(CC) -c $(CFLAGS) $< -o $@
+	${HIDE} $(RUST) --crate-type=staticlib $(RSFLAGS) $< -o $@
+	${HIDE} ranlib $@
+
+%.o: %.c
+	@ echo "  Compiling \"kernel/$<\"..."
+	$(HIDE) $(CC) -c $(CFLAGS) $< -o $@
 
 %.o: %.S
 	@ echo "  Compiling \"kernel/$<\"..."
-	@ $(CC) -c $(ASFLAGS) $(CFLAGS) $< -o $@
+	$(HIDE) $(CC) -c $(ASFLAGS) $(CFLAGS) $< -o $@
 
 cscope: $(HEAD) $(SRC)
 	@ echo "  Updating cscope symbol cross-reference..."
@@ -101,4 +118,4 @@ nyi:
 | awk '{printf("%25s %30s() %8s\n", $$2, $$3, $$1)}'
 
 clean:
-	@ rm -f $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files
+	$(HIDE) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files
