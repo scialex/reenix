@@ -15,6 +15,8 @@ pub use errno::*;
 
 mod errno;
 
+pub mod debug;
+
 pub mod kernel {
     //! The linker script will initialize these symbols. Note
     //! that the linker does not actually allocate any space

@@ -16,12 +16,13 @@ macro_rules! errnos (
             $( $n = $v,)*
         }
 
-        pub fn to_explanation(e: i32) -> &'static str {
-            let x : Option<Errno> = FromPrimitive::from_int(abs(e) as int);
-            match x {
-              $(Some($n) => $ex,)*
-                None => "Unknown error code",
+        impl Errno {
+            pub fn to_explanation(e: Errno) -> &'static str {
+                match e {
+                   $($n => $ex,)*
+                }
             }
+
         }
     )
 )
