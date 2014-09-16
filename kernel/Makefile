@@ -38,7 +38,7 @@ ISO_IMAGE := weenix.iso
 GDBCOMM   := gdb-commands
 
 define mod-rule
-libs/lib$(1).rlib : $$(wildcard $(1)/**/*.rs) $$(foreach l,$(2), libs/lib$$(l).rlib)
+libs/lib$(1).rlib : $$(shell find $(1) -type f) $$(foreach l,$(2), libs/lib$$(l).rlib)
 	$(HIDE) $(RUST) $(RSFLAGS) --crate-type=rlib -L libs $(1)/lib.rs --out-dir libs
 endef
 
