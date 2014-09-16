@@ -1,41 +1,64 @@
 // TODO Copyright Header
 //
-
-#![feature(macro_rules)]
 #![macro_escape]
 
+// TODO For some reason this won't resolve to the one from libcore. Figure it out.
+macro_rules! try {
+    ($e:expr) => {
+        (match $e { Ok(e) => e, Err(e) => return Err(e) })
+    }
+}
+
+#[macro_export]
 macro_rules! bitmask_create {
-    (flags $name:ident : $type:ty
+    (flags $name:ident : $t:ty
      { $($f:ident = $v:expr),+ }) => {
-        pub type $name = $type;
-        $(pub static $f : $type = $v;)*
+        #[deriving(PartialEq, Eq)]
+        pub struct $name($t);
+        $(pub static $f : $name = $name($v);)*
         impl Show for $name {
-            use core::fmt::Result;
-            use core::option::Option;
-            use core::result::Err;
-            use core::result::Ok;
-            use core::fmt::Formatter;
             fn fmt(&self, fmt: &mut Formatter) -> Result {
-                try!(fmt.write(Stringify!($name));)
-                try!(fmt.write("[");)
+                try!(fmt.write(stringify!($name).as_bytes()))
+                try!(fmt.write("[".as_bytes()))
                 let mut started = false;
                 $(
-                if self & $f != 0 {
-                    if started { try!(fmt.write("|");) } else { started = true; }
-                    try!(fmt.write(Stringify!($f));)
+                if self & $f != $name(0) {
+                    if started { try!(fmt.write("|".as_bytes())) } else { started = true; }
+                    try!(fmt.write(stringify!($f).as_bytes()))
                 }
                 )+
-                if !started { try!(fmt.write("0");) }
-                try!(fmt.write("]");)
-                return OK(());
+                if !started { try!(fmt.write("0".as_bytes())) }
+                try!(fmt.write("]".as_bytes()))
+                return Ok(());
             }
         }
-        impl $name {
-            $(
-            fn is_$(f)(e: $type) -> bool {
-                e & $v != 0
+        impl BitXor<$name,$name> for $name {
+            #[inline] fn bitxor(&self, r: &$name) -> $name {
+                let &$name(lhs) = self;
+                let &$name(rhs) = r;
+                $name(lhs ^ rhs)
             }
-            )+
+        }
+        impl BitOr<$name,$name> for $name {
+            #[inline] fn bitor(&self, r: &$name) -> $name {
+                let &$name(lhs) = self;
+                let &$name(rhs) = r;
+                $name(lhs | rhs)
+            }
+        }
+        impl BitAnd<$name,$name> for $name {
+            #[inline] fn bitand(&self, r: &$name) -> $name {
+                let &$name(lhs) = self;
+                let &$name(rhs) = r;
+                $name(lhs | rhs)
+            }
+        }
+        impl Add<$name,$name> for $name {
+            #[inline] fn add(&self, r: &$name) -> $name {
+                let &$name(lhs) = self;
+                let &$name(rhs) = r;
+                $name(lhs + rhs)
+            }
         }
     }
 }

@@ -4,8 +4,6 @@
 //!
 //!
 
-use core::option::*;
-use core::num::{FromPrimitive, abs};
 use core::default::Default;
 
 macro_rules! errnos (
