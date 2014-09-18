@@ -2,13 +2,6 @@
 //
 #![macro_escape]
 
-// TODO For some reason this won't resolve to the one from libcore. Figure it out.
-macro_rules! try {
-    ($e:expr) => {
-        (match $e { Ok(e) => e, Err(e) => return Err(e) })
-    }
-}
-
 #[macro_export]
 macro_rules! bitmask_create {
     (flags $name:ident : $t:ty

@@ -3,6 +3,7 @@
 use core::prelude::*;
 use core::fmt::*;
 
+/// The colors we can have
 pub mod color {
     pub static NORMAL   : &'static str = "\x1b[0m";
     pub static BLACK    : &'static str = "\x1b[30;47m";
@@ -31,13 +32,13 @@ macro_rules! dbg_modes (
         pub static ALL : DbgMode = DbgMode(-1);
         impl DbgMode {
             #[allow(dead_code)]
-            fn get_color(e: DbgMode) -> &'static str {
-                $(if $n & e != NONE { return $c; })+
+            pub fn get_color(&self) -> &'static str {
+                $(if $n & *self != NONE { return $c; })+
                 return color::NORMAL;
             }
             #[allow(dead_code)]
-            fn get_description(e: DbgMode) -> &'static str {
-                $(if $n & e != NONE { return $ex; })+
+            pub fn get_description(&self) -> &'static str {
+                $(if $n & *self != NONE { return $ex; })+
                 return "Unknown debug mode";
             }
         }
