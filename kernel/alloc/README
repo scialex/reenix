@@ -1,0 +1,3 @@
+This is a modified version of the rust projects 'liballoc'. It has been
+changed so it will link with the REENIX kmalloc impelementation.
+

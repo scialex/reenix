@@ -6,7 +6,7 @@ LDFLAGS   := -m elf_i386 -z nodefaultlib
 include ../Global.mk
 
 CFLAGS    += -D__KERNEL__
-RSFLAGS   += --cfg __KERNEL__
+RSFLAGS   += --cfg kernel
 
 ###
 
@@ -17,7 +17,7 @@ SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
 OBJS      := $(addsuffix .o,$(basename $(SRC))) reenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-MODULE_DIRS := base
+MODULE_DIRS := base alloc
 BUILT_MODULES := $(foreach dr, $(MODULE_DIRS), libs/lib$(dr).rlib)
 
 # List of prebuilt modules that do not include the source
@@ -43,6 +43,7 @@ libs/lib$(1).rlib : $$(shell find $(1) -type f) $$(foreach l,$(2), libs/lib$$(l)
 endef
 
 $(eval $(call mod-rule,base,))
+$(eval $(call mod-rule,alloc,))
 
 .PHONY: all cscope clean
 
@@ -116,6 +117,13 @@ nyi:
 | sed -e 's/^\(.*:.*\):.*\"\(.*\): \(.*\)\".*/\2 \1 \3/' \
 | grep -E "^($(FILTER))" \
 | awk '{printf("%25s %30s() %8s\n", $$2, $$3, $$1)}'
+
+todo:
+	@ echo "  Not yet done:"
+	@ echo
+	@ git grep --heading --break -Epnh "((\/\/|\/?\*) TODO|^ *\*t )" | sed -E "s/^([0-9]+)/\t\1/" \
+| sed -E "s/^\t?[0-9]+=/    /" \
+| sed -E "/^    .*;$$/d"
 
 clean:
 	$(HIDE) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files
