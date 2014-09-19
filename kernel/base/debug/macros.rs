@@ -6,7 +6,7 @@
 /// Directly print a formated string to the debug port.
 #[macro_export]
 macro_rules! dbg_write(
-    ($fmt:expr, $($a:expr),*) => ( unsafe { write!(&mut (::base::debug::printing::DBG_WRITER as ::core::fmt::FormatWriter), $fmt, $($a),*); })
+    ($fmt:expr, $($a:expr),*) => ( unsafe { write!((&mut ::base::debug::printing::DBG_WRITER) as &mut core::fmt::FormatWriter, $fmt, $($a),*); })
 )
 
 #[macro_export]

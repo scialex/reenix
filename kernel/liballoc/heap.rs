@@ -119,77 +119,13 @@ static MIN_ALIGN: uint = 8;
 #[cfg(target_arch = "x86_64")]
 static MIN_ALIGN: uint = 16;
 
-// TODO This is super inefficent and a waste of space.
-/// We are just going to use the kmalloc for now. This is SUPER inefficient. I might be able to get
-/// away with a bit of a hack by making a thing which allocates directly from a real allocator and
-/// puts its pointer before the struct.
+// NOTE This is just a shim to mm.
 #[cfg(kernel)]
 mod imp {
+    extern crate mm;
     // TODO I'm being f***ing stupid. I have the size on both alloc and free. I have a great
     // TODO opertunity to choose the best slab allocator. (;一_一)
-    use core::intrinsics as i;
-    use core::mem::size_of;
-    use libc::{c_char, c_int, c_void, size_t};
-    extern "C" {
-        fn kmalloc(size: size_t) -> *mut c_void;
-        fn kfree(ptr: *mut c_void, sz: size_t)
-    }
-
-    #[inline]
-    pub unsafe fn reallocate_inplace(_ptr: *mut u8, _size: uint, _align: uint,
-                                     _old_size: uint) -> bool {
-        _size <= usable_size(_old_size, _align)
-    }
-
-    #[inline]
-    pub unsafe fn reallocate(ptr: *mut u8, size: uint, align: uint,
-                             old_size: uint) -> *mut u8 {
-        if reallocate_inplace(ptr, size, align, old_size) {
-            ptr
-        } else {
-            let new_ptr = allocate(size, align);
-            core::ptr::copy_nonoverlapping_memory(new_ptr, ptr as *const u8, cmp::min(size, old_size));
-            deallocate(ptr, old_size, align);
-            new_ptr
-        }
-    }
-
-    #[inline]
-    pub unsafe fn allocate(size: uint, align: uint) -> *mut u8 {
-        if align <= MIN_ALIGN {
-            let ptr = kmalloc(size) as *mut u8;
-            if ptr.is_null() {
-                ::oom();
-            }
-            ptr
-        } else {
-            // TODO We should handle this better.
-            ::oom();
-        }
-    }
-
-    #[inline]
-    pub unsafe fn deallocate(ptr: *mut u8, size: uint, align: uint) {
-        kfree(ptr);
-    }
-
-
-    #[cfg(target_word_size = "32")]
-    unsafe fn ctlz(x: uint) -> uint { i::ctlz32(x as u32) }
-    #[cfg(target_word_size = "64")]
-    unsafe fn ctlz(x: uint) -> uint { i::ctlz64(x as u64) }
-
-    /// This is a huge hack.
-    #[inline]
-    pub fn usable_size(size: uint, _align: uint) -> uint {
-        let min_size: uint = size + size_of::<*mut c_void>();
-        let leading: uint = unsafe { ctlz(min_size) }
-        let shift : uint = 1 + uint.BITS - leading;
-        let real_size: uint = 1 << shift;
-        return real_size - size_of::<*mut c_void>();
-    }
-
-    pub fn stats_print() {}
+    pub use mm::alloc::*;
 }
 
 #[cfg(jemalloc, not(kernel))]

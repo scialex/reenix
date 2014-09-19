@@ -17,8 +17,9 @@ SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
 OBJS      := $(addsuffix .o,$(basename $(SRC))) reenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-MODULE_DIRS := base alloc
-BUILT_MODULES := $(foreach dr, $(MODULE_DIRS), libs/lib$(dr).rlib)
+BUILTIN_MODULE_DIRS := liballoc
+MODULE_DIRS := base mm
+BUILT_MODULES := $(foreach dr, $(MODULE_DIRS), libs/lib$(dr).rlib) $(foreach dr, $(BUILTIN_MODULE_DIRS), libs/$(dr).rlib)
 
 # List of prebuilt modules that do not include the source
 PREBUILT  :=
@@ -29,7 +30,13 @@ else
     MAKEISO := genisoimage
 endif
 
-HIDE ?= @
+HIDE ?= "true"
+ifeq ("true",$(HIDE))
+HIDE_SIGIL := @
+else
+HIDE_SIGIL :=
+endif
+
 SYMBOLS   := weenix.dbg
 BSYMBOLS  := symbols.dbg
 KERNEL    := kernel.bin
@@ -42,22 +49,23 @@ GDBCOMM   := gdb-commands
 # $(3) is the list of crates that this library depends on.
 define base-crate-rule
 libs/lib$(2).rlib : $$(shell find $(1) -type f) $$(foreach l,$(3), libs/lib$$(l).rlib)
-	$(HIDE) $(RUST) $(RSFLAGS) --crate-type=rlib -L libs $(1)/lib.rs --out-dir libs
+	$(HIDE_SIGIL) $(RUST) $(RSFLAGS) --crate-type=rlib -L libs $(1)/lib.rs --out-dir libs
 endef
 
 define crate-rule
-$(call base-crate-rule, $(1), $(1), $(2))
+$(eval $(call base-crate-rule,$(1),$(1),$(2)))
 endef
 
 # A module that is part of rusts stdlib.
 # $(1) is the name of the crate.
 # $(2) is the list of dependencies
 define builtin-crate-rule
-$(call base-crate-rule, lib$(1), $(1), $(2))
+$(eval $(call base-crate-rule,lib$(1),$(1),$(2)))
 endef
 
 $(eval $(call crate-rule,base,))
-$(eval $(call builtin-crate-rule,alloc,))
+$(eval $(call crate-rule,mm,base))
+$(eval $(call builtin-crate-rule,alloc,mm))
 
 .PHONY: all cscope clean
 
@@ -106,16 +114,16 @@ $(GDBCOMM): $(SCRIPTS)
 
 reenix.a : reenix.rs main/mod.rs $(BUILT_MODULES)
 	@ echo "  Compiling \"kernel/$<\"..."
-	${HIDE} $(RUST) --crate-type=staticlib $(RSFLAGS) $< -o $@
-	${HIDE} ranlib $@
+	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib $(RSFLAGS) $< -o $@
+	$(HIDE_SIGIL) ranlib $@
 
 %.o: %.c
 	@ echo "  Compiling \"kernel/$<\"..."
-	$(HIDE) $(CC) -c $(CFLAGS) $< -o $@
+	$(HIDE_SIGIL) $(CC) -c $(CFLAGS) $< -o $@
 
 %.o: %.S
 	@ echo "  Compiling \"kernel/$<\"..."
-	$(HIDE) $(CC) -c $(ASFLAGS) $(CFLAGS) $< -o $@
+	$(HIDE_SIGIL) $(CC) -c $(ASFLAGS) $(CFLAGS) $< -o $@
 
 cscope: $(HEAD) $(SRC)
 	@ echo "  Updating cscope symbol cross-reference..."
@@ -140,4 +148,4 @@ todo:
 | sed -E "/^    .*;$$/d"
 
 clean:
-	$(HIDE) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files
+	$(HIDE_SIGIL) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files

@@ -23,6 +23,7 @@ mod errno;
 pub mod io;
 pub mod debug;
 pub mod kernel;
+pub mod from_str;
 
 // NOTE Needed for the #[deriving] stuff to work. Because that makes sense.
 mod std {
@@ -31,6 +32,7 @@ mod std {
     pub use core::option;
     pub use core::num;
 }
+// This lets us use the macro's exported from here locally.
 mod base {
     pub use super::*;
 }

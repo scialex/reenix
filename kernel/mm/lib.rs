@@ -11,12 +11,12 @@
 
 extern crate core;
 extern crate libc;
-extern crate base;
+#[phase(plugin, link)] extern crate base;
 
 use core::prelude::*;
 use core::mem::transmute;
 
-pub use libc::{uintptr_t, c_void, uint32_t, size_t, c_int}
+pub use libc::{uintptr_t, c_void, uint32_t, size_t, c_int};
 
 use base::errno;
 use base::traits;
@@ -44,7 +44,7 @@ pub mod ptr {
 }
 
 pub mod memman {
-    //! Mapping protection
+    /// Mapping protection
     pub mod prot {
         pub static NONE  : int = 0x0;
         pub static READ  : int = 0x1;
@@ -53,14 +53,14 @@ pub mod memman {
         pub static MASK  : int = 0x7;
     }
     pub mod map {
-        //! Mapping type
+        /// Mapping type
         pub static SHARED  : int = 0x1;
         pub static PRIVATE : int = 0x2;
         pub static MASK    : int = 0x3;
-        //! Mapping flags
+        /// Mapping flags
         pub static FIXED : int = 0x4;
         pub static ANON  : int = 0x8;
-        pub static FAILED : uintptr_t = ~0;
+        pub static FAILED : uintptr_t = !0;
     }
 }
 
@@ -82,48 +82,63 @@ pub mod page {
 
     pub static SHIFT  : uint = 12;
     pub static SIZE   : uint = 1 << SHIFT;
-    pub static MASK   : uint = (~0) << SHIFT;
+    pub static MASK   : uint = (!0) << SHIFT;
     pub static NSIZES : uint = 8;
 
     #[inline]
-    pub unsafe fn align_down<T>(x: *T) -> *T {
-        transmute::<uintptr_t, *T>(
-            transmute::<*T, uintptr_t>(x) & MASK)
+    pub unsafe fn align_down<T>(x: *const T) -> *const T {
+        transmute::<uintptr_t, *const T>(
+            transmute::<*const T, uintptr_t>(x) & MASK)
     }
 
     #[inline]
-    pub unsafe fn align_up<T>(x: *T) -> *T {
-        transmute::<uintptr_t, *T>(
-            ((transmute::<*T, uintptr_t>(x) - 1) & MASK) + SIZE)
+    pub unsafe fn align_down<T>(x: *mut T) -> *mut T {
+        transmute::<uintptr_t, *mut T>(
+            transmute::<*mut T, uintptr_t>(x) & MASK)
     }
 
     #[inline]
-    pub unsafe fn offset<T>(x: *T) -> uintptr_t {
-        transmute::<*T, uintptr_t>(x) & (~MASK)
+    pub unsafe fn align_up<T>(x: *mut T) -> *mut T {
+        transmute::<uintptr_t, *mut T>(
+            ((transmute::<*mut T, uintptr_t>(x) - 1) & MASK) + SIZE)
     }
 
     #[inline]
-    pub unsafe fn num_to_addr<T>(x: uintptr_t) -> *T {
-        transmute::<uintptr_t, *T>(x << SHIFT)
+    pub unsafe fn align_up<T>(x: *const T) -> *const T {
+        transmute::<uintptr_t, *const T>(
+            ((transmute::<*const T, uintptr_t>(x) - 1) & MASK) + SIZE)
     }
 
     #[inline]
-    pub unsafe fn addr_to_num<T>(x: *T) -> uintptr_t {
-        transmute::<*T, uintptr_t>(x) >> SHIFT;
+    pub unsafe fn offset<T>(x: *const T) -> uintptr_t {
+        transmute::<*const T, uintptr_t>(x) & (!MASK)
     }
 
     #[inline]
-    pub unsafe fn aligned<T>(x: *T) -> bool {
-        0 == (transmute::<*T, uintptr_t>(x) % SIZE)
+    pub unsafe fn num_to_addr<T>(x: uintptr_t) -> *mut T {
+        transmute::<uintptr_t, *const T>(x << SHIFT)
     }
 
     #[inline]
-    pub unsafe fn same<T>(x: *T, y: *T) -> bool {
+    pub unsafe fn addr_to_num<T>(x: *const T) -> uintptr_t {
+        transmute::<*const T, uintptr_t>(x) >> SHIFT;
+    }
+
+    #[inline]
+    pub unsafe fn aligned<T>(x: *const T) -> bool {
+        0 == (transmute::<*const T, uintptr_t>(x) % SIZE)
+    }
+
+    #[inline]
+    pub unsafe fn same<T>(x: *const T, y: *const T) -> bool {
         align_down(x) == align_down(y)
     }
 }
 
 pub mod pagetable {
+    use super::Page;
+
+    // TODO Make this bitflags.
     pub static PRESENT        : u32 = 0x001;
     pub static WRITE          : u32 = 0x002;
     pub static USER           : u32 = 0x004;
@@ -134,8 +149,6 @@ pub mod pagetable {
     pub static SIZE           : u32 = 0x080;
     pub static GLOBAL         : u32 = 0x100;
 
-    use ::Page;
-
     pub static ENTRY_COUNT : u32 = Page::SIZE / core::u32::BYTES;
     pub static VADDR_SIZE  : u32 = Page::SIZE * ENTRY_COUNT;
 
@@ -144,8 +157,8 @@ pub mod pagetable {
 
     #[repr(C)]
     pub struct PageDir {
-        pd_physical : [pde_t, .. ENTRY_COUNT];
-        pd_virtual  : [*mut uintptr_t, .. ENTRY_COUNT];
+        pd_physical : [pde_t, .. ENTRY_COUNT],
+        pd_virtual  : [*mut uintptr_t, .. ENTRY_COUNT],
     }
 
     impl Drop for PageDir {
@@ -159,25 +172,25 @@ pub mod pagetable {
     // TODO Maybe make these rust.
     extern "C" {
 
-        //! Temporarily maps one page at the given physical address in at a
-        //! virtual address and returns that virtual address. Note that repeated
-        //! calls to this function will return the same virtual address, thereby
-        //! invalidating the previous mapping.
+        /// Temporarily maps one page at the given physical address in at a
+        /// virtual address and returns that virtual address. Note that repeated
+        /// calls to this function will return the same virtual address, thereby
+        /// invalidating the previous mapping.
         #[link_name = "pt_phys_tmp_map"]
         pub fn phys_tmp_map(paddr: uintptr_t) -> uintptr_t;
 
-        //! Permenantly maps the given number of physical pages, starting at the
-        //! given physical address to a virtual address and returns that virtual
-        //! address. Each call will return a different virtual address and the
-        //! memory will stay mapped forever. Note that there is an implementation
-        //! defined limit to the number of pages available and using too many
-        //! will cause the kernel to panic.
+        /// Permenantly maps the given number of physical pages, starting at the
+        /// given physical address to a virtual address and returns that virtual
+        /// address. Each call will return a different virtual address and the
+        /// memory will stay mapped forever. Note that there is an implementation
+        /// defined limit to the number of pages available and using too many
+        /// will cause the kernel to panic.
         #[link_name = "pt_phys_perm_map"]
         pub fn phys_perm_map(paddr: uintptr_t, count: u32) -> uintptr_t;
-        //! Looks up the given virtual address (vaddr) in the current page
-        //! directory, in order to find the matching physical memory address it
-        //! points to. vaddr MUST have a mapping in the current page directory,
-        //! otherwise this function's behavior is undefined */
+        /// Looks up the given virtual address (vaddr) in the current page
+        /// directory, in order to find the matching physical memory address it
+        /// points to. vaddr MUST have a mapping in the current page directory,
+        /// otherwise this function's behavior is undefined */
         #[link_name = "pt_virt_to_phys"]
         pub fn virt_to_phys(vaddr: uintptr_t) -> uintptr_t;
 
@@ -212,3 +225,5 @@ pub mod pagetable {
         }
     }
 }
+
+pub mod alloc;

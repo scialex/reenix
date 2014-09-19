@@ -48,9 +48,11 @@
            PIPES=0 # pipe(2) functionality
          SHADOWD=0 # shadow page cleanup
 
+# These are some options that were in-file #defines in the C version. We are making them cfg's now.
+ SLAB_CHECK_FREE=1 # Do we have slab checking on.
 # Boolean options specified in this specified in this file that should be
 # included as definitions at compile time
-        COMPILE_CONFIG_BOOLS=" DRIVERS VFS S5FS VM FI DYNAMIC MOUNTING MTP SHADOWD GETCWD UPREEMPT PIPES "
+        COMPILE_CONFIG_BOOLS=" DRIVERS VFS S5FS VM FI DYNAMIC MOUNTING MTP SHADOWD GETCWD UPREEMPT PIPES SLAB_CHECK_FREE "
 # As above, but not booleans
         COMPILE_CONFIG_DEFS=" NTERMS NDISKS DBG DISK_SIZE BOCHS_INSTALL_DIR "
 

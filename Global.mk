@@ -15,8 +15,7 @@ ASFLAGS   := -D__ASSEMBLY__
 include ../Config.mk
 include ../CheckTools.mk
 
-RSFLAGS   += $(foreach bool,$(COMPILE_CONFIG_BOOLS), \
-             $(if $(findstring 1,$($(bool))),--cfg __$(bool)__))
+RSFLAGS   += $(foreach bool,$(COMPILE_CONFIG_BOOLS), $(if $(findstring 1,$($(bool))),--cfg $(bool)))
 
 CFLAGS    += $(foreach bool,$(COMPILE_CONFIG_BOOLS), \
              $(if $(findstring 1,$($(bool))),-D__$(bool)__=$(strip $($(bool)))))
