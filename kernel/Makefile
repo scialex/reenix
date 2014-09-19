@@ -37,13 +37,27 @@ IMAGE     := weenix.img
 ISO_IMAGE := weenix.iso
 GDBCOMM   := gdb-commands
 
-define mod-rule
-libs/lib$(1).rlib : $$(shell find $(1) -type f) $$(foreach l,$(2), libs/lib$$(l).rlib)
+# $(1) is the directory the library is in
+# $(2) is the name of the crate
+# $(3) is the list of crates that this library depends on.
+define base-crate-rule
+libs/lib$(2).rlib : $$(shell find $(1) -type f) $$(foreach l,$(3), libs/lib$$(l).rlib)
 	$(HIDE) $(RUST) $(RSFLAGS) --crate-type=rlib -L libs $(1)/lib.rs --out-dir libs
 endef
 
-$(eval $(call mod-rule,base,))
-$(eval $(call mod-rule,alloc,))
+define crate-rule
+$(call base-crate-rule, $(1), $(1), $(2))
+endef
+
+# A module that is part of rusts stdlib.
+# $(1) is the name of the crate.
+# $(2) is the list of dependencies
+define builtin-crate-rule
+$(call base-crate-rule, lib$(1), $(1), $(2))
+endef
+
+$(eval $(call crate-rule,base,))
+$(eval $(call builtin-crate-rule,alloc,))
 
 .PHONY: all cscope clean
 
