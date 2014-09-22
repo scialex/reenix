@@ -43,14 +43,21 @@ macro_rules! bitmask_create {
             #[inline] fn bitand(&self, r: &$name) -> $name {
                 let &$name(lhs) = self;
                 let &$name(rhs) = r;
-                $name(lhs | rhs)
+                $name(lhs & rhs)
             }
         }
         impl Add<$name,$name> for $name {
-            #[inline] fn add(&self, r: &$name) -> $name {
-                let &$name(lhs) = self;
-                let &$name(rhs) = r;
-                $name(lhs + rhs)
+            #[inline] fn add(&self, r: &$name) -> $name { self.bitor(r) }
+        }
+        impl Sub<$name,$name> for $name {
+            #[inline] fn sub(&self, r: &$name) -> $name {
+                self & r.not()
+            }
+        }
+        impl Not<$name> for $name {
+            #[inline] fn not(&self) -> $name {
+                let &$name(val) = self;
+                $name(!val)
             }
         }
     }
