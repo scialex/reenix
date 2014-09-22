@@ -17,12 +17,16 @@ SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
 OBJS      := $(addsuffix .o,$(basename $(SRC))) reenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-BUILTIN_MODULE_DIRS := liballoc
-MODULE_DIRS := base mm
-BUILT_MODULES := $(foreach dr, $(MODULE_DIRS), libs/lib$(dr).rlib) $(foreach dr, $(BUILTIN_MODULE_DIRS), libs/$(dr).rlib)
+MODULES := base mm alloc libc
+BUILT_MODULES := $(foreach dr, $(MODULES), libs/lib$(dr).rlib)
+
+RSFLAGS += $(foreach dr, $(MODULES), --extern $(dr)=libs/lib$(dr).rlib)
 
 # List of prebuilt modules that do not include the source
 PREBUILT  :=
+# List of external modules for various things (Such as a small libm).
+EXTERNAL_LIBS  := openlibm
+EXTERNAL := $(foreach l, $(EXTERNAL_LIBS), libs/lib$(l).a)
 
 ifneq "$(shell which mkisofs 2>/dev/null)" ""
     MAKEISO := mkisofs
@@ -33,8 +37,10 @@ endif
 HIDE ?= "true"
 ifeq ("true",$(HIDE))
 HIDE_SIGIL := @
+SILENT_FLAG := --silent
 else
 HIDE_SIGIL :=
+SILENT_FLAG :=
 endif
 
 SYMBOLS   := weenix.dbg
@@ -43,6 +49,26 @@ KERNEL    := kernel.bin
 IMAGE     := weenix.img
 ISO_IMAGE := weenix.iso
 GDBCOMM   := gdb-commands
+
+# $(1) is the name of the target under external
+# $(2) is the name of the target we wish to build in external.
+# $(3) is the name of the file we wish to take into libs
+# $(4) are any flags we wish to pass down.
+define external-targets
+libs/$(notdir $(3)) : external/$(1)/$(3)
+	@ echo "   Copying \"kernel/$$@\"..."
+	$(HIDE_SIGIL) cp external/$(1)/$(3) $$@
+
+./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f)
+	@ echo "   Recursive make of \"kernel/$$@\"..."
+	$(HIDE_SIGIL) $(MAKE) $(SILENT_FLAG) -C external/$(1) $(2) $(4)
+
+.PHONEY:
+clean-$(1):
+	$(HIDE_SIGIL) rm libs/$(notdir $(3))
+	$(HIDE_SIGIL) $(MAKE) $(SILENT_FLAG) -C external/$(1) clean $(4)
+endef
+$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,$(MFLAGS) SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-g -m32 -march=i386 -ffreestanding" ARCH=i386))
 
 # $(1) is the directory the library is in
 # $(2) is the name of the crate
@@ -63,9 +89,10 @@ define builtin-crate-rule
 $(eval $(call base-crate-rule,lib$(1),$(1),$(2)))
 endef
 
-$(eval $(call crate-rule,base,))
-$(eval $(call crate-rule,mm,base))
-$(eval $(call builtin-crate-rule,alloc,mm))
+$(eval $(call builtin-crate-rule,libc,))
+$(eval $(call crate-rule,base,libc))
+$(eval $(call crate-rule,mm,base libc))
+$(eval $(call builtin-crate-rule,alloc,mm base libc))
 
 .PHONY: all cscope clean
 
@@ -75,7 +102,7 @@ $(eval $(call builtin-crate-rule,alloc,mm))
 .DEFAULT_GOAL := all
 all: $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 
-$(SYMBOLS): $(OBJS) $(PREBUILT)
+$(SYMBOLS): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ echo "  Linking for \"kernel/$@\"..."
 	@ $(LD) $(LDFLAGS) -T link.ld $(filter-out entry/entry.o,$^) -o $@ # entry.o included from link.ld
 
@@ -114,7 +141,7 @@ $(GDBCOMM): $(SCRIPTS)
 
 reenix.a : reenix.rs main/mod.rs $(BUILT_MODULES)
 	@ echo "  Compiling \"kernel/$<\"..."
-	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib $(RSFLAGS) $< -o $@
+	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib -L libs $(RSFLAGS) $< -o $@
 	$(HIDE_SIGIL) ranlib $@
 
 %.o: %.c
@@ -147,5 +174,5 @@ todo:
 | sed -E "s/^\t?[0-9]+=/    /" \
 | sed -E "/^    .*;$$/d"
 
-clean:
-	$(HIDE_SIGIL) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files
+clean: $(foreach d,$(EXTERNAL_LIBS),clean-$(d))
+	$(HIDE_SIGIL) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) $(EXTERNAL) */*.gdbcomm cscope*.out cscope.files
