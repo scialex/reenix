@@ -11,7 +11,7 @@ RSFLAGS   += --cfg kernel
 ###
 
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
-SRCDIR    := . main boot util drivers/disk drivers/tty drivers mm proc fs/ramfs fs/s5fs fs vm api test test/kshell entry test/vfstest
+SRCDIR    := main boot util mm vm test entry proc
 #SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.S) $(wildcard $(dr)/*.rs))
 SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
 OBJS      := $(addsuffix .o,$(basename $(SRC))) reenix.a
@@ -150,7 +150,7 @@ reenix.a : reenix.rs main/mod.rs $(BUILT_MODULES)
 
 %.o: %.S
 	@ echo "  Compiling \"kernel/$<\"..."
-	$(HIDE_SIGIL) $(CC) -c $(ASFLAGS) $(CFLAGS) $< -o $@
+	$(HIDE_SIGIL) $(CC) -g -c $(ASFLAGS) $(CFLAGS) $< -o $@
 
 cscope: $(HEAD) $(SRC)
 	@ echo "  Updating cscope symbol cross-reference..."
@@ -174,5 +174,9 @@ todo:
 | sed -E "s/^\t?[0-9]+=/    /" \
 | sed -E "/^    .*;$$/d"
 
-clean: $(foreach d,$(EXTERNAL_LIBS),clean-$(d))
-	$(HIDE_SIGIL) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) $(EXTERNAL) */*.gdbcomm cscope*.out cscope.files
+.PHONY:
+tidy:
+	$(HIDE_SIGIL) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files
+
+.PHONY:
+clean: tidy $(foreach d,$(EXTERNAL_LIBS),clean-$(d))

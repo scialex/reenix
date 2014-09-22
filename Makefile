@@ -8,9 +8,13 @@ all_user:
 	@ cd user && $(MAKE) all
 
 clean: clean_kernel clean_user
+tidy: tidy_kernel
+
 
 clean_kernel:
 	@ cd kernel && $(MAKE) clean
+tidy_kernel:
+	@ cd kernel && $(MAKE) tidy
 
 clean_user:
 	@ cd user && $(MAKE) clean
