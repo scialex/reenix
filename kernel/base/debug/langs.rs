@@ -8,7 +8,7 @@ use core;
 #[no_mangle]
 #[lang="begin_unwind"]
 #[allow(unused_must_use)]
-extern fn begin_unwind(msg: &core::fmt::Arguments,
+fn begin_unwind(msg: &core::fmt::Arguments,
                        file: &'static str,
                        line: uint) -> ! {
     unsafe { core::fmt::write(&mut DBG_WRITER, msg); }
@@ -25,7 +25,7 @@ fn eh_personality() {
 #[inline(never)]
 #[lang = "stack_exhausted"]
 #[allow(unused_must_use)]
-extern fn stack_exhausted(fmt: &core::fmt::Arguments,
+fn stack_exhausted(fmt: &core::fmt::Arguments,
                           file: &'static str,
                           line: uint) -> ! {
     unsafe { core::fmt::write(&mut DBG_WRITER, fmt); }

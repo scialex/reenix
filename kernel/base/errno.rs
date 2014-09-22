@@ -157,7 +157,9 @@ errnos!(
 
     /*, for robust mutexes */
     (EOWNERDEAD,      130, "Owner died"),
-    (ENOTRECOVERABLE, 131, "State not recoverable")
+    (ENOTRECOVERABLE, 131, "State not recoverable"),
+
+    (EUNKNOWN,        180, "Uknown error occured")
 )
 
 impl Default for Errno {

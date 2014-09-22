@@ -12,13 +12,13 @@
 #[phase(plugin, link)] extern crate core;
 extern crate libc;
 
-pub use errno::*;
+//pub use errno::*;
 
 // NOTE Needs to go first so everything else can get the macro's defined in it.
 mod bitflags;
 mod gdb;
 
-mod errno;
+pub mod errno;
 
 pub mod io;
 pub mod debug;
