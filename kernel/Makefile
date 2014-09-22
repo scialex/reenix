@@ -59,7 +59,7 @@ libs/$(notdir $(3)) : external/$(1)/$(3)
 	@ echo "   Copying \"kernel/$$@\"..."
 	$(HIDE_SIGIL) cp external/$(1)/$(3) $$@
 
-./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f)
+./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f -not -path ./external/$(1)/$(2))
 	@ echo "   Recursive make of \"kernel/$$@\"..."
 	$(HIDE_SIGIL) $(MAKE) $(SILENT_FLAG) -C external/$(1) $(2) $(4)
 
@@ -86,7 +86,7 @@ endef
 # $(1) is the name of the crate.
 # $(2) is the list of dependencies
 define builtin-crate-rule
-$(eval $(call base-crate-rule,lib$(1),$(1),$(2)))
+$(eval $(call base-crate-rule,rustlibs/lib$(1),$(1),$(2)))
 endef
 
 $(eval $(call builtin-crate-rule,libc,))
