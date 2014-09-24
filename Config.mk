@@ -75,4 +75,4 @@
 # The amount of physical memory which will be available to Weenix (in megabytes)
 # XXX MEMORY=32 is hardcoded in ./weenix right now -- this line here is
 #     currently ignored
-        MEMORY=32
+        MEMORY=256
