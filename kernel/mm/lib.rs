@@ -8,18 +8,14 @@
 #![crate_type="rlib"]
 #![allow(non_camel_case_types)]
 #![allow(missing_doc)]
+#![feature(phase, globs, struct_variant, macro_rules)]
+#![no_std]
 
-extern crate core;
+#[phase(link, plugin)] extern crate core;
+#[phase(link, plugin)] extern crate base;
 extern crate libc;
-#[phase(plugin, link)] extern crate base;
 
-use core::prelude::*;
-use core::mem::transmute;
-
-pub use libc::{uintptr_t, c_void, uint32_t, size_t, c_int};
-
-use base::errno;
-use base::traits;
+use libc::{c_void, size_t};
 
 extern "C" {
     #[link_name = "kmalloc"]
@@ -28,19 +24,24 @@ extern "C" {
     pub fn free(addr: *mut c_void);
 }
 
+mod utils;
+pub mod alloc;
+
 pub mod poison {
     pub static ENABLED : bool = true;
     pub static ALLOC   : u8   = 0xBB;
 }
 
+#[cfg(kernel, target_arch="x86")]
 pub mod user {
     pub static MEM_LOW  : uint = 0x00400000;
     pub static MEM_HIGH : uint = 0xc0000000;
 }
 
-pub mod ptr {
-    pub static SIZE : uint = core::uint::BYTES;
-    pub static MASK : uint = core::uint::BYTES - 1;
+pub mod pointer {
+    use core::uint;
+    pub static SIZE : uint = uint::BYTES;
+    pub static MASK : uint = uint::BYTES - 1;
 }
 
 pub mod memman {
@@ -60,11 +61,13 @@ pub mod memman {
         /// Mapping flags
         pub static FIXED : int = 0x4;
         pub static ANON  : int = 0x8;
-        pub static FAILED : uintptr_t = !0;
+        pub static FAILED : uint = !0;
     }
 }
 
 pub mod page {
+    use core::intrinsics::transmute;
+    use libc::{uintptr_t, c_void};
     extern "C" {
         #[link_name = "page_add_range"]
         pub fn add_range(start: uintptr_t, end: uintptr_t);
@@ -73,11 +76,11 @@ pub mod page {
         #[link_name = "page_free"]
         pub fn free(page: *mut c_void);
         #[link_name = "page_alloc_n"]
-        pub fn alloc_n(num: uint32_t) -> *mut c_void;
+        pub fn alloc_n(num: u32) -> *mut c_void;
         #[link_name = "page_free_n"]
-        pub fn free_n(pages: *mut c_void, num: uint32_t);
+        pub fn free_n(pages: *mut c_void, num: u32);
         #[link_name = "page_freecount"]
-        pub fn free_count() -> uint32_t;
+        pub fn free_count() -> u32;
     }
 
     pub static SHIFT  : uint = 12;
@@ -86,71 +89,76 @@ pub mod page {
     pub static NSIZES : uint = 8;
 
     #[inline]
-    pub unsafe fn align_down<T>(x: *const T) -> *const T {
-        transmute::<uintptr_t, *const T>(
-            transmute::<*const T, uintptr_t>(x) & MASK)
+    pub unsafe fn const_align_down<T>(x: *const T) -> *const T {
+        transmute::<uint, *const T>(
+            transmute::<*const T, uint>(x) & MASK)
     }
 
     #[inline]
     pub unsafe fn align_down<T>(x: *mut T) -> *mut T {
-        transmute::<uintptr_t, *mut T>(
-            transmute::<*mut T, uintptr_t>(x) & MASK)
+        transmute::<uint, *mut T>(
+            transmute::<*mut T, uint>(x) & MASK)
     }
 
     #[inline]
     pub unsafe fn align_up<T>(x: *mut T) -> *mut T {
-        transmute::<uintptr_t, *mut T>(
-            ((transmute::<*mut T, uintptr_t>(x) - 1) & MASK) + SIZE)
+        transmute::<uint, *mut T>(
+            ((transmute::<*mut T, uint>(x) - 1) & MASK) + SIZE)
     }
 
     #[inline]
-    pub unsafe fn align_up<T>(x: *const T) -> *const T {
-        transmute::<uintptr_t, *const T>(
-            ((transmute::<*const T, uintptr_t>(x) - 1) & MASK) + SIZE)
+    pub unsafe fn const_align_up<T>(x: *const T) -> *const T {
+        transmute::<uint, *const T>(
+            ((transmute::<*const T, uint>(x) - 1) & MASK) + SIZE)
     }
 
     #[inline]
-    pub unsafe fn offset<T>(x: *const T) -> uintptr_t {
-        transmute::<*const T, uintptr_t>(x) & (!MASK)
+    pub unsafe fn offset<T>(x: *const T) -> uint {
+        transmute::<*const T, uint>(x) & (!MASK)
     }
 
     #[inline]
-    pub unsafe fn num_to_addr<T>(x: uintptr_t) -> *mut T {
-        transmute::<uintptr_t, *const T>(x << SHIFT)
+    pub unsafe fn num_to_addr<T>(x: uint) -> *mut T {
+        transmute::<uint, *mut T>(x << SHIFT)
     }
 
     #[inline]
-    pub unsafe fn addr_to_num<T>(x: *const T) -> uintptr_t {
-        transmute::<*const T, uintptr_t>(x) >> SHIFT;
+    pub unsafe fn addr_to_num<T>(x: *const T) -> uint {
+        transmute::<*const T, uint>(x) >> SHIFT
     }
 
     #[inline]
     pub unsafe fn aligned<T>(x: *const T) -> bool {
-        0 == (transmute::<*const T, uintptr_t>(x) % SIZE)
+        0 == (transmute::<*const T, uint>(x) % SIZE)
     }
 
     #[inline]
     pub unsafe fn same<T>(x: *const T, y: *const T) -> bool {
-        align_down(x) == align_down(y)
+        const_align_down(x) == const_align_down(y)
     }
 }
 
 pub mod pagetable {
-    use super::Page;
+    use super::page;
+    use libc::uintptr_t;
+    use base::errno;
+    use core::u32;
+    use core::prelude::*;
+    use core::intrinsics::transmute;
 
     // TODO Make this bitflags.
-    pub static PRESENT        : u32 = 0x001;
-    pub static WRITE          : u32 = 0x002;
-    pub static USER           : u32 = 0x004;
-    pub static WRITE_THROUGH  : u32 = 0x008;
-    pub static CACHE_DISABLED : u32 = 0x010;
-    pub static ACCESSED       : u32 = 0x020;
-    pub static DIRTY          : u32 = 0x040;
-    pub static SIZE           : u32 = 0x080;
-    pub static GLOBAL         : u32 = 0x100;
+    pub static PRESENT        : uint = 0x001;
+    pub static WRITE          : uint = 0x002;
+    pub static USER           : uint = 0x004;
+    pub static WRITE_THROUGH  : uint = 0x008;
+    pub static CACHE_DISABLED : uint = 0x010;
+    pub static ACCESSED       : uint = 0x020;
+    pub static DIRTY          : uint = 0x040;
+    pub static SIZE           : uint = 0x080;
+    pub static GLOBAL         : uint = 0x100;
 
-    pub static ENTRY_COUNT : u32 = Page::SIZE / core::u32::BYTES;
-    pub static VADDR_SIZE  : u32 = Page::SIZE * ENTRY_COUNT;
+    pub static ENTRY_COUNT : uint = page::SIZE / u32::BYTES;
+    pub static VADDR_SIZE  : uint = page::SIZE * ENTRY_COUNT;
 
     pub type pte_t = u32;
     pub type pde_t = u32;
@@ -204,26 +212,34 @@ pub mod pagetable {
 
     // TODO Rest of include/mm/
     #[inline]
-    pub unsafe fn map(pd: *mut PageDir, vaddr: uintptr_t, paddr: uintptr_t, pdflags: u32, ptflags: u32) -> Result<(),i32> {
+    pub unsafe fn map(pd: *mut PageDir, vaddr: uintptr_t, paddr: uintptr_t, pdflags: u32, ptflags: u32) -> Result<(),errno::Errno> {
+        use core::num;
         let a = imp::map(pd, vaddr, paddr, pdflags, ptflags);
-        if a == errnos::EOK {
-            OK(())
-        } else {
-            Err((-a) as i32)
+        match num::from_i32::<errno::Errno>(a) {
+            Some(errno::EOK) => Ok(()),
+            Some(a) => Err(a),
+            None => Err(errno::EUNKNOWN),
         }
     }
 
     mod imp {
+        use libc::{c_int, uintptr_t};
+        use super::PageDir;
         extern "C" {
             #[link_name = "pt_map"]
             pub fn map(pd: *mut PageDir, vaddr: uintptr_t, paddr: uintptr_t, pdflags: u32, ptflags: u32) -> c_int;
 
             #[link_name = "pt_create_pagedir"]
             pub fn create_pagedir() -> *mut PageDir;
-            #[lnk_name = "pt_destroy_pagedir"]
+            #[link_name = "pt_destroy_pagedir"]
             pub fn destroy_pagedir(pd: *mut PageDir);
         }
     }
 }
 
-pub mod alloc;
+mod std {
+    pub use core::cmp;
+    pub use core::fmt;
+    pub use core::option;
+    pub use core::num;
+}
