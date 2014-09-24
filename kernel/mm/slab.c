@@ -46,6 +46,7 @@ struct slab {
 
 struct slab_allocator {
         struct slab_allocator   *sa_next;       /* link on list of slab allocators */
+        size_t                   sa_name_size;  /* Length in bytes of the name */
         const char              *sa_name;       /* user-provided name */
         size_t                   sa_objsize;    /* object size */
         struct slab             *sa_slabs;      /* head of slab list */
@@ -158,7 +159,7 @@ _calc_slab_size(struct slab_allocator *allocator)
 }
 
 static void
-_allocator_init(struct slab_allocator *allocator, const char *name, size_t size)
+_allocator_init(struct slab_allocator *allocator, size_t name_len, const char *name, size_t size)
 {
 #ifdef SLAB_REDZONE
         /*
@@ -170,6 +171,7 @@ _allocator_init(struct slab_allocator *allocator, const char *name, size_t size)
         if (!name)
                 name = "<unnamed>";
 
+        allocator->sa_name_size = name_len;
         allocator->sa_name = name;
         allocator->sa_objsize = size;
         allocator->sa_slabs = NULL;
@@ -180,22 +182,27 @@ _allocator_init(struct slab_allocator *allocator, const char *name, size_t size)
         slab_allocators = allocator;
 
         dbg(DBG_MM, "Initialized new slab allocator:\n");
-        dbgq(DBG_MM, "  Name:          \"%s\" (0x%p)\n", allocator->sa_name, allocator);
+        dbgq(DBG_MM, "  Name:          \"%.*s\" (0x%p)\n", allocator->sa_name_size, allocator->sa_name, allocator);
         dbgq(DBG_MM, "  Object Size:   %d\n", allocator->sa_objsize);
         dbgq(DBG_MM, "  Order:         %d\n", allocator->sa_order);
         dbgq(DBG_MM, "  Slab Capacity: %d\n", allocator->sa_slab_nobjs);
 }
 
 struct slab_allocator *
-slab_allocator_create(const char *name, size_t size) {
+slab_allocator_create_full(size_t name_len, const char *name, size_t size) {
         struct slab_allocator *allocator;
 
         allocator = (struct slab_allocator *) slab_obj_alloc(&slab_allocator_allocator);
         if (!allocator)
                 return NULL;
 
-        _allocator_init(allocator, name, size);
+        _allocator_init(allocator, name_len, name, size);
         return allocator;
+}
+
+struct slab_allocator *
+slab_allocator_create(const char *name, size_t size) {
+    return slab_allocator_create_full(strlen(name), name, size);
 }
 
 
@@ -248,8 +255,8 @@ _slab_allocator_grow(struct slab_allocator *allocator)
                 obj = next_obj(allocator, obj);
         }
 
-        dbg(DBG_MM, "Growing cache \"%s\" (0x%p), new slab 0x%p "
-            "(%d pages)\n", allocator->sa_name, allocator, slab,
+        dbg(DBG_MM, "Growing cache \"%.*s\" (0x%p), new slab 0x%p "
+            "(%d pages)\n", allocator->sa_name_size, allocator->sa_name, allocator, slab,
             1 << allocator->sa_order);
 
         /* Place this slab into the cache. */
@@ -290,8 +297,8 @@ slab_obj_alloc(struct slab_allocator *allocator)
 
         slab->s_inuse++;
 
-        dbg(DBG_MM, "Allocated object 0x%p from \"%s\" (0x%p), "
-            "slab 0x%p, inuse %d\n", obj, allocator->sa_name,
+        dbg(DBG_MM, "Allocated object 0x%p from \"%.*s\" (0x%p), "
+            "slab 0x%p, inuse %d\n", obj, allocator->sa_name_size, allocator->sa_name,
             allocator, allocator, slab->s_inuse);
 
 #ifdef SLAB_REDZONE
@@ -333,8 +340,8 @@ slab_obj_free(struct slab_allocator *allocator, void *obj)
 
         slab->s_inuse--;
 
-        dbg(DBG_MM, "Freed object 0x%p from \"%s\" (0x%p), slab 0x%p, inuse %d\n",
-            obj, allocator->sa_name, allocator, slab, slab->s_inuse);
+        dbg(DBG_MM, "Freed object 0x%p from \"%.*s\" (0x%p), slab 0x%p, inuse %d\n",
+            obj, allocator->sa_name_size, allocator->sa_name, allocator, slab, slab->s_inuse);
 }
 
 /*
@@ -480,7 +487,7 @@ slab_init()
         struct slab_allocator **cs;
 
         /* Special case initialization of the kmem_cache_t cache. */
-        _allocator_init(&slab_allocator_allocator, "slab_allocators", sizeof(struct slab_allocator));
+        _allocator_init(&slab_allocator_allocator, 15, "slab_allocators", sizeof(struct slab_allocator));
 
         /*
          * Allocate the power of two buckets for generic
