@@ -113,8 +113,8 @@ pub mod page {
     }
 
     #[inline]
-    pub unsafe fn offset<T>(x: *const T) -> uint {
-        transmute::<*const T, uint>(x) & (!MASK)
+    pub fn offset<T>(x: *const T) -> uint {
+        unsafe { transmute::<*const T, uint>(x) } & (!MASK)
     }
 
     #[inline]
@@ -123,18 +123,18 @@ pub mod page {
     }
 
     #[inline]
-    pub unsafe fn addr_to_num<T>(x: *const T) -> uint {
-        transmute::<*const T, uint>(x) >> SHIFT
+    pub fn addr_to_num<T>(x: *const T) -> uint {
+        unsafe { transmute::<*const T, uint>(x) } >> SHIFT
     }
 
     #[inline]
-    pub unsafe fn aligned<T>(x: *const T) -> bool {
-        0 == (transmute::<*const T, uint>(x) % SIZE)
+    pub fn aligned<T>(x: *const T) -> bool {
+        0 == (unsafe { transmute::<*const T, uint>(x) } % SIZE)
     }
 
     #[inline]
-    pub unsafe fn same<T>(x: *const T, y: *const T) -> bool {
-        const_align_down(x) == const_align_down(y)
+    pub fn same<T>(x: *const T, y: *const T) -> bool {
+        unsafe { const_align_down(x) == const_align_down(y) }
     }
 }
 
