@@ -64,6 +64,7 @@ static context_t bootstrap_context;
 void
 kmain()
 {
+#if 0
         GDB_CALL_HOOK(boot);
 
         dbg_init();
@@ -105,6 +106,7 @@ kmain()
         context_setup(&bootstrap_context, bootstrap, 0, NULL, bstack, PAGE_SIZE, bpdir);
         context_make_active(&bootstrap_context);
 
+#endif
         panic("\nReturned to kmain()!!!\n");
 }
 
