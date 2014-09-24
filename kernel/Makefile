@@ -1,5 +1,5 @@
 CFLAGS    := -ffreestanding
-RSFLAGS   ?=
+RSFLAGS   = -L libs
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 # XXX should have --omagic?
 
@@ -14,7 +14,7 @@ HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
 SRCDIR    := main boot util mm vm test entry proc
 #SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.S) $(wildcard $(dr)/*.rs))
 SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
-OBJS      := $(addsuffix .o,$(basename $(SRC))) reenix.a
+OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
 MODULES := base mm alloc libc
@@ -50,6 +50,9 @@ IMAGE     := weenix.img
 ISO_IMAGE := weenix.iso
 GDBCOMM   := gdb-commands
 
+RSFLAGS := $(strip $(RSFLAGS))
+$(info Rustflags are $(RSFLAGS))
+
 # $(1) is the name of the target under external
 # $(2) is the name of the target we wish to build in external.
 # $(3) is the name of the file we wish to take into libs
@@ -61,7 +64,7 @@ libs/$(notdir $(3)) : external/$(1)/$(3)
 
 ./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f -not -path ./external/$(1)/$(2))
 	@ echo "   Recursive make of \"kernel/$$@\"..."
-	$(HIDE_SIGIL) $(MAKE) $(SILENT_FLAG) -C external/$(1) $(2) $(4)
+	$(HIDE_SIGIL) $$(MAKE) $(SILENT_FLAG) $$(MFLAGS) -C external/$(1) $(2) $(4)
 
 .PHONEY:
 clean-$(1):
@@ -75,7 +78,7 @@ $(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,$(MFLAGS) SF
 # $(3) is the list of crates that this library depends on.
 define base-crate-rule
 libs/lib$(2).rlib : $$(shell find $(1) -type f) $$(foreach l,$(3), libs/lib$$(l).rlib)
-	$(HIDE_SIGIL) $(RUST) $(RSFLAGS) --crate-type=rlib -L libs $(1)/lib.rs --out-dir libs
+	$(HIDE_SIGIL) $(RUST) $(RSFLAGS) --crate-type=rlib $(1)/lib.rs --out-dir libs
 endef
 
 define crate-rule
@@ -108,7 +111,7 @@ $(SYMBOLS): $(OBJS) $(PREBUILT) $(EXTERNAL)
 
 $(BSYMBOLS): $(SYMBOLS)
 	@ echo "  Generating kernel symbols list..."
-	@ readelf -s $(SYMBOLS) | grep -Ev 'SECTION|UND|FILE|Num:|Symbol|^$$' | awk '{printf "0x%s %s\n", $$2, $$8}' > $@
+	@ readelf -Ws $(SYMBOLS) | grep -Ev 'SECTION|UND|FILE|Num:|Symbol|^$$' | awk '{printf "0x%s %s\n", $$2, $$8}' > $@
 
 $(KERNEL): $(SYMBOLS)
 	@ echo "  Setting addresses for kernel stage 1 and stage 2..."
@@ -139,10 +142,9 @@ $(GDBCOMM): $(SCRIPTS)
 #	@ echo "  Compiling \"kernel/$<\"..."
 #	$(RUST) --emit=obj $(RSFLAGS) $< -o $@
 
-reenix.a : reenix.rs main/mod.rs $(BUILT_MODULES)
+libs/libreenix.a : reenix.rs main/mod.rs $(BUILT_MODULES)
 	@ echo "  Compiling \"kernel/$<\"..."
-	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib -L libs $(RSFLAGS) $< -o $@
-	$(HIDE_SIGIL) ranlib $@
+	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib $(RSFLAGS) $< --out-dir=libs
 
 %.o: %.c
 	@ echo "  Compiling \"kernel/$<\"..."
