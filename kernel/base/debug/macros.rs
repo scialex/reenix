@@ -7,18 +7,24 @@
 #[macro_export]
 macro_rules! dbg_write(
     ($fmt:expr, $($a:expr),*) => ( unsafe {
+        use core::result::Err;
+        use base::debug::printing::DBG_WRITER;
         use core::fmt::FormatWriter;
-        write!(&mut base::debug::printing::DBG_WRITER as &mut FormatWriter, $fmt, $($a),*);
+        match write!(&mut DBG_WRITER as &mut FormatWriter, $fmt, $($a),*) {
+            Err(_) => (),
+            _ => (),
+        }
     })
 )
 
 #[macro_export]
 macro_rules! dbger(
     ($d:expr, $err:expr, $fmt:expr, $($a:expr),*) => ({
-        if (base::debug::dbg_active & ($d)) != base::debug::NONE {
-            dbg_write!("{}{} {}:{:u} <errno:{}> : ", ($d as base::debug::dbg_mode).get_color(), ($d as base::debug::dbg_mode), file!(), line!(), $err);
+        use base::debug;
+        if (debug::dbg_active & ($d)) != debug::NONE {
+            dbg_write!("{}{} {}:{:u} <errno:{}> : ", ($d as debug::dbg_mode).get_color(), ($d as debug::dbg_mode), file!(), line!(), $err);
             dbg_write!($fmt, $($a),*);
-            dbg_write!("{}\n", base::debug::color::NORMAL);
+            dbg_write!("{}\n", debug::color::NORMAL);
         }
     });
     ($d:expr, $err:expr, $fmt:expr) => ({
@@ -30,7 +36,7 @@ macro_rules! dbger(
 macro_rules! dbg(
     ($d:expr, $fmt:expr, $($a:expr),*) => ({
         use base::debug;
-        if (debug::dbg_active & ($d)) != base::debug::NONE {
+        if (debug::dbg_active & ($d)) != debug::NONE {
             dbg_write!("{}{}-{}:{:u} : ", $d.get_color(), $d, file!(), line!());
             dbg_write!($fmt, $($a),*);
             dbg_write!("{}\n", debug::color::NORMAL);
@@ -44,10 +50,12 @@ macro_rules! dbg(
 #[macro_export]
 macro_rules! panic(
     ($fmt:expr, $($a:expr),*) => ({
-        dbg_write!("{}{}-{}:{:u} : ", base::debug::PANIC.get_color(), base::debug::PANIC, file!(), line!());
+        use base::debug;
+        use base::kernel;
+        dbg_write!("{}{}-{}:{:u} : ", debug::PANIC.get_color(), debug::PANIC, file!(), line!());
         dbg_write!($fmt, $($a),* );
-        dbg_write!("{}\n", base::debug::color::NORMAL);
-        base::kernel::halt();
+        dbg_write!("{}\n", debug::color::NORMAL);
+        kernel::halt();
     });
 
     ($fmt:expr) => ({
