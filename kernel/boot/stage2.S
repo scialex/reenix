@@ -89,8 +89,10 @@ stage3:
          * TODO and then we could actually make use of it (since by then we would have the
          * TODO ability to allocate more stack space).
          */
-        movl    $0, %gs:0x30
 		movl	$0x10000, %esp
+        movl    %esp, %gs
+        movl    $0, %gs:0x30
+        subl    $0x34, %esp
 
 		mov		$0xa000, %esi
 		mov		$kernel_start, %edi
