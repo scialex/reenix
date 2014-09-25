@@ -1,6 +1,8 @@
 
 #[phase(plugin, link)] extern crate base;
 extern crate libc;
+extern crate alloc;
+use alloc::boxed::*;
 
 use core::iter::*;
 
@@ -16,35 +18,32 @@ fn clear_screen(background: u16) {
 
 extern "C" {
     fn dbg_init();
-    fn page_init();
-    fn pt_init();
-    fn slab_init();
-    // TODO I don't think I need this yet, or ever.
-    // fn pframe_init();
-    fn acpi_init();
-    fn apic_init();
-    fn gdt_init();
 }
 
-unsafe fn run_c_init() {
-    dbg_init();
-    page_init();
-    pt_init();
-    slab_init();
-    acpi_init();
-    apic_init();
-    gdt_init();
-}
-
-fn run_rust_init() {
+fn run_init() {
     use mm;
-    mm::alloc::init();
+    use acpi;
+    use apic;
+    use gdt;
+    unsafe { dbg_init(); }
+    mm::init();
+    acpi::init();
+    apic::init();
+    gdt::init();
+
+    mm::alloc::close_requests();
 }
 
 #[no_mangle]
 #[no_split_stack]
 pub extern "C" fn kmain2() {
-    unsafe { run_c_init(); }
+    /* TODO Export the symbols so I can run this.
+    dbg!(debug::CORE, "Kernel binary:\n");
+    dbg!(debug::CORE, "  text: 0x%p-0x%p\n", &kernel_start_text, &kernel_end_text);
+    dbg!(debug::CORE, "  data: 0x%p-0x%p\n", &kernel_start_data, &kernel_end_data);
+    dbg!(debug::CORE, "  bss:  0x%p-0x%p\n", &kernel_start_bss, &kernel_end_bss);
+    */
+    run_init();
     dbg!(debug::MM, "hi {}", "debugging");
     clear_screen(13);
     loop {}
