@@ -5,7 +5,7 @@
  * it gets called from the boot loader assembly */
 void entry()
 {
-        kmain2();
+        kmain();
         __asm__("cli\n\t"
                 "hlt");
 }

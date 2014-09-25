@@ -17,7 +17,7 @@ SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
 OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-MODULES := base mm alloc libc
+MODULES := base mm alloc libc main
 BUILT_MODULES := $(foreach dr, $(MODULES), libs/lib$(dr).rlib)
 
 RSFLAGS += $(foreach dr, $(MODULES), --extern $(dr)=libs/lib$(dr).rlib)
@@ -96,6 +96,7 @@ $(eval $(call builtin-crate-rule,libc,))
 $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
 $(eval $(call builtin-crate-rule,alloc,mm base libc))
+$(eval $(call crate-rule,main,$(filter-out main,$(MODULES))))
 
 .PHONY: all cscope clean
 
@@ -142,7 +143,7 @@ $(GDBCOMM): $(SCRIPTS)
 #	@ echo "  Compiling \"kernel/$<\"..."
 #	$(RUST) --emit=obj $(RSFLAGS) $< -o $@
 
-libs/libreenix.a : reenix.rs main/mod.rs $(BUILT_MODULES)
+libs/libreenix.a : reenix.rs $(BUILT_MODULES)
 	@ echo "  Compiling \"kernel/$<\"..."
 	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib $(RSFLAGS) $< --out-dir=libs
 
