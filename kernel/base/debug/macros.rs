@@ -36,7 +36,6 @@ macro_rules! dbger(
 macro_rules! dbg(
     ($d:expr, $fmt:expr, $($a:expr),*) => ({
         use base::debug;
-        use core::fmt::Show;
         if (debug::dbg_active & ($d)) != debug::NONE {
             dbg_write!("{}{}-{}:{:u} : ", $d.get_color(), $d, file!(), line!());
             dbg_write!($fmt, $($a),*);
