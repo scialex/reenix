@@ -2,6 +2,7 @@
 
 USAGE="Usage: $0 [OPTION]...
 -h --help            Display this help dialog.
+-c --check           when used with -d will include memcheck code
 -m --machine <arg>   Run on the specified machine. The default is
                      'qemu', which is also currently the only supported
                      machine.
@@ -19,7 +20,7 @@ GDB_COMM_INIT=commands.gdb
 GDB_INIT=init.gdb
 GDBCOMM=gdb-commands
 QEMU=qemu-system-i386
-QEMU_FLAGS="-d int -k en-us -boot order=dca"
+QEMU_FLAGS="-k en-us -boot order=dca"
 if ! which $QEMU; then
 	QEMU=qemu
 	if ! which $QEMU; then
@@ -41,7 +42,7 @@ MEMORY=32
 
 cd $(dirname $0)
 
-TEMP=$(getopt -o hm:d:n --long help,machine:,debug:,new-disk -n "$0" -- "$@")
+TEMP=$(getopt -o hcm:d:n --long help,check,machine:,debug:,new-disk -n "$0" -- "$@")
 if [ $? != 0 ] ; then
 	exit 2
 fi
@@ -49,10 +50,12 @@ fi
 machine=qemu
 dbgmode="run"
 newdisk=
+memcheck=
 eval set -- "$TEMP"
 while true ; do
 	case "$1" in
 		-h|--help) echo "$USAGE" >&2 ; exit 0 ;;
+        -c|--check) memcheck=1 ; shift ;;
 		-n|--new-disk) newdisk=1 ; shift ;;
 		-m|--machine) machine="$2" ; shift 2 ;;
 		-d|--debug) dbgmode="$2" ; shift 2 ;;
@@ -61,17 +64,22 @@ while true ; do
 	esac
 done
 
-GDB_FLAGS="-x $GDB_TMP_INIT -s $KERN_DIR/$SYMBOLS -x $GDB_COMM_INIT -x $GDB_INIT"
+MEMCHECK_INIT=
+if [[ -n "$memcheck" ]]
+then
+    MEMCHECK_INIT="-x memcheck.gdb"
+fi
+GDB_FLAGS="-x $GDB_TMP_INIT -s $KERN_DIR/$SYMBOLS -x $GDB_COMM_INIT $MEMCHECK_INIT -x $GDB_INIT"
 rm -f "$GDB_COMM_INIT"
 cat "$KERN_DIR/$GDBCOMM" | grep "\.gdb$" | while read file
 do
 	echo "source $file" >> "$GDB_COMM_INIT"
 done
 # XXX disabled until gdb version checks are written
-## cat "$KERN_DIR/$GDBCOMM" | grep "\.py$" | while read file
-## do
-## 	echo "source $file" >> "$GDB_COMM_INIT"
-## done
+cat "$KERN_DIR/$GDBCOMM" | grep "\.py$" | while read file
+do
+	echo "source $file" >> "$GDB_COMM_INIT"
+done
 
 case $machine in
 	qemu)
@@ -86,7 +94,7 @@ case $machine in
 			gdb)
 				# Build the gdb initialization script
 				echo "target remote localhost:$GDB_PORT" > $GDB_TMP_INIT
-				echo "python sys.path.append(\"$(pwd)\")" >> $GDB_TMP_INIT
+				echo "python sys.path.append(\"$(pwd)/python\")" >> $GDB_TMP_INIT
 
 				$GDB_TERM -e $QEMU $QEMU_FLAGS -m "$MEMORY" -cdrom "$KERN_DIR/$ISO_IMAGE" disk0.img -serial stdio -s -S -daemonize
 				$GDB $GDB_FLAGS
