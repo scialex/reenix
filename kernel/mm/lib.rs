@@ -17,11 +17,18 @@ extern crate libc;
 
 use libc::{c_void, size_t};
 
+/// Initialize this crate. This must be called exactly once during startup.
+#[deny(dead_code)]
+pub fn init() {
+    unsafe { page::init(); }
+    unsafe { pagetable::init(); }
+    alloc::init();
+}
+
 extern "C" {
-    #[link_name = "kmalloc"]
     pub fn malloc(size: size_t) -> *mut c_void;
-    #[link_name = "kfree"]
     pub fn free(addr: *mut c_void);
+    pub fn realloc(addr: *mut c_void, size: size_t) -> *mut c_void;
 }
 
 mod utils;
@@ -81,6 +88,10 @@ pub mod page {
         pub fn free_n(pages: *mut c_void, num: u32);
         #[link_name = "page_freecount"]
         pub fn free_count() -> u32;
+
+        #[link_name = "page_init"]
+        #[deny(dead_code)]
+        pub fn init();
     }
 
     pub static SHIFT  : uint = 12;
@@ -114,7 +125,7 @@ pub mod page {
 
     #[inline]
     pub fn offset<T>(x: *const T) -> uint {
-        unsafe { transmute::<*const T, uint>(x) } & (!MASK)
+        unsafe { transmute::<*const T, uint>(x) & (!MASK) }
     }
 
     #[inline]
@@ -124,12 +135,12 @@ pub mod page {
 
     #[inline]
     pub fn addr_to_num<T>(x: *const T) -> uint {
-        unsafe { transmute::<*const T, uint>(x) } >> SHIFT
+        unsafe { transmute::<*const T, uint>(x) >> SHIFT }
     }
 
     #[inline]
     pub fn aligned<T>(x: *const T) -> bool {
-        0 == (unsafe { transmute::<*const T, uint>(x) } % SIZE)
+        0 == (unsafe { transmute::<*const T, uint>(x) % SIZE })
     }
 
     #[inline]
@@ -208,6 +219,9 @@ pub mod pagetable {
         #[link_name = "pt_unmap_range"]
         pub fn unmap_range(pd: *mut PageDir, vlow: uintptr_t, vhigh: uintptr_t);
 
+        #[link_name = "pt_init"]
+        #[deny(dead_code)]
+        pub fn init();
     }
 
     // TODO Rest of include/mm/
@@ -242,4 +256,5 @@ mod std {
     pub use core::fmt;
     pub use core::option;
     pub use core::num;
+    pub use core::clone;
 }

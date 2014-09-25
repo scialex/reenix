@@ -387,8 +387,18 @@ slab_allocators_reclaim(int target)
 
 #define KMALLOC_SIZE_MIN_ORDER  (6)
 #define KMALLOC_SIZE_MAX_ORDER  (18)
+#define KMALLOC_NUM_ALLOCATORS  (KMALLOC_SIZE_MAX_ORDER - KMALLOC_SIZE_MIN_ORDER + 1)
 
-static struct slab_allocator *kmalloc_allocators[KMALLOC_SIZE_MAX_ORDER - KMALLOC_SIZE_MIN_ORDER + 1];
+static struct slab_allocator *kmalloc_allocators[KMALLOC_NUM_ALLOCATORS];
+
+// Used to get the kmalloc allocators in rust, so we can use them too.
+struct slab_allocator *get_kmalloc_allocator(int i) {
+    if (i >= KMALLOC_NUM_ALLOCATORS || i < 0) {
+        return NULL;
+    } else {
+        return kmalloc_allocators[i];
+    }
+}
 
 /* Note that kmem_cache_names should be modified to remain consistent
  * with KMALLOC_SIZE_MIN_ORDER ... KMALLOC_SIZE_MAX_ORDER.
@@ -442,7 +452,7 @@ kmalloc(size_t size)
         return NULL;
 }
 
-__attribute__((used)) static void *
+__attribute__((used)) void *
 malloc(size_t size)
 {
         /* This function is used by gdb to allocate memory
@@ -472,12 +482,37 @@ kfree(void *addr)
         slab_obj_free(sa, addr);
 }
 
-__attribute__((used)) static void
+__attribute__((used)) void
 free(void *addr)
 {
         /* This function is used by gdb to free memory allocated
          * by malloc, no code in the kernel should call it. */
         kfree(addr);
+}
+
+
+__attribute__((used)) void*
+krealloc(void* addr, size_t size) {
+        if (addr == NULL) {
+            if (size == 0) {
+                return NULL;
+            }
+            return kmalloc(size);
+        } else if (size == 0) {
+            kfree(addr);
+            return NULL;
+        }
+        struct slab_allocator *sa = *(((struct slab_allocator **)addr) - 1);
+        size_t old_size = sa->sa_objsize - sizeof(struct slab_allocator*);
+        void* new = kmalloc(size);
+        memcpy(new, addr, (size > old_size) ? old_size : size);
+        kfree(addr);
+        return new;
+}
+
+__attribute__((used)) void*
+realloc(void* addr, size_t size) {
+    return krealloc(addr, size);
 }
 
 void

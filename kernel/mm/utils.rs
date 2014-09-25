@@ -4,13 +4,12 @@
 
 use core::prelude::*;
 use core::option::*;
-use core::mem;
-use core::ptr;
+use core::{ptr, fmt};
 use core::ptr::RawMutPtr;
 
 // TODO I should actually make this a balancing tree by making Node have values, Option<left,right>
 // etc.
-pub enum LightNode<T: Clone> {
+pub enum LightNode<T: Clone + fmt::Show> {
     // key is the max value on the left subtree.
     Node { left: *mut LightNode<T>, right: *mut LightNode<T>, key: uint },
     Leaf { key: uint, val: T }
@@ -26,7 +25,7 @@ macro_rules! deref_mut(
 
 pub type LightNodeAlloc<T> = unsafe fn() -> *mut LightNode<T>;
 
-impl<T: Clone> LightNode<T> {
+impl<T: Clone + fmt::Show> LightNode<T> {
     /// Initialize a leaf node. Note that since this is for base mem management only a failure to
     /// allocate is considered unrecoverable.
     #[inline]
@@ -40,34 +39,24 @@ impl<T: Clone> LightNode<T> {
         tmp
     }
 
-    //#[inline]
-    //fn init_node(alloc: unsafe || -> *mut LightNode<T>, l: *mut LightNode<T>, r: Option<*mut LightNode<T>>, k: uint) {
-    //    let tmp = unsafe { alloc() };
-    //    if tmp == ptr::null() {
-    //        fail!("Unable to allocate memory for node");
-    //    }
-    //    let val = Node { left: l, right: r,  key: k, size: 0};
-    //    unsafe { mem::overwrite(tmp, val); }
-    //}
-
     fn insert_at(&mut self, key: uint, val: T, alloc: LightNodeAlloc<T>) {
         match self {
-            &Node(_, _, k) if k == key => fail!("Already have a value with this key."),
-            &Leaf(k, _) if k == key => fail!("Already have a value with this key."),
-            &Leaf(k, ref v) if k != key => {
+            &Node{ left: _, right: _, key: k} if k == key => fail!("Already have a value with this key."),
+            &Leaf{ key: k, val: _} if k == key => fail!("Already have a value with this key."),
+            &Leaf{ key: k, val: ref v} if k != key => {
                 let new_leaf = LightNode::init_leaf(alloc, key, val);
                 let old_leaf = LightNode::init_leaf(alloc, k, v.clone());
                 let new_node = if k > key {
-                    Node(new_leaf, old_leaf, key)
+                    Node { left: new_leaf, right: old_leaf, key: key }
                 } else {
-                    Node(old_leaf, new_leaf, k)
+                    Node { left: old_leaf, right: new_leaf, key: key }
                 };
                 // We just overwrite ourself with the new value.
                 unsafe { ptr::write(self as *mut LightNode<T>, new_node); }
             },
             // NOTE for some reason rust doesn't like deref_mut!(l).insert_at(...)?
-            &Node(l, _, k) if k > key => { let x = deref_mut!(l); x.insert_at(key, val, alloc) },
-            &Node(_, r, k) if k < key => { let x = deref_mut!(r); x.insert_at(key, val, alloc) },
+            &Node{ left: l, right: _, key: k} if k > key => { let x = deref_mut!(l); x.insert_at(key, val, alloc) },
+            &Node{ left: _, right: r, key: k} if k < key => { let x = deref_mut!(r); x.insert_at(key, val, alloc) },
             _ => unreachable!(),
         }
         // TODO I should put in a self.balance() routine.
@@ -77,22 +66,46 @@ impl<T: Clone> LightNode<T> {
         match *self {
             Leaf(k, ref v) if k >= key => Some((k, v.clone())),
             Leaf(k, _)     if k <  key => None,
-            Node(_, r, k)  if k >  key => { let x = deref!(r); x.search(key) },
-            Node(l, _, k)  if k <= key => { let x = deref!(l); x.search(key) },
+            Node(l, _, k)  if k >  key => { let x = deref!(l); x.search(key) },
+            Node(_, r, k)  if k <= key => { let x = deref!(r); x.search(key) },
             _ => unreachable!(),
         }
     }
 }
+impl<T: Clone + fmt::Show> fmt::Show for LightNode<T> {
+    fn fmt(&self, w : &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &Node(l, r, k) => {
+                try!(w.write("[".as_bytes()));
+                let left = deref!(l);
+                try!(left.fmt(w));
+                try!(w.write(" ".as_bytes()));
+                try!(k.fmt(w));
+                try!(w.write(" ".as_bytes()));
+                let right = deref!(r);
+                try!(right.fmt(w));
+                try!(w.write("]".as_bytes()));
+                return Ok(());
+            },
+            &Leaf(k, ref v) => {
+                try!(w.write("[k: ".as_bytes()));
+                try!(k.fmt(w));
+                try!(w.write(", T: ".as_bytes()));
+                try!(v.clone().fmt(w));
+                try!(w.write(")]".as_bytes()));
+                return Ok(());
+            }
+        }
+    }
+}
 
-pub struct LightMap<T: Clone> {
+pub struct LightMap<T: Clone + fmt::Show> {
     pub root : *mut LightNode<T>,
     pub len  : uint,
     pub alloc: LightNodeAlloc<T>,
 }
 
-impl<T: Clone> LightMap<T> {
-    #[inline]
-    pub fn new(allocator: LightNodeAlloc<T>) -> LightMap<T> { LightMap { root : 0 as *mut LightNode<T>, len : 0, alloc : allocator } }
+impl<T: Clone + fmt::Show> LightMap<T> {
     pub fn add(&mut self, k: uint, v: T) {
         let cur = self.find(k);
         match cur {
@@ -128,6 +141,23 @@ impl<T: Clone> LightMap<T> {
         }
     }
 
+    #[inline]
     pub fn len(&self) -> uint { self.len }
+}
+
+impl<T: Clone + fmt::Show> fmt::Show for LightMap<T> {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        try!(w.write("LightMap (size: ".as_bytes()));
+        if self.len == 0 {
+            try!(w.write("0) {}".as_bytes()));
+            return Ok(());
+        }
+        try!(self.len().fmt(w));
+        try!(w.write(") {".as_bytes()));
+        let nd = deref!(self.root);
+        try!(nd.fmt(w));
+        try!(w.write("}".as_bytes()));
+        return Ok(());
+    }
 }
 
