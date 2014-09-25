@@ -11,13 +11,13 @@ RSFLAGS   += --cfg kernel
 ###
 
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
-SRCDIR    := main boot util mm vm test entry proc
+SRCDIR    := main boot util mm vm test entry procs
 #SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.S) $(wildcard $(dr)/*.rs))
 SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
 OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-MODULES := base mm alloc libc main
+MODULES := base mm alloc libc main procs
 BUILT_MODULES := $(foreach dr, $(MODULES), libs/lib$(dr).rlib)
 
 RSFLAGS += $(foreach dr, $(MODULES), --extern $(dr)=libs/lib$(dr).rlib)
@@ -96,6 +96,9 @@ $(eval $(call builtin-crate-rule,libc,))
 $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
 $(eval $(call builtin-crate-rule,alloc,mm base libc))
+$(eval $(call crate-rule,procs,alloc base libc mm))
+
+
 $(eval $(call crate-rule,main,$(filter-out main,$(MODULES))))
 
 .PHONY: all cscope clean
