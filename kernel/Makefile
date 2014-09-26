@@ -1,5 +1,5 @@
 CFLAGS    := -ffreestanding
-RSFLAGS   = -L libs
+RSFLAGS   = -L libs -Z gc
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 # XXX should have --omagic?
 
@@ -11,13 +11,13 @@ RSFLAGS   += --cfg kernel
 ###
 
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
-SRCDIR    := main boot util mm vm test entry procs
+SRCDIR    := main boot util mm entry procs
 #SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.S) $(wildcard $(dr)/*.rs))
-SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) )
+SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) ) drivers/pci.c
 OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-MODULES := base mm alloc libc main procs
+MODULES := base mm alloc libc main procs startup
 BUILT_MODULES := $(foreach dr, $(MODULES), libs/lib$(dr).rlib)
 
 RSFLAGS += $(foreach dr, $(MODULES), --extern $(dr)=libs/lib$(dr).rlib)
@@ -95,8 +95,9 @@ endef
 $(eval $(call builtin-crate-rule,libc,))
 $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
-$(eval $(call builtin-crate-rule,alloc,mm base libc))
-$(eval $(call crate-rule,procs,alloc base libc mm))
+$(eval $(call crate-rule,startup,mm base libc))
+$(eval $(call builtin-crate-rule,alloc,startup mm base libc))
+$(eval $(call crate-rule,procs,startup alloc base libc mm))
 
 
 $(eval $(call crate-rule,main,$(filter-out main,$(MODULES))))
