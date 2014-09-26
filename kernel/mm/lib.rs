@@ -19,10 +19,16 @@ use libc::{c_void, size_t};
 
 /// Initialize this crate. This must be called exactly once during startup.
 #[deny(dead_code)]
-pub fn init() {
-    unsafe { page::init(); }
-    unsafe { pagetable::init(); }
-    alloc::init();
+pub fn init_stage1() {
+    page::init_stage1();
+    pagetable::init_stage1();
+    alloc::init_stage1();
+}
+
+pub fn init_stage2() {
+    page::init_stage2();
+    pagetable::init_stage2();
+    alloc::init_stage2();
 }
 
 extern "C" {
@@ -89,10 +95,11 @@ pub mod page {
         #[link_name = "page_freecount"]
         pub fn free_count() -> u32;
 
-        #[link_name = "page_init"]
         #[deny(dead_code)]
-        pub fn init();
+        pub fn page_init();
     }
+    pub fn init_stage1() { unsafe { page_init(); } }
+    pub fn init_stage2() {}
 
     pub static SHIFT  : uint = 12;
     pub static SIZE   : uint = 1 << SHIFT;
@@ -219,10 +226,12 @@ pub mod pagetable {
         #[link_name = "pt_unmap_range"]
         pub fn unmap_range(pd: *mut PageDir, vlow: uintptr_t, vhigh: uintptr_t);
 
-        #[link_name = "pt_init"]
         #[deny(dead_code)]
-        pub fn init();
+        fn pt_init();
     }
+
+    pub fn init_stage1() { unsafe { pt_init(); } }
+    pub fn init_stage2() {}
 
     // TODO Rest of include/mm/
     #[inline]

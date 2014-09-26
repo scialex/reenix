@@ -25,15 +25,8 @@ fn clear_screen(background: u16) {
     }
 }
 
-extern "C" {
-    fn dbg_init();
-}
-
-pub fn init() {
-    acpi::init();
-    apic::init();
-    gdt::init();
-}
+pub fn init_stage1() { }
+pub fn init_stage2() { }
 
 #[no_mangle]
 #[no_split_stack]
@@ -47,25 +40,6 @@ pub fn bootstrap() {
     dbg!(debug::MM, "hi {}", "debugging");
     clear_screen(13);
     loop {}
-}
-
-pub mod acpi {
-    extern "C" {
-        fn acpi_init();
-    }
-
-    pub fn init() {
-        unsafe { acpi_init(); }
-    }
-}
-
-pub mod apic {
-    extern "C" {
-        fn apic_init();
-    }
-    pub fn init() {
-        unsafe { apic_init(); }
-    }
 }
 
 pub mod gdt {

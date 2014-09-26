@@ -220,6 +220,7 @@ pt_destroy_pagedir(pagedir_t *pdir)
         page_free_n(pdir, 2);
 }
 
+#if 0
 static void
 _pt_fault_handler(regs_t *regs)
 {
@@ -231,10 +232,12 @@ _pt_fault_handler(regs_t *regs)
         /* Check if pagefault was in user space (otherwise, BAD!) */
         if (cause & FAULT_USER) {
                 handle_pagefault(vaddr, cause);
+                panic("\nPage faulted while accessing 0x%08x\n", vaddr);
         } else {
                 panic("\nPage faulted while accessing 0x%08x\n", vaddr);
         }
 }
+#endif
 
 static void
 _pt_fill_page(pagedir_t *pd, pte_t *pt, pde_t pdflags, pte_t ptflags,
@@ -335,7 +338,8 @@ pt_template_init()
         KASSERT(NULL != template_pagedir);
         memcpy(template_pagedir, current_pagedir, sizeof(*template_pagedir));
 
-        intr_register(INTR_PAGE_FAULT, _pt_fault_handler);
+        // TODO Register INTR_PAGE_FAULT in rust code.
+        // intr_register(INTR_PAGE_FAULT, _pt_fault_handler);
 }
 
 /* Debugging information to print human-readable information about

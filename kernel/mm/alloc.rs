@@ -100,7 +100,9 @@ impl SlabAllocator {
 
     pub fn new(name: &'static str, size: size_t) -> SlabAllocator {
         unsafe {
-            SlabAllocator(slab_allocator_create_full(name.len() as size_t, name.as_ptr(), size))
+            let v = slab_allocator_create_full(name.len() as size_t, name.as_ptr(), size);
+            assert!(v != 0 as *mut CSlabAllocator);
+            SlabAllocator(v)
         }
     }
 }
@@ -131,7 +133,7 @@ extern "C" {
 
 /// Do one time startup initialization of the slab allocators and associated machinery.
 #[deny(dead_code)]
-pub fn init() {
+pub fn init_stage1() {
     unsafe { slab_init(); }
     let node_size = mem::size_of::<super::utils::LightNode<*mut SlabAllocator>>();
     unsafe { NODE_ALLOCATOR = SlabAllocator::new("Map Node Allocator", node_size as size_t); }
@@ -139,6 +141,8 @@ pub fn init() {
     unsafe { SLAB_ALLOCATORS.add(node_size, NODE_ALLOCATOR); }
     dbg!(debug::MM, "Allocator tree is {}", SLAB_ALLOCATORS );
 }
+
+pub fn init_stage2() {}
 
 /// are we done with the memory management setup?
 static mut REQUESTS_CLOSED : bool = false;
