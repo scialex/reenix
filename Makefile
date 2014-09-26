@@ -18,7 +18,7 @@ tidy_kernel:
 	@ $(MAKE) -C kernel $(MFLAGS) tidy
 
 clean_user:
-	@ $(MAKE) -C user $(MFLAGS) tidy
+	@ $(MAKE) -C user $(MFLAGS) clean
 
 nyi:
 	@ $(MAKE) -C kernel $(MFLAGS) nyi
