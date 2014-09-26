@@ -16,6 +16,7 @@ extern crate libc;
 
 // NOTE Needs to go first so everything else can get the macro's defined in it.
 mod bitflags;
+mod macros;
 mod gdb;
 
 pub mod errno;
@@ -24,6 +25,9 @@ pub mod io;
 pub mod debug;
 pub mod kernel;
 pub mod from_str;
+
+pub fn init_stage1() {}
+pub fn init_stage2() {}
 
 // NOTE Needed for the #[deriving] stuff to work. Because that makes sense.
 mod std {
