@@ -17,7 +17,7 @@ SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) ) drivers/pci.c
 OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-MODULES := base mm alloc libc main procs startup
+MODULES := base mm alloc libc main startup collections procs
 BUILT_MODULES := $(foreach dr, $(MODULES), libs/lib$(dr).rlib)
 
 RSFLAGS += $(foreach dr, $(MODULES), --extern $(dr)=libs/lib$(dr).rlib)
@@ -93,11 +93,12 @@ $(eval $(call base-crate-rule,rustlibs/lib$(1),$(1),$(2)))
 endef
 
 $(eval $(call builtin-crate-rule,libc,))
+$(eval $(call builtin-crate-rule,collections,alloc libc))
 $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
-$(eval $(call crate-rule,startup,mm base libc))
+$(eval $(call crate-rule,startup,mm base libc collections))
 $(eval $(call builtin-crate-rule,alloc,startup mm base libc))
-$(eval $(call crate-rule,procs,startup alloc base libc mm))
+$(eval $(call crate-rule,procs,startup alloc base libc mm collections))
 
 
 $(eval $(call crate-rule,main,$(filter-out main,$(MODULES))))
@@ -112,35 +113,35 @@ all: $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 
 $(SYMBOLS): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ echo "  Linking for \"kernel/$@\"..."
-	@ $(LD) $(LDFLAGS) -T link.ld $(filter-out entry/entry.o,$^) -o $@ # entry.o included from link.ld
+	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T link.ld $(filter-out entry/entry.o,$^) -o $@ # entry.o included from link.ld
 
 $(BSYMBOLS): $(SYMBOLS)
 	@ echo "  Generating kernel symbols list..."
-	@ readelf -Ws $(SYMBOLS) | grep -Ev 'SECTION|UND|FILE|Num:|Symbol|^$$' | awk '{printf "0x%s %s\n", $$2, $$8}' > $@
+	$(HIDE_SIGIL) readelf -Ws $(SYMBOLS) | grep -Ev 'SECTION|UND|FILE|Num:|Symbol|^$$' | awk '{printf "0x%s %s\n", $$2, $$8}' > $@
 
 $(KERNEL): $(SYMBOLS)
 	@ echo "  Setting addresses for kernel stage 1 and stage 2..."
-	@ objcopy -j .stage1 --set-section-flags .stage1=load --change-section-address .stage1=0 -O binary $< /tmp/temptemp
-	@ cat /tmp/temptemp > kernel.bin
-	@ objcopy -j .stage2 --set-section-flags .stage2=load --change-section-address .stage2=0 -O binary $< /tmp/temptemp
-	@ cat /tmp/temptemp >> kernel.bin
-	@ objcopy -O binary $< /tmp/temptemp
-	@ cat /tmp/temptemp >> kernel.bin
-	@ rm /tmp/temptemp # XXX find better solution than this
+	$(HIDE_SIGIL) objcopy -j .stage1 --set-section-flags .stage1=load --change-section-address .stage1=0 -O binary $< /tmp/temptemp
+	$(HIDE_SIGIL) cat /tmp/temptemp > kernel.bin
+	$(HIDE_SIGIL) objcopy -j .stage2 --set-section-flags .stage2=load --change-section-address .stage2=0 -O binary $< /tmp/temptemp
+	$(HIDE_SIGIL) cat /tmp/temptemp >> kernel.bin
+	$(HIDE_SIGIL) objcopy -O binary $< /tmp/temptemp
+	$(HIDE_SIGIL) cat /tmp/temptemp >> kernel.bin
+	$(HIDE_SIGIL) rm /tmp/temptemp # XXX find better solution than this
 
 $(IMAGE): $(KERNEL)
 	@ echo "  Creating floppy disk image from kernel binary..."
-	@ dd if=/dev/zero of=$@ bs=1024 count=1440 2> /dev/null
-	@ dd if=$< of=$@ conv=notrunc 2> /dev/null
+	$(HIDE_SIGIL) dd if=/dev/zero of=$@ bs=1024 count=1440 2> /dev/null
+	$(HIDE_SIGIL) dd if=$< of=$@ conv=notrunc 2> /dev/null
 
 $(ISO_IMAGE): $(IMAGE)
 	@ echo "  Creating \"kernel/$@\" from floppy disk image..."
-	@ $(MAKEISO) -quiet -input-charset utf-8 -o $@ -b $< $<
+	$(HIDE_SIGIL) $(MAKEISO) -quiet -input-charset utf-8 -o $@ -b $< $<
 
 $(GDBCOMM): $(SCRIPTS)
 	@ echo "  Creating gdb command list..."
-	@ $(foreach script, $(SCRIPTS), echo $(abspath $(script)) >> $(dir $(script))$(shell basename $(dir $(script))).gdbcomm; )
-	@ cat */*.gdbcomm > $@
+	$(HIDE_SIGIL) $(foreach script, $(SCRIPTS), echo $(abspath $(script)) >> $(dir $(script))$(shell basename $(dir $(script))).gdbcomm; )
+	$(HIDE_SIGIL) cat */*.gdbcomm > $@
 
 #-include out.mk
 #main.o: reenix.rs main/mod.rs
