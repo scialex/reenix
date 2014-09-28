@@ -96,7 +96,7 @@ $(eval $(call builtin-crate-rule,libc,))
 $(eval $(call builtin-crate-rule,collections,alloc libc))
 $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
-$(eval $(call crate-rule,startup,mm base libc collections))
+$(eval $(call crate-rule,startup,mm base libc))
 $(eval $(call builtin-crate-rule,alloc,startup mm base libc))
 $(eval $(call crate-rule,procs,startup alloc base libc mm collections))
 

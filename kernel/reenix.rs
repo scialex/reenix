@@ -28,8 +28,8 @@ fn run_init() {
 
     base::init_stage1();
     mm::init_stage1();
-    procs::init_stage1();
     startup::init_stage1();
+    procs::init_stage1();
     main::init_stage1();
 
     mm::alloc::close_requests();
