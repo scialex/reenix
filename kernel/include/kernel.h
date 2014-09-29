@@ -9,6 +9,7 @@
  * the address where the kernel ends is &kernel_end,
  * NOT kernel_end.
  */
+extern void *setup_end;
 extern void *kernel_start;
 extern void *kernel_start_text;
 extern void *kernel_start_data;

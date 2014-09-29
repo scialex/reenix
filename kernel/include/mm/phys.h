@@ -1,4 +1,9 @@
 #pragma once
+#include "multiboot.h"
+
+// This is a physical address of some information the boot loader gives
+// us. It should only be used by phys_detect_highmem.
+multiboot_info_t *boot_info;
 
 /* Returns the highest physical address of the range of usable
  * that start at kernel_start. The intention is that this will

@@ -28,12 +28,6 @@ PREBUILT  :=
 EXTERNAL_LIBS  := openlibm
 EXTERNAL := $(foreach l, $(EXTERNAL_LIBS), libs/lib$(l).a)
 
-ifneq "$(shell which mkisofs 2>/dev/null)" ""
-    MAKEISO := mkisofs
-else
-    MAKEISO := genisoimage
-endif
-
 HIDE ?= "true"
 ifeq ("true",$(HIDE))
 HIDE_SIGIL := @
@@ -58,20 +52,20 @@ $(info Rustflags are $(RSFLAGS))
 # $(3) is the name of the file we wish to take into libs
 # $(4) are any flags we wish to pass down.
 define external-targets
-libs/$(notdir $(3)) : external/$(1)/$(3)
+./libs/$(notdir $(3)) : external/$(1)/$(3)
 	@ echo "   Copying \"kernel/$$@\"..."
 	$(HIDE_SIGIL) cp external/$(1)/$(3) $$@
 
-./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f -not -path ./external/$(1)/$(2))
+./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f -not -path ./external/$(1)/$(3))
 	@ echo "   Recursive make of \"kernel/$$@\"..."
 	$(HIDE_SIGIL) $$(MAKE) $(SILENT_FLAG) $$(MFLAGS) -C external/$(1) $(2) $(4)
 
 .PHONEY:
 clean-$(1):
-	$(HIDE_SIGIL) rm libs/$(notdir $(3))
+	$(HIDE_SIGIL) rm libs/$(notdir $(3)) || true
 	$(HIDE_SIGIL) $(MAKE) $(SILENT_FLAG) -C external/$(1) clean $(4)
 endef
-$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,$(MFLAGS) SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-g -m32 -march=i386 -ffreestanding" ARCH=i386))
+$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-g -m32 -march=i386 -ffreestanding" ARCH=i386))
 
 # $(1) is the directory the library is in
 # $(2) is the name of the crate
@@ -109,44 +103,41 @@ $(eval $(call crate-rule,main,$(filter-out main,$(MODULES))))
 	touch $@
 
 .DEFAULT_GOAL := all
-all: $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
+all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 
-$(SYMBOLS): $(OBJS) $(PREBUILT) $(EXTERNAL)
+$(KERNEL): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ echo "  Linking for \"kernel/$@\"..."
-	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T link.ld $(filter-out entry/entry.o,$^) -o $@ # entry.o included from link.ld
+	@ # entry.o included from link.ld. boot/boot.S must be the first file so that the multiboot header is close enough to the front.
+	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T link.ld boot/boot.o $(filter-out boot/boot.o entry/entry.o,$^) -o $@
 
 $(BSYMBOLS): $(SYMBOLS)
 	@ echo "  Generating kernel symbols list..."
 	$(HIDE_SIGIL) readelf -Ws $(SYMBOLS) | grep -Ev 'SECTION|UND|FILE|Num:|Symbol|^$$' | awk '{printf "0x%s %s\n", $$2, $$8}' > $@
 
-$(KERNEL): $(SYMBOLS)
-	@ echo "  Setting addresses for kernel stage 1 and stage 2..."
-	$(HIDE_SIGIL) objcopy -j .stage1 --set-section-flags .stage1=load --change-section-address .stage1=0 -O binary $< /tmp/temptemp
-	$(HIDE_SIGIL) cat /tmp/temptemp > kernel.bin
-	$(HIDE_SIGIL) objcopy -j .stage2 --set-section-flags .stage2=load --change-section-address .stage2=0 -O binary $< /tmp/temptemp
-	$(HIDE_SIGIL) cat /tmp/temptemp >> kernel.bin
-	$(HIDE_SIGIL) objcopy -O binary $< /tmp/temptemp
-	$(HIDE_SIGIL) cat /tmp/temptemp >> kernel.bin
-	$(HIDE_SIGIL) rm /tmp/temptemp # XXX find better solution than this
+$(SYMBOLS): $(OBJS) $(PREBUILT) $(EXTERNAL)
+	@ echo "  Generating a image for debugging..."
+	@ # TODO This is bad and fragile. We really should be modifying $(KERNEL) to make it's paddr's match the vaddr's in its program headers.
+	@ # entry.o included from link.ld. boot/boot.S must be the first file so that the multiboot header is close enough to the front.
+	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T debug.ld boot/boot.o $(filter-out boot/boot.o entry/entry.o,$^) -o $@
 
-$(IMAGE): $(KERNEL)
-	@ echo "  Creating floppy disk image from kernel binary..."
-	$(HIDE_SIGIL) dd if=/dev/zero of=$@ bs=1024 count=1440 2> /dev/null
-	$(HIDE_SIGIL) dd if=$< of=$@ conv=notrunc 2> /dev/null
-
-$(ISO_IMAGE): $(IMAGE)
+$(ISO_IMAGE): $(KERNEL)
 	@ echo "  Creating \"kernel/$@\" from floppy disk image..."
-	$(HIDE_SIGIL) $(MAKEISO) -quiet -input-charset utf-8 -o $@ -b $< $<
+	$(HIDE_SIGIL) mkdir -p .iso/boot/grub
+	$(HIDE_SIGIL) ln -f $< .iso/boot/$<
+	$(HIDE_SIGIL) echo "default=0" > .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo "timeout=0" > .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo "menuentry \"$@\" {" >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo " echo \"Booting $@ from /boot/$<\" " >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo " echo \"Welcome To Weenix!\" " >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo " multiboot /boot/$< " >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo " boot " >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo "}" >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) grub-mkrescue -o $@ ./.iso
 
 $(GDBCOMM): $(SCRIPTS)
 	@ echo "  Creating gdb command list..."
 	$(HIDE_SIGIL) $(foreach script, $(SCRIPTS), echo $(abspath $(script)) >> $(dir $(script))$(shell basename $(dir $(script))).gdbcomm; )
 	$(HIDE_SIGIL) cat */*.gdbcomm > $@
-
-#-include out.mk
-#main.o: reenix.rs main/mod.rs
-#	@ echo "  Compiling \"kernel/$<\"..."
-#	$(RUST) --emit=obj $(RSFLAGS) $< -o $@
 
 libs/libreenix.a : reenix.rs $(BUILT_MODULES)
 	@ echo "  Compiling \"kernel/$<\"..."
@@ -185,6 +176,7 @@ todo:
 .PHONY:
 tidy:
 	$(HIDE_SIGIL) rm -f $(BUILT_MODULES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files
+	$(HIDE_SIGIL) rm -rf .iso
 
 .PHONY:
 clean: tidy $(foreach d,$(EXTERNAL_LIBS),clean-$(d))

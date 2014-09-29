@@ -13,23 +13,23 @@ SECTIONS
 		kernel_start = .;
 		kernel_start_text = .;
 
-		.text ALIGN(4096) : AT(ADDR(.text) - kernel_phys_off) { *(.multiboot) *(.text) }
+		.text ALIGN(4096) : { *(.multiboot) *(.text) }
 
 		kernel_start_init = .;
-		.init : AT(ADDR(.init) - kernel_phys_off) { *(.init) }
+		.init : { *(.init) }
 		kernel_end_init = .;
 
 		. = ALIGN(0x1000);
 		kernel_end_text = .;
 		kernel_start_data = .;
 
-		.data   ALIGN(4096) : AT(ADDR(.data)   - kernel_phys_off) { *(.data) }
-		.rodata ALIGN(4096) : AT(ADDR(.rodata) - kernel_phys_off) { *(.rodata) }
+		.data   ALIGN(4096) : { *(.data) }
+		.rodata ALIGN(4096) : { *(.rodata) }
 
 		kernel_end_data = .;
 		kernel_start_bss = .;
 
-		.bss ALIGN(4096) : AT(ADDR(.bss) - kernel_phys_off) { *(.bss) }
+		.bss ALIGN(4096) : { *(.bss) }
 
 		. = ALIGN(0x1000);
 		kernel_end_bss = .;

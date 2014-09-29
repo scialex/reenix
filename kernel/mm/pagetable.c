@@ -292,16 +292,36 @@ pt_init(void)
         pagedir->pd_physical[PT_ENTRY_COUNT - 1] = temppdir[PT_ENTRY_COUNT - 1];
         pagedir->pd_virtual[PT_ENTRY_COUNT - 1] = final_page;
 
-        /* identity map the first 4mb (one page table) of physical memory */
-        pte_t *pagetable = final_page + PT_ENTRY_COUNT;
-        _pt_fill_page(pagedir, pagetable, PD_PRESENT | PD_WRITE, PT_PRESENT | PT_WRITE, 0, 0);
+        uint32_t kernel_page_tables = ((((uintptr_t)&kernel_end) - ((uintptr_t)&kernel_start)) / 0x100000) + 1;
+        dbgq(DBG_MM, "Kernel contained in %d page tables\n", kernel_page_tables);
 
-        /* map in 4mb (one page table) where the kernel is
+        /* identity map the first kernel_page_tables worth of physical memory */
+        uintptr_t mapped = 0;
+        pte_t *pagetable = final_page + PT_ENTRY_COUNT;
+        for (uint32_t cnt = 0; cnt < kernel_page_tables; cnt++) {
+            _pt_fill_page(pagedir, pagetable, PD_PRESENT | PD_WRITE, PT_PRESENT | PT_WRITE,
+                          mapped, mapped);
+            pagetable += PT_ENTRY_COUNT;
+            mapped += PT_VADDR_SIZE;
+        }
+
+        /* map in where the kernel is with kernel_page_tables tables.
          * this will make our new page table identical to the temporary
          * page table the boot loader created. */
+        uintptr_t map_start = (uintptr_t)&kernel_start;
+        uintptr_t phys_start = KERNEL_PHYS_BASE;
         pagetable += PT_ENTRY_COUNT;
+        for (uint32_t cnt = 0; cnt < kernel_page_tables; cnt++) {
+            _pt_fill_page(pagedir, pagetable, PD_PRESENT | PD_WRITE, PT_PRESENT | PT_WRITE,
+                          map_start, phys_start);
+            map_start += PT_VADDR_SIZE;
+            phys_start += PT_VADDR_SIZE;
+            pagetable += PT_ENTRY_COUNT;
+        }
+        /* Map the extra page. (needed in case we don't have enough extra space for the
+         * last_page page directory. */
         _pt_fill_page(pagedir, pagetable, PD_PRESENT | PD_WRITE, PT_PRESENT | PT_WRITE,
-                      (uintptr_t)&kernel_start, KERNEL_PHYS_BASE);
+                      map_start, phys_start);
 
         current_pagedir = pagedir;
         /* swap the temporary page table with our identical, but more
@@ -321,7 +341,7 @@ pt_init(void)
                 _pt_fill_page(pagedir, pagetable, PD_PRESENT | PD_WRITE, PT_PRESENT | PT_WRITE, vaddr, paddr);
         } while (paddr < physmax);
 
-        page_add_range((uintptr_t) pagetable + PT_ENTRY_COUNT, physmax + ((uintptr_t)&kernel_start) - KERNEL_PHYS_BASE);
+        page_add_range((uintptr_t)PAGE_ALIGN_UP(pagetable), physmax + ((uintptr_t)&kernel_start) - KERNEL_PHYS_BASE);
 }
 
 void
