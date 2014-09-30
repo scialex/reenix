@@ -37,8 +37,9 @@ extern "C" {
     pub fn realloc(addr: *mut c_void, size: size_t) -> *mut c_void;
 }
 
-mod utils;
+pub mod utils;
 pub mod alloc;
+mod lightmap;
 
 pub mod poison {
     pub static ENABLED : bool = true;

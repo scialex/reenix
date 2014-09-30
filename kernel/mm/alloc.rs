@@ -15,7 +15,7 @@ use core::cmp::min;
 use core::intrinsics::transmute;
 use core::{fmt, mem, ptr};
 use libc::{size_t, c_void, c_int};
-use super::utils;
+use super::lightmap::{LightNode, LightMap, LightNodeAlloc};
 
 pub static SLAB_REDZONE : u32 = 0xdeadbeef;
 
@@ -122,10 +122,10 @@ impl fmt::Show for SlabAllocator {
 
 static mut NODE_ALLOCATOR: SlabAllocator = SlabAllocator(0 as *mut CSlabAllocator);
 
-unsafe fn create_node() -> *mut utils::LightNode<SlabAllocator> { mem::transmute(NODE_ALLOCATOR.allocate()) }
+unsafe fn create_node() -> *mut LightNode<SlabAllocator> { mem::transmute(NODE_ALLOCATOR.allocate()) }
 
-static mut SLAB_ALLOCATORS: utils::LightMap<SlabAllocator> =
-    utils::LightMap { root: 0 as *mut utils::LightNode<SlabAllocator>, len: 0, alloc: create_node };
+static mut SLAB_ALLOCATORS: LightMap<SlabAllocator> =
+    LightMap { root: 0 as *mut LightNode<SlabAllocator>, len: 0, alloc: create_node };
 
 extern "C" {
     fn slab_init();
@@ -135,7 +135,7 @@ extern "C" {
 #[deny(dead_code)]
 pub fn init_stage1() {
     unsafe { slab_init(); }
-    let node_size = mem::size_of::<super::utils::LightNode<*mut SlabAllocator>>();
+    let node_size = mem::size_of::<LightNode<*mut SlabAllocator>>();
     unsafe { NODE_ALLOCATOR = SlabAllocator::new("Map Node Allocator", node_size as size_t); }
     add_kmalloc_slabs();
     unsafe { SLAB_ALLOCATORS.add(node_size, NODE_ALLOCATOR); }
