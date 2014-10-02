@@ -21,3 +21,8 @@ disk0.vmdk
 *.nfs*
 cscope.out
 tags
+
+# tex stuff
+*.aux
+*.log
+*.pdf

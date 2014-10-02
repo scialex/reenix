@@ -1,0 +1,214 @@
+\documentclass[12pt,letterpaper]{article}
+\usepackage{amsmath,amsthm,amsfonts,amssymb,amscd}
+\usepackage{fullpage}
+\usepackage{lastpage}
+\usepackage{enumerate}
+\usepackage{fancyhdr}
+\usepackage{mathrsfs}
+\usepackage{xfrac}
+\usepackage{listings}
+\usepackage[margin=3cm]{geometry}
+\setlength{\parindent}{0.0in}
+\setlength{\parskip}{0.05in}
+
+% Edit these as appropriate
+\newcommand\course{Reenix Design}
+\newcommand\yourname{Alexander Light} % <-- your name
+\newcommand\login{allight}            % <-- your CS login
+
+%My commands
+\newcommand{\field}[1]{\mathbb{#1}}
+\newcommand{\union}{\cup}
+\newcommand{\intersect}{\cap}
+\newcommand{\xor}{\oplus}
+\newcommand{\limplies}{\rightarrow}
+\newcommand{\liff}{\leftrightarrow}
+\newcommand{\rust}{\texttt{Rust}}
+
+%other stuff
+
+\pagestyle{fancyplain}
+\headheight 35pt
+\lhead{\yourname\ (\login)}
+\chead{\textbf{\Large \course}}
+\rhead{\today}
+\headsep 10pt
+
+\begin{document}
+\lstset{language={[x86masm]Assembler}}
+\section{Introduction}
+
+Reenix is the name of a unix-like operating system written in \rust{}
+that I am writing. I plan for it to be based on the design of the Weenix
+operating system from \texttt{CS167/9} and for it to be useful both as
+a measure of how usable \rust{} is in making an operating system and
+as a measure of how the use of a higher level language can aid in the
+creation of an OS kernel.
+
+\section{Overall Design}
+I have split Reenix up into several crates (what most other languages
+would call libraries or modules), most of which are similar to the
+directories of the Weenix project. The reasons for splitting this up is
+partly due to the long compile times of \rust{} and the fact that if I
+want to make use of the \rust{} standard library I need some parts of my
+system (such as memory allocation) compiled before the standard library
+packages are. Each module is created as a standard \rust{} library
+package, with a \texttt{lib.rs} file being the base which declares
+the dependencies on external crates and declares the interior modules
+and exports. This crate is split further up into different files and
+sub-directories where appropriate.
+
+I will talk about each of the crates in turn, expanding on the design
+of any interesting pieces within them, any strange decisions within the
+crate and the reasons for them and what crates each depends upon. I will
+also talk about each of the rust standard library crates I am using,
+whether I have had to modify them and if so how, and what each of them do.
+
+
+\subsection{Crate: \texttt{base}}
+The \texttt{base} crate holds many of the small, low-level pieces
+of Reenix which are needed by almost every other crate. It holds a
+definition of errno, the links to some linker variables, as well as a
+definition for a \texttt{halt} function. Other than these most of what it
+holds are purely utility and helper functions. For example it contains
+the whole Reenix debug-printing system, which is used to implement a
+\texttt{dbg} macro. There are some other miscellaneous things this crate
+holds but none are very interesting. The only thing that really ties
+them together is that they are totally separate from the whole rest of
+the kernel and are useful in all other modules.
+
+In the future this may declare some \texttt{traits} (something similar to
+\texttt{java}'s \texttt{interface}'s) for many of the important pieces
+of Reenix in other crates to get around \rust{}'s requirement that
+crates have no dependency loops. Alternatively these \texttt{traits}
+may end up in their own crate to allow us to make use of the \rust{}
+\texttt{collections} and \texttt{alloc} crate within them.
+
+This crate has no dependencies aside from the \rust{} \texttt{core} crate.
+
+\subsection{Crate: \texttt{mm}}
+The \texttt{mm} crate holds the implementation of memory management
+for Reenix. Currently it is mostly just a translation layer between the
+\texttt{C} memory system from Weenix and the \rust{} notion of what memory
+management is. It also defines a way for modules to request that specific
+sizes of slab allocators be provided, in order to improve allocation speed
+and consistency. Finally it has a way to search for the correct slab
+to allocate a request for a given amount of memory on. It does this by
+allocating a page if it is larger than a certain threshold and otherwise
+searching through a tree map it has of all the allocators and their sizes.
+
+Due to the fact that we use the size of objects being allocated and freed
+to determine which slab we should use to provide the actual memory we
+have a strange restriction that all slabs must be allocated and known
+about prior to allocating the first object. Because of this restriction
+we have a somewhat strange 2 phase initialization system for the Reenix
+as a whole where during phase 1 memory allocation is forbidden (except
+through explicit use of kmalloc/kfree). We then go to phase 2 where
+memory may be allocated and freed normally.
+
+In the future this crate will likely also hold an implementation of
+\texttt{pframes}, although that might go in the \texttt{fs} crate.
+
+This crate depends only upon the \texttt{Core} crate and the \rust{}
+standard library crates \texttt{core} and \texttt{libc}.
+
+\subsection{Crate: \texttt{startup}}
+The (somewhat confusingly named) \texttt{startup} crate (name provisional)
+is a bit of a hodge-podge of Reenix components that do not obviously
+belong anywhere else. This crate will likely move into other parts
+as their places become clearer. The only part likely to remain in the
+\texttt{startup} crate longterm is the \texttt{gdt} support, since this
+is needed to setup the stack overflow detection that \rust{} builds into
+its language.
+
+It also currently contains the \texttt{acpi} shim and the \texttt{pci}
+shim. These both might end up being moved later as they are implemented in \rust{}.
+
+This crate depends upon the \texttt{base} and \texttt{mm} crates.
+
+\subsection{Crate: \texttt{procs}}
+The \texttt{procs} crate holds all the code relating to processes and
+threads in Reenix. It holds a definition for KProc, The Reenix process
+implementation, as well as KThread and all scheduling and process
+switching related code. It also holds the implementation of interrupts
+and a (hopefully temporary) shim to initialize the \texttt{apic}. An
+implementation of a mutex synchronization primitive is also defined here.
+
+These are all implemented similarly to Weenix but using \rust{} standard
+library collections types instead of the interned list approach used
+by Weenix.
+
+This crate depends upon the \texttt{base} and \texttt{mm} crates. It
+also depends on the \rust{} standard library crates \texttt{alloc}
+and \texttt{collections} for smart pointers and collections respectively.
+
+\subsection{Crate: \texttt{drivers}}
+The \texttt{drivers} crate will hold most of the code related to drivers
+in Reenix. It will hold implementations for taking in keyboard input,
+reading/writing from disks and displaying text on the screen. It may
+also hold the \texttt{acpi} and \texttt{pci} implementations instead
+of \texttt{startup}.
+
+More details about the design and implementation of this crate will be
+added as I get closer to implementing it.
+
+\subsection{Crate: \texttt{fs}}
+The \texttt{fs} crate holds an implementation of the VFS subsystem
+which implements the common unix file-system contract. This holds an
+implementation of \texttt{vnode} and associated entities. This might
+also include \texttt{s5fs} (and possibly \texttt{ramfs}) or these might
+be in their own crates.
+
+More details about the design and implementation of this crate will be
+added as I get closer to implementing it.
+
+\subsection{Crate: \texttt{s5fs}}
+The \texttt{s5fs} crate holds an implementation of the s5fs file system
+as described by the Weenix documentation. This might end up simply as a
+module in the \texttt{fs} crate.
+
+More details about the design and implementation of this crate will be
+added as I get closer to implementing it.
+
+\subsection{Crate: \texttt{vm}}
+The \texttt{vm} crate holds an implementation of virtual memory for
+Reenix, implementing the \texttt{mmap} and \texttt{brk} syscalls and
+implementing an anonymous and shadow page subsystem.
+
+More details about the design and implementation of this crate will be
+added as I get closer to implementing it.
+
+\subsection{Crate: \texttt{main}}
+The \texttt{main} crate holds most of the main method of Reenix. It holds
+the main methods for the idle and init processes. It also is what calls
+the initialization functions for all other modules and is what brings
+the full system up.
+
+\subsection{Standard Crate: \texttt{core}}
+The \texttt{core} standard library crate defines many of the basic
+data-types needed to write \rust{} code as well as some useful interfaces
+and macros for doing things such as formating text. No modifications were
+needed to this crate and the one that is built for the standard \rust{}
+compiler is used.
+
+\subsection{Standard Crate: \texttt{libc}}
+The \texttt{libc} crate declares a large number of \texttt{extern}
+functions from the \texttt{C} and \texttt{POSIX} standard libraries as
+well as declaring type aliases for them. This is modified to remove most
+of the \texttt{POSIX} functions, while leaving the type declarations.
+
+\subsection{Standard Crate: \texttt{alloc}}
+The \texttt{alloc} crate declares what \rust{} thinks memory allocation
+is and defines some standard smart pointers. It is modified only to
+allow it to link with the \texttt{mm} crate to get the memory allocation
+from there.
+
+\subsection{Standard Crate: \texttt{collections}}
+The \texttt{collections} crate provides implementations for several
+standard collection data-types, such as a vector and map.  It is
+unmodified and only included in the Reenix source because it inlines
+large parts of \texttt{alloc} which is bad since it should be using
+my, modified, version of it.
+
+\end{document}
+
