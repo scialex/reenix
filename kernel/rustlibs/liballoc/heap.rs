@@ -111,12 +111,12 @@ unsafe fn exchange_free(ptr: *mut u8, size: uint, align: uint) {
 // The minimum alignment guaranteed by the architecture. This value is used to
 // add fast paths for low alignment values. In practice, the alignment is a
 // constant at the call site and the branch will be optimized out.
-#[cfg(target_arch = "arm")]
-#[cfg(target_arch = "mips")]
-#[cfg(target_arch = "mipsel")]
+#[cfg(any(target_arch = "arm",
+          target_arch = "mips",
+          target_arch = "mipsel"))]
 static MIN_ALIGN: uint = 8;
-#[cfg(target_arch = "x86")]
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86",
+          target_arch = "x86_64"))]
 static MIN_ALIGN: uint = 16;
 
 // NOTE This is just a shim to mm.
@@ -131,7 +131,7 @@ mod imp {
     }
 }
 
-#[cfg(jemalloc, not(kernel))]
+#[cfg(all(jemalloc, not(kernel)))]
 mod imp {
     use core::option::{None, Option};
     use core::ptr::{RawPtr, null_mut, null};
@@ -158,7 +158,7 @@ mod imp {
     }
 
     // -lpthread needs to occur after -ljemalloc, the earlier argument isn't enough
-    #[cfg(not(windows), not(target_os = "android"))]
+    #[cfg(all(not(windows), not(target_os = "android")))]
     #[link(name = "pthread")]
     extern {}
 
@@ -218,7 +218,7 @@ mod imp {
     }
 }
 
-#[cfg(not(jemalloc), unix, not(kernel))]
+#[cfg(all(not(jemalloc), unix, not(kernel)))]
 mod imp {
     use core::cmp;
     use core::ptr;
@@ -280,7 +280,7 @@ mod imp {
     pub fn stats_print() {}
 }
 
-#[cfg(not(jemalloc), windows, not(kernel))]
+#[cfg(all(not(jemalloc), windows, not(kernel)))]
 mod imp {
     use libc::{c_void, size_t};
     use libc;
@@ -346,7 +346,7 @@ mod imp {
     pub fn stats_print() {}
 }
 
-#[cfg(test, not(kernel))]
+#[cfg(test)]
 mod bench {
     extern crate test;
     use self::test::Bencher;
