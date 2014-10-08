@@ -45,7 +45,6 @@ ISO_IMAGE := weenix.iso
 GDBCOMM   := gdb-commands
 
 RSFLAGS := $(strip $(RSFLAGS))
-$(info Rustflags are $(RSFLAGS))
 
 # $(1) is the name of the target under external
 # $(2) is the name of the target we wish to build in external.
@@ -124,14 +123,14 @@ $(ISO_IMAGE): $(KERNEL)
 	@ echo "  Creating \"kernel/$@\" from floppy disk image..."
 	$(HIDE_SIGIL) mkdir -p .iso/boot/grub
 	$(HIDE_SIGIL) ln -f $< .iso/boot/$<
-	$(HIDE_SIGIL) echo "default=0" > .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo "timeout=0" > .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo "menuentry \"$@\" {" >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo "default=0"                           >  .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo "timeout=0"                           >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo "menuentry \"$@\" {"                  >> .iso/boot/grub/grub.cfg
 	$(HIDE_SIGIL) echo " echo \"Booting $@ from /boot/$<\" " >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo " echo \"Welcome To Weenix!\" " >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo " multiboot /boot/$< " >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo " boot " >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo "}" >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo " echo \"Welcome To Weenix!\" "       >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo " multiboot /boot/$< "                >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo " boot "                              >> .iso/boot/grub/grub.cfg
+	$(HIDE_SIGIL) echo "}"                                   >> .iso/boot/grub/grub.cfg
 	$(HIDE_SIGIL) grub-mkrescue -o $@ ./.iso
 
 $(GDBCOMM): $(SCRIPTS)
@@ -169,9 +168,55 @@ nyi:
 todo:
 	@ echo "  Not yet done:"
 	@ echo
-	@ git grep --heading --break -Epnh "((\/\/|\/?\*) TODO|^ *\*t )" | sed -E "s/^([0-9]+)/\t\1/" \
-| sed -E "s/^\t?[0-9]+=/    /" \
-| sed -E "/^    .*;$$/d"
+	@ git grep --heading --break -Epnh "((\/\/|\/?\*) TODO|^ *\*t )" \
+| sed -E "s/^\t?[0-9]+=/  /" \
+| sed -E "/^  .*;$$/d" \
+| awk '                                                       \
+    BEGIN {                                                   \
+        FS       = ":";                                       \
+        count    = 0;                                         \
+        cur_file = "";                                        \
+        prev     = "";                                        \
+        prev_cnt = 0;                                         \
+    }                                                         \
+    {                                                         \
+        if ($$0 !~ /^[0-9]+:/) {                              \
+            if ($$0 !~ /^ +/) {                               \
+                if (cur_file != "") {                         \
+                    plural = "";                              \
+                    if (prev_cnt != 1) {                      \
+                        plural = "s";                         \
+                    }                                         \
+                    printf("%s: %d thing%s to do\n%s\n",      \
+                           cur_file, prev_cnt, plural, prev); \
+                }                                             \
+                cur_file = $$0;                               \
+                prev_cnt = 0;                                 \
+                prev     = "";                                \
+            } else {                                          \
+                prev = prev "" $$0 "\n";                      \
+            }                                                 \
+        } else {                                              \
+            count    += 1;                                    \
+            prev_cnt += 1;                                    \
+            first     = $$1;                                  \
+            $$1       = "";                                   \
+            prev      = prev "" sprintf("%7s: %s\n",          \
+                                        first, $$0);          \
+        }                                                     \
+    }                                                         \
+    END {                                                     \
+        if (cur_file != "") {                                 \
+            plural = "";                                      \
+            if (prev_cnt != 1) {                              \
+                plural = "s";                                 \
+            }                                                 \
+            printf("%s: %d thing%s to do\n%s",                \
+                   cur_file, prev_cnt, plural, prev);         \
+        }                                                     \
+        printf("\nTotal of %d TODOs\n", count);               \
+    }                                                         \
+    '
 
 .PHONY:
 tidy:
