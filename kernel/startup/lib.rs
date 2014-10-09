@@ -2,7 +2,7 @@
 #![crate_name="startup"]
 #![crate_type="rlib"]
 #![no_std]
-#![feature(asm, macro_rules, globs, concat_idents,lang_items, trace_macros, phase, intrinsics)]
+#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics)]
 
 //! # The Reenix startup stuff.
 ///
@@ -128,7 +128,7 @@ pub mod tsd {
                       self.vlow[8],self.vlow[9],self.vlow[10], self.stack_high)
         }
     }
-    pub static initial_tsd : TSDInfo = TSDInfo { vlow: [0 as *mut c_void, ..11], stack_high: 0, open_slot: 0 };
+    pub static INITIAL_TSD : TSDInfo = TSDInfo { vlow: [0 as *mut c_void, ..11], stack_high: 0, open_slot: 0 };
 }
 
 // TODO I should move this to rust.
@@ -159,7 +159,8 @@ pub mod gdt {
     pub fn init_stage1() {
         unsafe { gdt_init(); }
         unsafe {
-            set_entry(THREAD_SPECIFIC as u32, transmute(&::tsd::initial_tsd), 0x100, 0, 0, 0, 0);
+            // TODO  This should just use size_of::<TSDInfo>.
+            set_entry(THREAD_SPECIFIC as u32, transmute(&::tsd::INITIAL_TSD), 0x100, 0, 0, 0, 0);
             asm!("mov $$0x40, %ax; mov %ax, %gs": : : "eax");
         }
     }
