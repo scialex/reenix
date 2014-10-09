@@ -38,7 +38,7 @@ fi
 GDB=gdb
 GDB_PORT=1234
 GDB_TERM=xterm
-MEMORY=32
+MEMORY=256
 
 cd $(dirname $0)
 
