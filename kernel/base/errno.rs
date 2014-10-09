@@ -5,6 +5,8 @@
 //!
 
 use core::default::Default;
+use describe::*;
+use core::fmt;
 
 macro_rules! errnos (
     ($(($n:ident, $v:expr, $ex:expr)),+) => (
@@ -20,7 +22,11 @@ macro_rules! errnos (
                    $($n => $ex,)*
                 }
             }
-
+        }
+        impl Describeable for Errno {
+            fn describe(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                write!(f, "{}", Errno::to_explanation(*self))
+            }
         }
     )
 )

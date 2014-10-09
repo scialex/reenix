@@ -7,3 +7,8 @@ macro_rules! not_yet_implemented(
     ($name:expr, $msg:expr) => (not_yet_implemented!($name, "{}", $msg));
     ($name:expr, $msg:expr, $($v:expr),*) => (panic!(concat!(stringify!($name), " is not yet implemented ", $msg, $($v),*)))
 )
+
+#[macro_export]
+macro_rules! describe(
+    ($v:expr) => ({ use base::describe::Describer; Describer($v) })
+)

@@ -38,6 +38,7 @@ extern "C" {
 
 // TODO I maybe should move this to a different module.
 /// This stops everything.
+#[no_split_stack]
 #[inline]
 pub fn halt() -> ! {
     unsafe {

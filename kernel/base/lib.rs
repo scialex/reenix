@@ -26,6 +26,29 @@ pub mod debug;
 pub mod kernel;
 pub mod from_str;
 
+pub mod describe {
+    use core::fmt;
+    use core::prelude::*;
+    pub trait Describeable {
+        fn describe(&self, &mut fmt::Formatter) -> fmt::Result;
+    }
+    pub struct Describer<T: Describeable>(T);
+    impl<T: Describeable> Describeable for Describer<T> {
+        fn describe(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let &Describer(ref x) = self;
+            try!(write!(f, "Describe("));
+            try!(x.describe(f));
+            write!(f, ")")
+        }
+    }
+    impl<T: Describeable> fmt::Show for Describer<T> {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            let &Describer(ref x) = self;
+            x.describe(f)
+        }
+    }
+}
+
 pub fn init_stage1() {}
 pub fn init_stage2() {}
 
