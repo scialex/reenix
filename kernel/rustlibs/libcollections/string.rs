@@ -28,7 +28,7 @@ use slice::CloneableVector;
 use str;
 use str::{CharRange, StrAllocating, MaybeOwned, Owned};
 use str::Slice as MaybeOwnedSlice; // So many `Slice`s...
-use vec::Vec;
+use vec::{DerefVec, Vec, as_vec};
 
 /// A growable string stored as a UTF-8 encoded buffer.
 #[deriving(Clone, PartialEq, PartialOrd, Eq, Ord)]
@@ -160,7 +160,7 @@ impl String {
 
         if i > 0 {
             unsafe {
-                res.as_mut_vec().push_all(v.slice_to(i))
+                res.as_mut_vec().push_all(v[..i])
             };
         }
 
@@ -177,7 +177,7 @@ impl String {
             macro_rules! error(() => ({
                 unsafe {
                     if subseqidx != i_ {
-                        res.as_mut_vec().push_all(v.slice(subseqidx, i_));
+                        res.as_mut_vec().push_all(v[subseqidx..i_]);
                     }
                     subseqidx = i;
                     res.as_mut_vec().push_all(REPLACEMENT);
@@ -246,7 +246,7 @@ impl String {
         }
         if subseqidx < total {
             unsafe {
-                res.as_mut_vec().push_all(v.slice(subseqidx, total))
+                res.as_mut_vec().push_all(v[subseqidx..total])
             };
         }
         Owned(res.into_string())
@@ -269,7 +269,7 @@ impl String {
     /// ```
     #[unstable = "error value in return may change"]
     pub fn from_utf16(v: &[u16]) -> Option<String> {
-        let mut s = String::with_capacity(v.len() / 2);
+        let mut s = String::with_capacity(v.len());
         for c in str::utf16_items(v) {
             match c {
                 str::ScalarValue(c) => s.push(c),
@@ -613,7 +613,8 @@ impl String {
     ///
     /// # Failure
     ///
-    /// Fails if `len` > current length.
+    /// Fails if `new_len` > current length,
+    /// or if `new_len` is not a character boundary.
     ///
     /// # Example
     ///
@@ -624,9 +625,9 @@ impl String {
     /// ```
     #[inline]
     #[unstable = "the failure conventions for strings are under development"]
-    pub fn truncate(&mut self, len: uint) {
-        assert!(self.as_slice().is_char_boundary(len));
-        self.vec.truncate(len)
+    pub fn truncate(&mut self, new_len: uint) {
+        assert!(self.as_slice().is_char_boundary(new_len));
+        self.vec.truncate(new_len)
     }
 
     /// Appends a byte to this string buffer.
@@ -927,6 +928,7 @@ impl<S: Str> Add<S, String> for String {
     }
 }
 
+#[cfg(stage0)]
 impl ops::Slice<uint, str> for String {
     #[inline]
     fn as_slice_<'a>(&'a self) -> &'a str {
@@ -947,6 +949,46 @@ impl ops::Slice<uint, str> for String {
     fn slice_<'a>(&'a self, from: &uint, to: &uint) -> &'a str {
         self[][*from..*to]
     }
+}
+#[cfg(not(stage0))]
+impl ops::Slice<uint, str> for String {
+    #[inline]
+    fn as_slice_<'a>(&'a self) -> &'a str {
+        self.as_slice()
+    }
+
+    #[inline]
+    fn slice_from_or_fail<'a>(&'a self, from: &uint) -> &'a str {
+        self[][*from..]
+    }
+
+    #[inline]
+    fn slice_to_or_fail<'a>(&'a self, to: &uint) -> &'a str {
+        self[][..*to]
+    }
+
+    #[inline]
+    fn slice_or_fail<'a>(&'a self, from: &uint, to: &uint) -> &'a str {
+        self[][*from..*to]
+    }
+}
+
+/// Wrapper type providing a `&String` reference via `Deref`.
+#[experimental]
+pub struct DerefString<'a> {
+    x: DerefVec<'a, u8>
+}
+
+impl<'a> Deref<String> for DerefString<'a> {
+    fn deref<'b>(&'b self) -> &'b String {
+        unsafe { mem::transmute(&*self.x) }
+    }
+}
+
+/// Convert a string slice to a wrapper type providing a `&String` reference.
+#[experimental]
+pub fn as_string<'a>(x: &'a str) -> DerefString<'a> {
+    DerefString { x: as_vec(x.as_bytes()) }
 }
 
 /// Unsafe operations
@@ -1015,8 +1057,14 @@ mod tests {
     use {Mutable, MutableSeq};
     use str;
     use str::{Str, StrSlice, Owned};
-    use super::String;
+    use super::{as_string, String};
     use vec::Vec;
+
+    #[test]
+    fn test_as_string() {
+        let x = "foo";
+        assert_eq!(x, as_string(x).as_slice());
+    }
 
     #[test]
     fn test_from_str() {

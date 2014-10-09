@@ -61,7 +61,7 @@ use core::iter::AdditiveIterator;
 use core::mem;
 use core::prelude::{Char, Clone, Collection, Eq, Equiv, ImmutableSlice};
 use core::prelude::{Iterator, MutableSlice, None, Option, Ord, Ordering};
-use core::prelude::{PartialEq, PartialOrd, Result, Slice, Some, Tuple2};
+use core::prelude::{PartialEq, PartialOrd, Result, AsSlice, Some, Tuple2};
 use core::prelude::{range};
 
 use {Deque, MutableSeq};
@@ -75,7 +75,7 @@ use vec::Vec;
 pub use core::str::{from_utf8, CharEq, Chars, CharOffsets};
 pub use core::str::{Bytes, CharSplits};
 pub use core::str::{CharSplitsN, AnyLines, MatchIndices, StrSplits};
-pub use core::str::{eq_slice, is_utf8, is_utf16, Utf16Items};
+pub use core::str::{Utf16CodeUnits, eq_slice, is_utf8, is_utf16, Utf16Items};
 pub use core::str::{Utf16Item, ScalarValue, LoneSurrogate, utf16_items};
 pub use core::str::{truncate_utf16_at_nul, utf8_char_width, CharRange};
 pub use core::str::{Str, StrSlice};
@@ -778,13 +778,11 @@ pub trait StrAllocating: Str {
     /// Returns the Levenshtein Distance between two strings.
     fn lev_distance(&self, t: &str) -> uint {
         let me = self.as_slice();
-        let slen = me.len();
-        let tlen = t.len();
+        if me.is_empty() { return t.char_len(); }
+        if t.is_empty() { return me.char_len(); }
 
-        if slen == 0 { return tlen; }
-        if tlen == 0 { return slen; }
-
-        let mut dcol = Vec::from_fn(tlen + 1, |x| x);
+        let mut dcol = Vec::from_fn(t.len() + 1, |x| x);
+        let mut t_last = 0;
 
         for (i, sc) in me.chars().enumerate() {
 
@@ -799,15 +797,15 @@ pub trait StrAllocating: Str {
                     *dcol.get_mut(j + 1) = current;
                 } else {
                     *dcol.get_mut(j + 1) = cmp::min(current, next);
-                    *dcol.get_mut(j + 1) = cmp::min(dcol[j + 1],
-                                                    dcol[j]) + 1;
+                    *dcol.get_mut(j + 1) = cmp::min(dcol[j + 1], dcol[j]) + 1;
                 }
 
                 current = next;
+                t_last = j;
             }
         }
 
-        return dcol[tlen];
+        dcol[t_last + 1]
     }
 
     /// Returns an iterator over the string in Unicode Normalization Form D
@@ -882,7 +880,7 @@ mod tests {
     use {Collection, MutableSeq};
 
     use super::*;
-    use std::slice::{Slice, ImmutableSlice};
+    use std::slice::{AsSlice, ImmutableSlice};
     use string::String;
     use vec::Vec;
 
@@ -1680,7 +1678,7 @@ mod tests {
         let mut bytes = [0u8, ..4];
         for c in range(0u32, 0x110000).filter_map(|c| ::core::char::from_u32(c)) {
             let len = c.encode_utf8(bytes).unwrap_or(0);
-            let s = ::core::str::from_utf8(bytes.slice_to(len)).unwrap();
+            let s = ::core::str::from_utf8(bytes[..len]).unwrap();
             if Some(c) != s.chars().next() {
                 fail!("character {:x}={} does not decode correctly", c as u32, c);
             }
@@ -1692,7 +1690,7 @@ mod tests {
         let mut bytes = [0u8, ..4];
         for c in range(0u32, 0x110000).filter_map(|c| ::core::char::from_u32(c)) {
             let len = c.encode_utf8(bytes).unwrap_or(0);
-            let s = ::core::str::from_utf8(bytes.slice_to(len)).unwrap();
+            let s = ::core::str::from_utf8(bytes[..len]).unwrap();
             if Some(c) != s.chars().rev().next() {
                 fail!("character {:x}={} does not decode correctly", c as u32, c);
             }
@@ -1876,6 +1874,27 @@ mod tests {
         let data = "\n \tMäry   häd\tä  little lämb\nLittle lämb\n";
         let words: Vec<&str> = data.words().collect();
         assert_eq!(words, vec!["Märy", "häd", "ä", "little", "lämb", "Little", "lämb"])
+    }
+
+    #[test]
+    fn test_lev_distance() {
+        use std::char::{ from_u32, MAX };
+        // Test bytelength agnosticity
+        for c in range(0u32, MAX as u32)
+                 .filter_map(|i| from_u32(i))
+                 .map(|i| String::from_char(1, i)) {
+            assert_eq!(c[].lev_distance(c[]), 0);
+        }
+
+        let a = "\nMäry häd ä little lämb\n\nLittle lämb\n";
+        let b = "\nMary häd ä little lämb\n\nLittle lämb\n";
+        let c = "Mary häd ä little lämb\n\nLittle lämb\n";
+        assert_eq!(a.lev_distance(b), 1);
+        assert_eq!(b.lev_distance(a), 1);
+        assert_eq!(a.lev_distance(c), 2);
+        assert_eq!(c.lev_distance(a), 2);
+        assert_eq!(b.lev_distance(c), 1);
+        assert_eq!(c.lev_distance(b), 1);
     }
 
     #[test]

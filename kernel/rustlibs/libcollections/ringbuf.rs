@@ -271,7 +271,7 @@ impl<T> RingBuf<T> {
     ///     *num = *num - 2;
     /// }
     /// let b: &[_] = &[&mut 3, &mut 1, &mut 2];
-    /// assert_eq!(buf.iter_mut().collect::<Vec<&mut int>>().as_slice(), b);
+    /// assert_eq!(buf.iter_mut().collect::<Vec<&mut int>>()[], b);
     /// ```
     pub fn iter_mut<'a>(&'a mut self) -> MutItems<'a, T> {
         let start_index = raw_index(self.lo, self.elts.len(), 0);
@@ -291,7 +291,7 @@ impl<T> RingBuf<T> {
         } else {
             // Items to iterate goes from start_index to end_index:
             let (empty, elts) = self.elts.split_at_mut(0);
-            let remaining1 = elts.slice_mut(start_index, end_index);
+            let remaining1 = elts[mut start_index..end_index];
             MutItems { remaining1: remaining1,
                                  remaining2: empty,
                                  nelts: self.nelts }
@@ -532,7 +532,6 @@ impl<T: fmt::Show> fmt::Show for RingBuf<T> {
 mod tests {
     use std::fmt::Show;
     use std::prelude::*;
-    use std::gc::{GC, Gc};
     use std::hash;
     use test::Bencher;
     use test;
@@ -585,43 +584,6 @@ mod tests {
         assert_eq!(*d.get(1), 2);
         assert_eq!(*d.get(2), 3);
         assert_eq!(*d.get(3), 4);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_boxes() {
-        let a: Gc<int> = box(GC) 5;
-        let b: Gc<int> = box(GC) 72;
-        let c: Gc<int> = box(GC) 64;
-        let d: Gc<int> = box(GC) 175;
-
-        let mut deq = RingBuf::new();
-        assert_eq!(deq.len(), 0);
-        deq.push_front(a);
-        deq.push_front(b);
-        deq.push(c);
-        assert_eq!(deq.len(), 3);
-        deq.push(d);
-        assert_eq!(deq.len(), 4);
-        assert_eq!(deq.front(), Some(&b));
-        assert_eq!(deq.back(), Some(&d));
-        assert_eq!(deq.pop_front(), Some(b));
-        assert_eq!(deq.pop(), Some(d));
-        assert_eq!(deq.pop(), Some(c));
-        assert_eq!(deq.pop(), Some(a));
-        assert_eq!(deq.len(), 0);
-        deq.push(c);
-        assert_eq!(deq.len(), 1);
-        deq.push_front(b);
-        assert_eq!(deq.len(), 2);
-        deq.push(d);
-        assert_eq!(deq.len(), 3);
-        deq.push_front(a);
-        assert_eq!(deq.len(), 4);
-        assert_eq!(*deq.get(0), a);
-        assert_eq!(*deq.get(1), b);
-        assert_eq!(*deq.get(2), c);
-        assert_eq!(*deq.get(3), d);
     }
 
     #[cfg(test)]
@@ -753,12 +715,6 @@ mod tests {
     #[test]
     fn test_param_int() {
         test_parameterized::<int>(5, 72, 64, 175);
-    }
-
-    #[test]
-    fn test_param_at_int() {
-        test_parameterized::<Gc<int>>(box(GC) 5, box(GC) 72,
-                                      box(GC) 64, box(GC) 175);
     }
 
     #[test]
