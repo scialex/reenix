@@ -1,7 +1,5 @@
         .file "boot.S"
         .global _start
-        .global _high_half
-        .global gdt_flush
 
 #define ASM_FILE 1
 #include "multiboot.h"
@@ -64,11 +62,13 @@ _start:
     ljmp    $0x08, $_finish_boot
 
 /* This is the stack until we actually set up a real one. */
+.global sys_stack
 sys_stack:
 .align 4
-.skip 0x1000
+.skip 0x4000
 sys_stack_bottom:
 
+.global _finish_boot
 _finish_boot:
     mov     $0x10, %ax /* setting data segments */
     mov     %ax, %ds
