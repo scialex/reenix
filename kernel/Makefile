@@ -52,11 +52,11 @@ RSFLAGS := $(strip $(RSFLAGS))
 # $(4) are any flags we wish to pass down.
 define external-targets
 ./libs/$(notdir $(3)) : external/$(1)/$(3)
-	@ echo "   Copying \"kernel/$$@\"..."
+	@ echo "  Copying \"kernel/$$@\"..."
 	$(HIDE_SIGIL) cp external/$(1)/$(3) $$@
 
 ./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f -not -path ./external/$(1)/$(3))
-	@ echo "   Recursive make of \"kernel/$$@\"..."
+	@ echo "  Recursive make of \"kernel/$$@\"..."
 	$(HIDE_SIGIL) $$(MAKE) $(SILENT_FLAG) $$(MFLAGS) -C external/$(1) $(2) $(4)
 
 .PHONEY:
@@ -69,20 +69,22 @@ $(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,SFLAGS="-m32
 # $(1) is the directory the library is in
 # $(2) is the name of the crate
 # $(3) is the list of crates that this library depends on.
+# $(4) is any additional rust flags you want.
 define base-crate-rule
 libs/lib$(2).rlib : $$(shell find $(1) -type f) $$(foreach l,$(3), libs/lib$$(l).rlib)
-	$(HIDE_SIGIL) $(RUST) $(RSFLAGS) --crate-type=rlib $(1)/lib.rs --out-dir libs
+	@ echo "  Compiling \"kernel/$(1)/lib.rs\"..." # for \"kernel/$$@\""
+	$(HIDE_SIGIL) $(RUST) $(RSFLAGS) $(4) --crate-type=rlib $(1)/lib.rs --out-dir libs
 endef
 
 define crate-rule
-$(eval $(call base-crate-rule,$(1),$(1),$(2)))
+$(eval $(call base-crate-rule,$(1),$(1),$(2),))
 endef
 
 # A module that is part of rusts stdlib.
 # $(1) is the name of the crate.
 # $(2) is the list of dependencies
 define builtin-crate-rule
-$(eval $(call base-crate-rule,rustlibs/lib$(1),$(1),$(2)))
+$(eval $(call base-crate-rule,rustlibs/lib$(1),$(1),$(2),--allow=dead-code))
 endef
 
 $(eval $(call builtin-crate-rule,libc,))

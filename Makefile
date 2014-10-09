@@ -18,8 +18,8 @@ tidy: tidy_kernel tidy_doc
 all_doc: design.pdf
 
 tidy_doc:
-	@ rm design.log
-	@ rm design.aux
+	@ rm design.log 2>/dev/null || true
+	@ rm design.aux 2>/dev/null || true
 
 clean_doc: tidy_doc
 	@ rm design.pdf
