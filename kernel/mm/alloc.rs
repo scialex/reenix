@@ -15,7 +15,7 @@ use core::cmp::min;
 use core::intrinsics::transmute;
 use core::{fmt, mem, ptr};
 use libc::{size_t, c_void, c_int};
-use super::lightmap::{LightNode, LightMap, LightNodeAlloc};
+use super::lightmap::{LightNode, LightMap};
 
 pub static SLAB_REDZONE : u32 = 0xdeadbeef;
 
@@ -139,7 +139,7 @@ pub fn init_stage1() {
     unsafe { NODE_ALLOCATOR = SlabAllocator::new("Map Node Allocator", node_size as size_t); }
     add_kmalloc_slabs();
     unsafe { SLAB_ALLOCATORS.add(node_size, NODE_ALLOCATOR); }
-    dbg!(debug::MM, "Allocator tree is {}", SLAB_ALLOCATORS );
+    unsafe { dbg!(debug::MM, "Allocator tree is {}", SLAB_ALLOCATORS); }
 }
 
 pub fn init_stage2() {}
@@ -326,7 +326,6 @@ pub unsafe fn deallocate(ptr: *mut u8, size: uint, _align: uint) {
 pub fn usable_size(size: uint, _align: uint) -> uint {
     if size >= MAX_SLAB_SIZE {
         use super::page;
-        use libc::c_void;
         unsafe { page::const_align_up(size as *const u8) as uint }
     } else {
         let alloc = unsafe {SLAB_ALLOCATORS.find_smallest(size)};

@@ -42,8 +42,8 @@ struct pagedir {
         (((uint32_t)(vaddr)) & (~PAGE_MASK))
 
 /* the virtual address of the page directory in cr3 */
-static pagedir_t *current_pagedir = NULL;
-static pagedir_t *template_pagedir = NULL;
+pagedir_t *current_pagedir = NULL;
+pagedir_t *template_pagedir = NULL;
 
 static uint32_t phys_map_count = 1;
 static pte_t *final_page;

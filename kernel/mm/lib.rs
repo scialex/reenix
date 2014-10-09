@@ -8,7 +8,7 @@
 #![crate_type="rlib"]
 #![allow(non_camel_case_types)]
 #![allow(missing_doc)]
-#![feature(phase, globs, struct_variant, macro_rules)]
+#![feature(phase, globs, struct_variant, macro_rules, asm, if_let)]
 #![no_std]
 
 #[phase(link, plugin)] extern crate core;
@@ -20,12 +20,14 @@ use libc::{c_void, size_t};
 /// Initialize this crate. This must be called exactly once during startup.
 #[deny(dead_code)]
 pub fn init_stage1() {
+    tlb::init_stage1();
     page::init_stage1();
     pagetable::init_stage1();
     alloc::init_stage1();
 }
 
 pub fn init_stage2() {
+    tlb::init_stage2();
     page::init_stage2();
     pagetable::init_stage2();
     alloc::init_stage2();
@@ -37,6 +39,7 @@ extern "C" {
     pub fn realloc(addr: *mut c_void, size: size_t) -> *mut c_void;
 }
 
+pub mod pagetable;
 pub mod utils;
 pub mod alloc;
 mod lightmap;
@@ -46,7 +49,7 @@ pub mod poison {
     pub static ALLOC   : u8   = 0xBB;
 }
 
-#[cfg(kernel, target_arch="x86")]
+#[cfg(all(kernel, target_arch="x86"))]
 pub mod user {
     pub static MEM_LOW  : uint = 0x00400000;
     pub static MEM_HIGH : uint = 0xc0000000;
@@ -76,6 +79,33 @@ pub mod memman {
         pub static FIXED : int = 0x4;
         pub static ANON  : int = 0x8;
         pub static FAILED : uint = !0;
+    }
+}
+
+pub mod tlb {
+    use libc::c_void;
+    use core::iter::range;
+    pub fn init_stage1() {}
+    pub fn init_stage2() {}
+
+    pub unsafe fn flush(vaddr : *mut c_void) {
+        asm!("invlpg ($0)" : : "r"(vaddr) : "memory" : "volatile")
+    }
+
+    #[allow(unused_variable)]
+    pub unsafe fn flush_range(vaddr: *mut c_void, pages: uint) {
+        use super::page;
+        let mut uv = vaddr as uint;
+        for i in range(0, pages) {
+            flush(uv as *mut c_void);
+            uv += page::SIZE;
+        }
+    }
+
+    pub unsafe fn flush_all() {
+        let pdir : uint;
+        asm!("movl %cr3, $0" : "=r"(pdir) :           :          : "volatile");
+        asm!("movl $0, %cr3" :            : "r"(pdir) : "memory" : "volatile");
     }
 }
 
@@ -154,110 +184,6 @@ pub mod page {
     #[inline]
     pub fn same<T>(x: *const T, y: *const T) -> bool {
         unsafe { const_align_down(x) == const_align_down(y) }
-    }
-}
-
-pub mod pagetable {
-    use super::page;
-    use libc::uintptr_t;
-    use base::errno;
-    use core::u32;
-    use core::prelude::*;
-    use core::intrinsics::transmute;
-
-    // TODO Make this bitflags.
-    pub static PRESENT        : uint = 0x001;
-    pub static WRITE          : uint = 0x002;
-    pub static USER           : uint = 0x004;
-    pub static WRITE_THROUGH  : uint = 0x008;
-    pub static CACHE_DISABLED : uint = 0x010;
-    pub static ACCESSED       : uint = 0x020;
-    pub static DIRTY          : uint = 0x040;
-    pub static SIZE           : uint = 0x080;
-    pub static GLOBAL         : uint = 0x100;
-
-    pub static ENTRY_COUNT : uint = page::SIZE / u32::BYTES;
-    pub static VADDR_SIZE  : uint = page::SIZE * ENTRY_COUNT;
-
-    pub type pte_t = u32;
-    pub type pde_t = u32;
-
-    #[repr(C)]
-    pub struct PageDir {
-        pd_physical : [pde_t, .. ENTRY_COUNT],
-        pd_virtual  : [*mut uintptr_t, .. ENTRY_COUNT],
-    }
-
-    impl Drop for PageDir {
-        fn drop(&mut self) {
-            unsafe {
-                imp::destroy_pagedir(transmute(self))
-            }
-        }
-    }
-
-    // TODO Maybe make these rust.
-    extern "C" {
-
-        /// Temporarily maps one page at the given physical address in at a
-        /// virtual address and returns that virtual address. Note that repeated
-        /// calls to this function will return the same virtual address, thereby
-        /// invalidating the previous mapping.
-        #[link_name = "pt_phys_tmp_map"]
-        pub fn phys_tmp_map(paddr: uintptr_t) -> uintptr_t;
-
-        /// Permenantly maps the given number of physical pages, starting at the
-        /// given physical address to a virtual address and returns that virtual
-        /// address. Each call will return a different virtual address and the
-        /// memory will stay mapped forever. Note that there is an implementation
-        /// defined limit to the number of pages available and using too many
-        /// will cause the kernel to panic.
-        #[link_name = "pt_phys_perm_map"]
-        pub fn phys_perm_map(paddr: uintptr_t, count: u32) -> uintptr_t;
-        /// Looks up the given virtual address (vaddr) in the current page
-        /// directory, in order to find the matching physical memory address it
-        /// points to. vaddr MUST have a mapping in the current page directory,
-        /// otherwise this function's behavior is undefined */
-        #[link_name = "pt_virt_to_phys"]
-        pub fn virt_to_phys(vaddr: uintptr_t) -> uintptr_t;
-
-        #[link_name = "pt_unmap"]
-        pub fn unmap(pd: *mut PageDir, vaddr: uintptr_t);
-
-        #[link_name = "pt_unmap_range"]
-        pub fn unmap_range(pd: *mut PageDir, vlow: uintptr_t, vhigh: uintptr_t);
-
-        #[deny(dead_code)]
-        fn pt_init();
-    }
-
-    pub fn init_stage1() { unsafe { pt_init(); } }
-    pub fn init_stage2() {}
-
-    // TODO Rest of include/mm/
-    #[inline]
-    pub unsafe fn map(pd: *mut PageDir, vaddr: uintptr_t, paddr: uintptr_t, pdflags: u32, ptflags: u32) -> Result<(),errno::Errno> {
-        use core::num;
-        let a = imp::map(pd, vaddr, paddr, pdflags, ptflags);
-        match num::from_i32::<errno::Errno>(a) {
-            Some(errno::EOK) => Ok(()),
-            Some(a) => Err(a),
-            None => Err(errno::EUNKNOWN),
-        }
-    }
-
-    mod imp {
-        use libc::{c_int, uintptr_t};
-        use super::PageDir;
-        extern "C" {
-            #[link_name = "pt_map"]
-            pub fn map(pd: *mut PageDir, vaddr: uintptr_t, paddr: uintptr_t, pdflags: u32, ptflags: u32) -> c_int;
-
-            #[link_name = "pt_create_pagedir"]
-            pub fn create_pagedir() -> *mut PageDir;
-            #[link_name = "pt_destroy_pagedir"]
-            pub fn destroy_pagedir(pd: *mut PageDir);
-        }
     }
 }
 
