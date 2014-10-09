@@ -64,7 +64,7 @@ clean-$(1):
 	$(HIDE_SIGIL) rm libs/$(notdir $(3)) || true
 	$(HIDE_SIGIL) $(MAKE) $(SILENT_FLAG) -C external/$(1) clean $(4)
 endef
-$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-g -m32 -march=i386 -ffreestanding" ARCH=i386))
+$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-Wno-maybe-uninitialized -g -m32 -march=i386 -ffreestanding" ARCH=i386))
 
 # $(1) is the directory the library is in
 # $(2) is the name of the crate
