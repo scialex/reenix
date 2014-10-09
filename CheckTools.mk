@@ -15,7 +15,7 @@ else
 ifneq ($(RUST_MINOR),12)
 $(error Found $(RUST) version $(RUST_MINOR) expected 12)
 else
-$(info Using $(RUST) version '$(RUST_VERSION)')
+#$(info Using $(RUST) version '$(RUST_VERSION)')
 endif
 endif
 endif
