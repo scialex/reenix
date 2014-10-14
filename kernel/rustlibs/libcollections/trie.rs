@@ -34,10 +34,10 @@ use slice::{Items, MutItems};
 use slice;
 
 // FIXME: #5244: need to manually update the TrieNode constructor
-static SHIFT: uint = 4;
-static SIZE: uint = 1 << SHIFT;
-static MASK: uint = SIZE - 1;
-static NUM_CHUNKS: uint = uint::BITS / SHIFT;
+const SHIFT: uint = 4;
+const SIZE: uint = 1 << SHIFT;
+const MASK: uint = SIZE - 1;
+const NUM_CHUNKS: uint = uint::BITS / SHIFT;
 
 #[deriving(Clone)]
 enum Child<T> {
@@ -389,15 +389,6 @@ macro_rules! bound {
 
 impl<T> TrieMap<T> {
     // If `upper` is true then returns upper_bound else returns lower_bound.
-    #[cfg(stage0)]
-    #[inline]
-    fn bound<'a>(&'a self, key: uint, upper: bool) -> Entries<'a, T> {
-        bound!(Entries, self = self,
-               key = key, is_upper = upper,
-               slice_from = slice_from_, iter = iter,
-               mutability = )
-    }
-    #[cfg(not(stage0))]
     #[inline]
     fn bound<'a>(&'a self, key: uint, upper: bool) -> Entries<'a, T> {
         bound!(Entries, self = self,
@@ -440,15 +431,6 @@ impl<T> TrieMap<T> {
         self.bound(key, true)
     }
     // If `upper` is true then returns upper_bound else returns lower_bound.
-    #[cfg(stage0)]
-    #[inline]
-    fn bound_mut<'a>(&'a mut self, key: uint, upper: bool) -> MutEntries<'a, T> {
-        bound!(MutEntries, self = self,
-               key = key, is_upper = upper,
-               slice_from = slice_from_mut_, iter = iter_mut,
-               mutability = mut)
-    }
-    #[cfg(not(stage0))]
     #[inline]
     fn bound_mut<'a>(&'a mut self, key: uint, upper: bool) -> MutEntries<'a, T> {
         bound!(MutEntries, self = self,
@@ -967,8 +949,8 @@ macro_rules! iterator_impl {
                 // rules, and are just manipulating raw pointers like there's no
                 // such thing as invalid pointers and memory unsafety. The
                 // reason is performance, without doing this we can get the
-                // bench_iter_large microbenchmark down to about 30000 ns/iter
-                // (using .unsafe_get to index self.stack directly, 38000
+                // (now replaced) bench_iter_large microbenchmark down to about
+                // 30000 ns/iter (using .unsafe_get to index self.stack directly, 38000
                 // ns/iter with [] checked indexing), but this smashes that down
                 // to 13500 ns/iter.
                 //
@@ -1477,31 +1459,39 @@ mod test_map {
 mod bench_map {
     use std::prelude::*;
     use std::rand::{weak_rng, Rng};
-    use test::Bencher;
+    use test::{Bencher, black_box};
 
     use MutableMap;
     use super::TrieMap;
 
-    #[bench]
-    fn bench_iter_small(b: &mut Bencher) {
-        let mut m = TrieMap::<uint>::new();
+    fn bench_iter(b: &mut Bencher, size: uint) {
+        let mut map = TrieMap::<uint>::new();
         let mut rng = weak_rng();
-        for _ in range(0u, 20) {
-            m.insert(rng.gen(), rng.gen());
+
+        for _ in range(0, size) {
+            map.swap(rng.gen(), rng.gen());
         }
 
-        b.iter(|| for _ in m.iter() {})
+        b.iter(|| {
+            for entry in map.iter() {
+                black_box(entry);
+            }
+        });
     }
 
     #[bench]
-    fn bench_iter_large(b: &mut Bencher) {
-        let mut m = TrieMap::<uint>::new();
-        let mut rng = weak_rng();
-        for _ in range(0u, 1000) {
-            m.insert(rng.gen(), rng.gen());
-        }
+    pub fn iter_20(b: &mut Bencher) {
+        bench_iter(b, 20);
+    }
 
-        b.iter(|| for _ in m.iter() {})
+    #[bench]
+    pub fn iter_1000(b: &mut Bencher) {
+        bench_iter(b, 1000);
+    }
+
+    #[bench]
+    pub fn iter_100000(b: &mut Bencher) {
+        bench_iter(b, 100000);
     }
 
     #[bench]
