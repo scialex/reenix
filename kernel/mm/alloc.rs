@@ -115,7 +115,7 @@ impl fmt::Show for SlabAllocator {
         try!(name.fmt(w));
         try!(w.write("', objsize: ".as_bytes()));
         try!(size.fmt(w));
-        try!(w.write("}".as_bytes()));
+        try!(w.write(" }".as_bytes()));
         Ok(())
     }
 }
@@ -245,7 +245,7 @@ pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
             panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
         },
         Some((alloc_size, sa)) => {
-            dbg!(debug::MM, "Allocating from {} for request for {}", sa, size);
+            dbg!(debug::MM, "Allocating {} of max size of {} from {}", size, alloc_size, sa);
             assert!(alloc_size >= size, "allocator's size {} was less then required size {}", alloc_size, size);
             assert!(sa.get_size() as uint >= size, "{} is not large enough for allocation of {}", sa, size);
             let res = sa.allocate();
@@ -334,8 +334,8 @@ pub fn usable_size(size: uint, _align: uint) -> uint {
                 // This should never really happen, truely large ones will get their own page.
                 panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
             },
-            Some((_,sa)) => {
-                sa.get_size() as uint
+            Some((size,_)) => {
+                size
             }
         }
     }

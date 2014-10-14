@@ -55,8 +55,8 @@ impl<T: Clone + fmt::Show> LightNode<T> {
                 unsafe { ptr::write(self as *mut LightNode<T>, new_node); }
             },
             // NOTE for some reason rust doesn't like deref_mut!(l).insert_at(...)?
-            &Node{ left: l, right: _, key: k} if k > key => { let x = deref_mut!(l); x.insert_at(key, val, alloc) },
-            &Node{ left: _, right: r, key: k} if k < key => { let x = deref_mut!(r); x.insert_at(key, val, alloc) },
+            &Node{ left: l, right: _, key: k} if k > key => { (deref_mut!(l)).insert_at(key, val, alloc) },
+            &Node{ left: _, right: r, key: k} if k < key => { (deref_mut!(r)).insert_at(key, val, alloc) },
             _ => unreachable!(),
         }
         // TODO I should put in a self.balance() routine.
@@ -66,8 +66,8 @@ impl<T: Clone + fmt::Show> LightNode<T> {
         match *self {
             Leaf(k, ref v) if k >= key => Some((k, v.clone())),
             Leaf(k, _)     if k <  key => None,
-            Node(l, _, k)  if k >  key => { let x = deref!(l); x.search(key) },
-            Node(_, r, k)  if k <= key => { let x = deref!(r); x.search(key) },
+            Node(l, _, k)  if k >= key => { (deref!(l)).search(key) },
+            Node(_, r, k)  if k <  key => { (deref!(r)).search(key) },
             _ => unreachable!(),
         }
     }

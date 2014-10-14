@@ -8,7 +8,7 @@ use core::u32;
 use core::prelude::*;
 use core::intrinsics::copy_nonoverlapping_memory;
 use core::ptr::{zero_memory,null,null_mut};
-use core::mem::{uninitialized,size_of};
+use core::mem::uninitialized;
 
 // TODO Make this bitflags.
 pub const PRESENT        : uint = 0x001;
@@ -165,6 +165,7 @@ impl Drop for PageDir {
         let end = (user::MEM_HIGH - 1) / VADDR_SIZE;
         assert!(begin < end && begin > 0);
 
+        dbg!(debug::MM, "Freeing pagedir");
         for i in range(begin, end) {
             if let Some(x) = self.get_pagetable(i) {
                 unsafe { page::free(x as *mut c_void) }
