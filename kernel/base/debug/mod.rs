@@ -10,7 +10,7 @@ pub use self::flags::*;
 pub mod printing;
 mod flags;
 
-pub static DBG_ACTIVE : DbgMode = ALL;
+pub const DBG_ACTIVE : DbgMode = ALL;
 
 mod macros;
 

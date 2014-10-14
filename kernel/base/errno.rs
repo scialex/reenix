@@ -175,6 +175,6 @@ impl Default for Errno {
 
 
 /* added by dap from Linux */
-pub static EDEADLOCK : Errno = EDEADLK;
-pub static EOPNOTSUPP : Errno =  ENOTSUP;
-pub static EWOULDBLOCK : Errno = EAGAIN;
+pub const EDEADLOCK : Errno = EDEADLK;
+pub const EOPNOTSUPP : Errno =  ENOTSUP;
+pub const EWOULDBLOCK : Errno = EAGAIN;

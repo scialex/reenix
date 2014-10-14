@@ -28,8 +28,8 @@ macro_rules! dbg_modes (
         bitmask_create!(flags DbgMode : u64 {
             $($n = (0x1 << $v)),+
         })
-        pub static NONE : DbgMode = DbgMode(0);
-        pub static ALL : DbgMode = DbgMode(-1);
+        pub const NONE : DbgMode = DbgMode(0);
+        pub const ALL : DbgMode = DbgMode(-1);
         impl DbgMode {
             #[allow(dead_code)]
             pub fn get_color(&self) -> &'static str {

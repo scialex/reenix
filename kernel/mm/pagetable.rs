@@ -11,18 +11,18 @@ use core::ptr::{zero_memory,null,null_mut};
 use core::mem::{uninitialized,size_of};
 
 // TODO Make this bitflags.
-pub static PRESENT        : uint = 0x001;
-pub static WRITE          : uint = 0x002;
-pub static USER           : uint = 0x004;
-pub static WRITE_THROUGH  : uint = 0x008;
-pub static CACHE_DISABLED : uint = 0x010;
-pub static ACCESSED       : uint = 0x020;
-pub static DIRTY          : uint = 0x040;
-pub static SIZE           : uint = 0x080;
-pub static GLOBAL         : uint = 0x100;
+pub const PRESENT        : uint = 0x001;
+pub const WRITE          : uint = 0x002;
+pub const USER           : uint = 0x004;
+pub const WRITE_THROUGH  : uint = 0x008;
+pub const CACHE_DISABLED : uint = 0x010;
+pub const ACCESSED       : uint = 0x020;
+pub const DIRTY          : uint = 0x040;
+pub const SIZE           : uint = 0x080;
+pub const GLOBAL         : uint = 0x100;
 
-pub static ENTRY_COUNT : uint = page::SIZE / u32::BYTES;
-pub static VADDR_SIZE  : uint = page::SIZE * ENTRY_COUNT;
+pub const ENTRY_COUNT : uint = page::SIZE / u32::BYTES;
+pub const VADDR_SIZE  : uint = page::SIZE * ENTRY_COUNT;
 
 type pte = uint;
 type pde = uint;
@@ -34,12 +34,14 @@ pub struct PageDir {
 }
 
 impl PageDir {
+    // TODO I need to make this return something different. That manages the memory by itself.
+    // TODO CURRENTLY I OVERFLOW THE STACK creating this.
     pub fn new() -> PageDir {
         assert!(template_pagedir != null());
         unsafe {
             let mut ret = uninitialized();
             let r : *mut PageDir = &mut ret;
-            copy_nonoverlapping_memory(r, template_pagedir, size_of::<PageDir>());
+            copy_nonoverlapping_memory(r, template_pagedir, 1);
             ret
         }
     }
@@ -175,6 +177,8 @@ impl Drop for PageDir {
 #[allow(ctypes)]
 extern "C" {
     static template_pagedir : *const PageDir;
+    #[link_name = "current_pagedir"]
+    pub static current : *const PageDir;
 
     /// Temporarily maps one page at the given physical address in at a
     /// virtual address and returns that virtual address. Note that repeated
@@ -200,6 +204,9 @@ extern "C" {
     pub fn base_virt_to_phys(vaddr: uintptr_t) -> uintptr_t;
 
     #[deny(dead_code)]
+    fn pt_template_init();
+
+    #[deny(dead_code)]
     fn pt_init();
 
     #[link_name = "pt_set"]
@@ -208,4 +215,5 @@ extern "C" {
 
 pub fn init_stage1() { unsafe { pt_init(); } }
 pub fn init_stage2() {}
+pub fn template_init() { unsafe { pt_template_init(); } }
 

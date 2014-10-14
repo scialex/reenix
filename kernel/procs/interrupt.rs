@@ -14,22 +14,24 @@ pub struct Registers {
     eip  : u32, cs  : u32, eflags : u32, useresp : u32, ss : u32, /* pushed by the processor automatically */
 }
 
-pub static MAX_INTERRUPTS : u16 = 256;
-pub static SPURIOUS       : u8  = 0xEF;
+pub const MAX_INTERRUPTS : u16 = 256;
+pub const SPURIOUS       : u8  = 0xEF;
 
-pub static LOW  : u8 = 0;
-pub static HIGH : u8 = 0xff;
+/// All Interrupts enabled.
+pub const LOW  : u8 = 0;
+/// All Interrupts disabled
+pub const HIGH : u8 = 0xFF;
 
-pub static DIVIDE_BY_ZERO : u8 = 0x00;
-pub static INVALID_OPCODE : u8 = 0x06;
-pub static GPF            : u8 = 0x0d;
-pub static PAGE_FAULT     : u8 = 0x0e;
-pub static SYSCALL        : u8 = 0x2e;
-pub static PIT            : u8 = 0xf1;
-pub static APICTIMER      : u8 = 0xf0;
-pub static KEYBOARD       : u8 = 0xe0;
-pub static DISK_PRIMARY   : u8 = 0xd0;
-pub static DISK_SECONDARY : u8 = 0xd1;
+pub const DIVIDE_BY_ZERO : u8 = 0x00;
+pub const INVALID_OPCODE : u8 = 0x06;
+pub const GPF            : u8 = 0x0d;
+pub const PAGE_FAULT     : u8 = 0x0e;
+pub const SYSCALL        : u8 = 0x2e;
+pub const PIT            : u8 = 0xf1;
+pub const APICTIMER      : u8 = 0xf0;
+pub const KEYBOARD       : u8 = 0xe0;
+pub const DISK_PRIMARY   : u8 = 0xd0;
+pub const DISK_SECONDARY : u8 = 0xd1;
 
 /**
  * Enable interupts
@@ -102,20 +104,20 @@ struct InterruptInfo {
 
 pub mod interrupt_attr {
     pub type Attr = u8;
-    pub static TRAP    : Attr = 0x01;
-    pub static BIT16   : Attr = 0x06;
-    pub static BIT32   : Attr = 0x0E;
-    pub static RING0   : Attr = 0x00;
-    pub static RING1   : Attr = 0x40;
-    pub static RING2   : Attr = 0x20;
-    pub static RING3   : Attr = 0x60;
-    pub static PRESENT : Attr = 0x80;
+    pub const TRAP    : Attr = 0x01;
+    pub const BIT16   : Attr = 0x06;
+    pub const BIT32   : Attr = 0x0E;
+    pub const RING0   : Attr = 0x00;
+    pub const RING1   : Attr = 0x40;
+    pub const RING2   : Attr = 0x20;
+    pub const RING3   : Attr = 0x60;
+    pub const PRESENT : Attr = 0x80;
 }
 
 pub type InterruptHandler = unsafe extern fn(&Registers);
 
 #[allow(unused_unsafe)]
-#[no_split_stack]
+#[no_stack_check]
 unsafe extern fn unhandled_intr(r: &Registers) {
     panic!("Unhandled interrupt 0x{:X}", r.intr);
 }
@@ -123,7 +125,7 @@ unsafe extern fn unhandled_intr(r: &Registers) {
 static mut IDT : InterruptState<'static> = InterruptState {
     table    : [InterruptDescription { baselo : 0, selector: 0, zero: 0, attr: 0, basehi: 0 }, ..MAX_INTERRUPTS as uint],
     handlers : [unhandled_intr, ..MAX_INTERRUPTS as uint],
-    mappings : [None, ..MAX_INTERRUPTS as uint], 
+    mappings : [None, ..MAX_INTERRUPTS as uint],
     data     : InterruptInfo { size: 0, base : 0 as *const InterruptDescription }
 };
 
@@ -137,7 +139,7 @@ pub struct InterruptState<'a> {
 macro_rules! make_panic_handler(
     ($int:ident) => ({
         #[allow(unused_unsafe)]
-        #[no_split_stack]
+        #[no_stack_check]
         unsafe extern fn die(r: &Registers) {
             panic!(concat!("Recieved a ", stringify!($int), " interrupt (0x{:X}). Aborting"), r.intr);
         }
@@ -155,9 +157,10 @@ unsafe fn set_entry(isr: u8, addr: u32, seg: u16, flags: u8) {
 
 /// This is the function that is actually initially entered by the interrupt handler.
 #[no_mangle]
-#[no_split_stack]
+#[no_stack_check]
 #[inline(never)]
-unsafe extern "C" fn _rust_intr_handler(r: Registers) {
+#[allow(dead_code)]
+pub unsafe extern "C" fn _rust_intr_handler(r: Registers) {
     // TODO I might need to setup the %es stuff as early as here.
     let h = IDT.handlers[r.intr as uint];
     h(&r);
@@ -168,10 +171,13 @@ unsafe extern "C" fn _rust_intr_handler(r: Registers) {
 
 macro_rules! make_noerr_handlers (
     ($(($num:expr, $seg:expr, $flag:expr)),*) => ({
-        #[allow(unused)]
-        #[no_split_stack]
-        #[inline(never)]
-        unsafe extern fn intr_entry() -> ! {
+        #[cfg(target_arch = "x86")]
+        #[no_stack_check] #[inline(never)] #[no_mangle]
+        unsafe extern "C" fn intr_entry() {
+            // NOTE This is a huge hack to make sure that this code is not removed for being
+            // unreachable without declaring it public.
+            dbg!(debug::CORE, "Calling into interrupt entry function to ensure it is not removed");
+            asm!("jmp 2f":::: "volatile");
             asm!("
             .global _rust_intr_handlers_global
             _rust_intr_handler_global:
@@ -182,6 +188,8 @@ macro_rules! make_noerr_handlers (
             movl %ss, %edx
             movl %edx, %ds
             movl %edx, %es
+            mov $$0x40, %dx
+            mov %dx, %gs
             call _rust_intr_handler
             pop %es
             pop %ds
@@ -205,9 +213,14 @@ macro_rules! make_noerr_handlers (
                  cli
                  hlt
                  "::::"volatile");
+            asm!("
+                 2:
+                 nop
+                 "::::"volatile");
 
-            unreachable!();
+            return;
         }
+        intr_entry();
 
         $({
             let x: u32;
@@ -219,10 +232,14 @@ macro_rules! make_noerr_handlers (
 
 macro_rules! make_err_handlers (
     ($(($num:expr, $seg:expr, $flag:expr)),*) => ({
-        #[allow(unused)]
-        #[no_split_stack]
+        #[no_stack_check]
         #[inline(never)]
-        unsafe extern fn intr_entry_noerr() -> ! {
+        #[no_mangle]
+        unsafe extern "C" fn intr_entry_noerr() {
+            // NOTE This is a huge hack to make sure that this code is not removed for being
+            // unreachable without declaring it public.
+            dbg!(debug::CORE, "Calling into interrupt err entry function to ensure it is not removed");
+            asm!("jmp 2f":::: "volatile");
             $(
                 asm!(concat!("
                 .global _rust_intr_handler_err_", stringify!($num),"
@@ -238,8 +255,10 @@ macro_rules! make_err_handlers (
                  hlt
                  "::::"volatile");
 
-            unreachable!();
+            asm!("2: nop"::::"volatile");
+            return;
         }
+        intr_entry_noerr();
 
         $({
             let x: u32;
@@ -249,6 +268,7 @@ macro_rules! make_err_handlers (
     })
 )
 
+#[inline(never)]
 pub fn init_stage1() {
     unsafe {
         IDT.data = InterruptInfo {

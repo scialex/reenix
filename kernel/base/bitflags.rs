@@ -8,7 +8,7 @@ macro_rules! bitmask_create {
      { $($f:ident = $v:expr),+ }) => {
         #[deriving(PartialEq, Eq)]
         pub struct $name($t);
-        $(pub static $f : $name = $name($v);)*
+        $(pub const $f : $name = $name($v);)*
         impl Show for $name {
             fn fmt(&self, fmt: &mut Formatter) -> Result {
                 try!(fmt.write(stringify!($name).as_bytes()))

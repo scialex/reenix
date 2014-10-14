@@ -45,40 +45,40 @@ pub mod alloc;
 mod lightmap;
 
 pub mod poison {
-    pub static ENABLED : bool = true;
-    pub static ALLOC   : u8   = 0xBB;
+    pub const ENABLED : bool = true;
+    pub const ALLOC   : u8   = 0xBB;
 }
 
 #[cfg(all(kernel, target_arch="x86"))]
 pub mod user {
-    pub static MEM_LOW  : uint = 0x00400000;
-    pub static MEM_HIGH : uint = 0xc0000000;
+    pub const MEM_LOW  : uint = 0x00400000;
+    pub const MEM_HIGH : uint = 0xc0000000;
 }
 
 pub mod pointer {
     use core::uint;
-    pub static SIZE : uint = uint::BYTES;
-    pub static MASK : uint = uint::BYTES - 1;
+    pub const SIZE : uint = uint::BYTES;
+    pub const MASK : uint = uint::BYTES - 1;
 }
 
 pub mod memman {
     /// Mapping protection
     pub mod prot {
-        pub static NONE  : int = 0x0;
-        pub static READ  : int = 0x1;
-        pub static WRITE : int = 0x2;
-        pub static EXEC  : int = 0x4;
-        pub static MASK  : int = 0x7;
+        pub const NONE  : int = 0x0;
+        pub const READ  : int = 0x1;
+        pub const WRITE : int = 0x2;
+        pub const EXEC  : int = 0x4;
+        pub const MASK  : int = 0x7;
     }
     pub mod map {
         /// Mapping type
-        pub static SHARED  : int = 0x1;
-        pub static PRIVATE : int = 0x2;
-        pub static MASK    : int = 0x3;
+        pub const SHARED  : int = 0x1;
+        pub const PRIVATE : int = 0x2;
+        pub const MASK    : int = 0x3;
         /// Mapping flags
-        pub static FIXED : int = 0x4;
-        pub static ANON  : int = 0x8;
-        pub static FAILED : uint = !0;
+        pub const FIXED : int = 0x4;
+        pub const ANON  : int = 0x8;
+        pub const FAILED : uint = !0;
     }
 }
 
@@ -132,10 +132,10 @@ pub mod page {
     pub fn init_stage1() { unsafe { page_init(); } }
     pub fn init_stage2() {}
 
-    pub static SHIFT  : uint = 12;
-    pub static SIZE   : uint = 1 << SHIFT;
-    pub static MASK   : uint = (!0) << SHIFT;
-    pub static NSIZES : uint = 8;
+    pub const SHIFT  : uint = 12;
+    pub const SIZE   : uint = 1 << SHIFT;
+    pub const MASK   : uint = (!0) << SHIFT;
+    pub const NSIZES : uint = 8;
 
     #[inline]
     pub unsafe fn const_align_down<T>(x: *const T) -> *const T {
