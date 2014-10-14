@@ -65,7 +65,6 @@ impl KQueue {
             dbg!(debug::SCHED, "Not waiting for cancelation because thread {} is already canceled", t);
             return false;
         }
-        dbg!(debug::SCHED, "Switching from thread {}", t);
         block_interrupts!({
             unsafe {
                 t.queue = transmute_copy(&self);
@@ -74,7 +73,6 @@ impl KQueue {
             self.add(t);
             t.ctx.switch();
         });
-        dbg!(debug::SCHED, "returning from thread {}", t);
         return !t.cancelled;
     }
 

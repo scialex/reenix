@@ -4,7 +4,7 @@
 #![crate_type="rlib"]
 #![no_std]
 
-#![feature(globs, phase)]
+#![feature(globs, phase, macro_rules)]
 
 
 #[phase(plugin, link)] extern crate core;
@@ -20,14 +20,16 @@ use alloc::boxed::*;
 
 use procs::cleanup_bootstrap_function;
 use base::kernel;
+use base::errno;
 use procs::kproc;
-use procs::kproc::{KProc, WaitProcId, Pid, ProcId};
+use procs::kproc::{KProc, Pid, ProcId};
 use core::iter::*;
 use libc::c_void;
 use mm::pagetable;
 use core::prelude::*;
 use collections::String;
 
+mod proctest;
 
 #[no_stack_check]
 fn clear_screen(background: u16) {
@@ -43,16 +45,18 @@ pub fn init_stage2() { }
 
 #[no_mangle]
 #[no_stack_check]
-pub extern "C" fn bootstrap(i: i32, v: *mut c_void) -> *mut c_void {
+pub extern "C" fn bootstrap(_: i32, _: *mut c_void) -> *mut c_void {
     dbg!(debug::CORE, "Kernel binary:");
-    dbg!(debug::CORE, "  text: 0x{:p}-0x{:p}", &kernel::start_text, &kernel::end_text);
-    dbg!(debug::CORE, "  data: 0x{:p}-0x{:p}", &kernel::start_data, &kernel::end_data);
-    dbg!(debug::CORE, "  bss:  {:p}-0x{:p}", &kernel::start_bss, &kernel::end_bss);
+    dbg!(debug::CORE, "  text: {:p}-{:p}", &kernel::start_text, &kernel::end_text);
+    dbg!(debug::CORE, "  data: {:p}-{:p}", &kernel::start_data, &kernel::end_data);
+    dbg!(debug::CORE, "  bss:  {:p}-{:p}", &kernel::start_bss, &kernel::end_bss);
 
     pagetable::template_init();
     kproc::start_idle_proc(idle_proc_run, 0, 0 as *mut c_void);
-    clear_screen(0x0);
-    loop {}
+}
+
+fn shutdown() -> ! {
+    kernel::halt();
 }
 
 extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
@@ -65,11 +69,11 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
         Ok((pid, pst)) => { dbg!(debug::CORE, "Returned {}, 0x{:x}", pid, pst); },
         Err(errno) => {dbg!(debug::CORE, "returned errno {}", errno);}
     }
-    kernel::halt();
+    shutdown();
 }
 
-fn finish_init() {
-}
+// TODO
+fn finish_init() { }
 extern "C" fn second_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     finish_init();
     dbg!(debug::CORE, "Reached second process");
@@ -79,15 +83,21 @@ extern "C" fn second_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
 
 extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     finish_init();
-    dbg!(debug::CORE, "Reached init process");
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
-    KProc::new(String::from_str("second proc run"), second_proc_run, 0, 0 as *mut c_void);
-    let x = KProc::waitpid(kproc::Any, 0);
-    match x {
-        Ok((pid, pst)) => { dbg!(debug::CORE, "Returned {}, 0x{:x}", pid, pst); },
-        Err(errno) => {dbg!(debug::CORE, "returned errno {}", errno);}
+    proctest::start();
+    loop {
+        let x = KProc::waitpid(kproc::Any, 0);
+        match x {
+            Ok((pid, pst)) => { dbg!(debug::CORE, "{} Returned {} (0x{:x})", pid, pst, pst); },
+            Err(errno) => {
+                dbg!(debug::CORE, "returned errno {}", errno);
+                if errno == errno::ECHILD {
+                    break;
+                }
+            }
+        }
     }
-    return 0xdeadbee2 as *mut c_void;
+    return 0 as *mut c_void;
 }
 
 mod std {
