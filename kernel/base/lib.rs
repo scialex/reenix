@@ -49,7 +49,7 @@ pub mod describe {
     }
 }
 
-pub fn init_stage1() {}
+pub fn init_stage1() { debug::setup(); }
 pub fn init_stage2() {}
 
 // NOTE Needed for the #[deriving] stuff to work. Because that makes sense.

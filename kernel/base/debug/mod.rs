@@ -10,7 +10,24 @@ pub use self::flags::*;
 pub mod printing;
 mod flags;
 
-pub const DBG_ACTIVE : DbgMode = ALL;
+static mut DBG_ACTIVE : DbgMode = ALL;
+pub fn get_debug_active() -> DbgMode {
+    unsafe { DBG_ACTIVE }
+}
+
+pub fn setup() {
+    unsafe {
+        DBG_ACTIVE = flags::DbgMode::get_default();
+    }
+}
+
+pub fn remove_mode(m: DbgMode) {
+    unsafe { DBG_ACTIVE = DBG_ACTIVE - m; }
+}
+
+pub fn add_mode(m: DbgMode) {
+    unsafe { DBG_ACTIVE = DBG_ACTIVE + m; }
+}
 
 mod macros;
 

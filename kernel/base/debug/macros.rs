@@ -22,7 +22,7 @@ macro_rules! dbg_write(
 macro_rules! dbger(
     ($d:expr, $err:expr, $fmt:expr, $($a:expr),*) => ({
         use base::debug;
-        if (debug::DBG_ACTIVE & ($d)) != debug::NONE {
+        if (debug::get_debug_active() & ($d)) != debug::NONE {
             dbg_write!("{}{} {}:{:u} <errno:{}> : ", $d.get_color(), $d, file!(), line!(), $err);
             dbg_write!($fmt, $($a),*);
             dbg_write!("{}\n", debug::color::NORMAL);
@@ -37,7 +37,7 @@ macro_rules! dbger(
 macro_rules! dbg(
     ($d:expr, $fmt:expr, $($a:expr),*) => ({
         use base::debug;
-        if (debug::DBG_ACTIVE & ($d)) != debug::NONE {
+        if (debug::get_debug_active() & ($d)) != debug::NONE {
             dbg_write!("{}{}-{}:{:u} : ", $d.get_color(), $d, file!(), line!());
             dbg_write!($fmt, $($a),*);
             dbg_write!("{}\n", debug::color::NORMAL);

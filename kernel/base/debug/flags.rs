@@ -41,6 +41,12 @@ macro_rules! dbg_modes (
                 $(if $n & *self != NONE { return $ex; })+
                 return "Unknown debug mode";
             }
+
+            pub fn get_default() -> DbgMode {
+                let mut ret : DbgMode = ALL;
+                $(if cfg!($n) { ret = ret - $n })+
+                return ret;
+            }
         }
     )
 )

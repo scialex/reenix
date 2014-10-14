@@ -16,6 +16,7 @@ include ../Config.mk
 include ../CheckTools.mk
 
 RSFLAGS   += $(foreach bool,$(COMPILE_CONFIG_BOOLS),$(if $(findstring 1,$($(bool))),--cfg $(bool),))
+RSFLAGS   += $(foreach r,$(REMOVE_DBG),--cfg $(r) )
 
 CFLAGS    += $(foreach bool,$(COMPILE_CONFIG_BOOLS), \
              $(if $(findstring 1,$($(bool))),-D__$(bool)__=$(strip $($(bool)))))
