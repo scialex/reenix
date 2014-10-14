@@ -1,5 +1,5 @@
 CFLAGS    := -ffreestanding
-RSFLAGS   = -L libs -Z gc
+RSFLAGS   = -L libs -Z gc --opt-level=2
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 # XXX should have --omagic?
 
@@ -89,10 +89,11 @@ endef
 
 $(eval $(call builtin-crate-rule,libc,))
 $(eval $(call builtin-crate-rule,collections,alloc libc))
+$(eval $(call builtin-crate-rule,alloc,mm libc))
+
 $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
-$(eval $(call crate-rule,startup,mm base libc))
-$(eval $(call builtin-crate-rule,alloc,startup mm base libc))
+$(eval $(call crate-rule,startup,alloc mm base libc collections))
 $(eval $(call crate-rule,procs,startup alloc base libc mm collections))
 
 

@@ -83,9 +83,10 @@ pub extern "C" fn __morestack() {
 pub extern fn rust_begin_unwind(msg: &core::fmt::Arguments,
                                 file: &'static str,
                                 line: uint) -> ! {
-    dbg!(debug::PANIC, "Failed at {:s}:{:u}",file, line);
-    unsafe { core::fmt::write(&mut DBG_WRITER, msg); }
-    panic!("");
+    use base::kernel;
+    dbg!(debug::PANIC, "Failed at {:s}:{:u} -> {}",file, line, msg);
+    //unsafe { core::fmt::write(&mut DBG_WRITER, msg); }
+    kernel::halt();
 }
 
 #[cold]

@@ -1,0 +1,263 @@
+
+//! The implementation of a process context
+
+use mm::pagetable;
+use alloc::boxed::*;
+use mm::page;
+use startup::{gdt, tsd};
+use libc::{c_void, uintptr_t};
+use interrupt;
+use core::mem::{transmute, transmute_copy, drop};
+use collections::{RingBuf, Deque, Collection, MutableSeq};
+use core::ptr::*;
+use core::option::*;
+use alloc::rc::*;
+use pcell::*;
+
+
+pub type ContextFunc = extern "C" fn (i: i32, v: *mut c_void) -> *mut c_void;
+
+#[repr(C)]
+struct CContext {
+    eip : uintptr_t,
+    esp : uintptr_t,
+    ebp : uintptr_t,
+}
+
+pub struct Context {
+    ccontext : CContext,
+
+    pd  : *mut pagetable::PageDir, /* Pointer to this processes page directory */
+    pub tsd : Box<tsd::TSDInfo>,
+
+    kstack : uint,
+    kstack_size : uint,
+}
+
+static mut BOOTSTRAP_FUNC_CTX : *mut Context = 0 as *mut Context;
+pub fn enter_bootstrap_func(f: ContextFunc, i: i32, v: *mut c_void) -> ! {
+    dbg!(debug::CORE, "Entering bootstrap");
+    unsafe {
+        let bstack = page::alloc_n(4);
+        let ctx = box Context::new(f, i, v, bstack as *mut u8, 4 * page::SIZE, transmute(pagetable::current));
+        BOOTSTRAP_FUNC_CTX = transmute_copy(&ctx);
+        ctx.make_active();
+    }
+}
+
+pub fn cleanup_bootstrap_function() {
+    unsafe {
+        assert!(BOOTSTRAP_FUNC_CTX != null_mut());
+        let x : Box<Context> = transmute(BOOTSTRAP_FUNC_CTX);
+        BOOTSTRAP_FUNC_CTX = null_mut();
+        drop(x);
+    }
+}
+
+
+struct SleepingThread(*mut Context);
+struct RunQueue(RingBuf<SleepingThread>);
+
+impl RunQueue {
+    fn push(&mut self, ctx: &mut Context) {
+        assert!(interrupt::get_ipl() == interrupt::HIGH);
+        let &RunQueue(ref mut b) = self;
+        b.push(SleepingThread(unsafe { transmute(ctx) }));
+    }
+    fn pop(&mut self) -> &mut Context {
+        assert!(interrupt::get_ipl() == interrupt::HIGH);
+        let &RunQueue(ref mut b) = self;
+        while b.is_empty() {
+            dbg!(debug::SCHED, "No threads waiting to be executed!");
+            interrupt::disable();
+            interrupt::set_ipl(interrupt::LOW);
+            interrupt::wait();
+            interrupt::set_ipl(interrupt::HIGH);
+        }
+        if let Some(next) = b.pop_front() {
+            // TODO Put this dbg back in.
+            //dbg!(debug::SCHED, "found context for thead {} in {}", next.get_current_thread(), next.get_current_proc());
+            let SleepingThread(c) = next;
+            unsafe { c.as_mut().expect("Null thread in queue?") }
+        } else {
+            panic!("No context found for next thread despite is_empty returning false!");
+        }
+    }
+}
+
+static mut runq : *mut RunQueue = 0 as *mut RunQueue;
+
+pub fn init_stage1() {}
+pub fn init_stage2() {
+    let x = box RunQueue(RingBuf::new());
+    unsafe {
+        runq = transmute(x);
+    }
+}
+
+static mut INITIAL_SWITCH : bool = false;
+pub fn initial_ctx_switch() -> ! {
+    assert!(unsafe { INITIAL_SWITCH } == false);
+    interrupt::set_ipl(interrupt::HIGH);
+    unsafe { INITIAL_SWITCH = true; }
+    let nxt = pop_runable_ctx();
+    unsafe {
+        nxt.make_active();
+    }
+}
+
+pub fn die() -> ! {
+    // TODO
+    interrupt::set_ipl(interrupt::HIGH);
+    let nxt = pop_runable_ctx();
+    assert!(interrupt::HIGH == interrupt::get_ipl());
+    let thr = current_thread!();
+    unsafe { thr.ctx.switch_to(nxt) };
+    panic!("Returned to killed thread!");
+}
+
+fn push_runable_ctx(ctx : &mut Context) {
+    unsafe {
+        let rq : &mut RunQueue = runq.as_mut().expect("attempt to push context before initialization finished");
+        rq.push(ctx);
+    }
+}
+
+// Not really static but I need to make sure it isn't collected.
+fn pop_runable_ctx() -> &'static mut Context {
+    unsafe {
+        let rq : &mut RunQueue = runq.as_mut().expect("Attempted to pop context before initialization finished");
+        rq.pop()
+    }
+}
+
+extern "C" fn failure_func() {
+    panic!("Should never reach here. context.eip is not getting properly overriden.");
+}
+
+extern "C" fn _rust_context_initial_function(f : ContextFunc, i: i32, v: *mut c_void) -> ! {
+    // TODO Might still want this. We need it off for the idle-proc though :-/
+//    interrupt::set_ipl(interrupt::LOW);
+//    interrupt::enable();
+
+    let result = f(i, v);
+    let thr = current_thread!();
+    thr.exit(result);
+    //gdt::get_tsd().get_current_thread().exit(result);
+
+    panic!("Should never return from kthread.exit()");
+}
+
+impl Context {
+    pub fn make_runable(&mut self) {
+        block_interrupts!({ push_runable_ctx(self) });
+    }
+
+    /// Places the thread in a runqueue and then switches,
+    pub fn kyield(&mut self) {
+        let curipl = interrupt::get_ipl();
+        interrupt::set_ipl(interrupt::HIGH);
+        self.make_runable();
+        self.switch();
+        interrupt::set_ipl(curipl);
+    }
+
+    /// Switches to another context without puting this one on the run queue
+    pub fn switch(&mut self) {
+        let curipl = interrupt::get_ipl();
+        interrupt::set_ipl(interrupt::HIGH);
+        let nxt = pop_runable_ctx();
+        assert!(interrupt::HIGH == interrupt::get_ipl());
+        unsafe { self.switch_to(nxt); }
+        assert!(interrupt::HIGH == interrupt::get_ipl());
+        interrupt::set_ipl(curipl);
+    }
+
+    /// Switches away dieing. This function never returns. It does not update the context of the
+    /// calling thread.
+    pub unsafe fn new(f : ContextFunc, arg1 : i32, arg2 : *mut c_void,
+                      kstack : *mut u8, stack_size : uint,
+                      pd: *mut pagetable::PageDir) -> Context {
+        assert!(pd != null_mut());
+        assert!(page::aligned(kstack as *const u8));
+
+        let shigh= kstack.offset(stack_size as int);
+        let esp : uint;
+        /* put the arguments for __contect_initial_func onto the
+         * stack, leave room at the bottom of the stack for a phony
+         * return address (we should never return from the lowest
+         * function on the stack */
+        asm!("
+            pushl %ebp
+            movl %esp, %ebp
+            movl  $1, %esp
+            pushl $2
+            pushl $3
+            pushl $4
+            pushl $$0xDEAD4EAD
+            movl %esp, $0
+            movl %ebp, %esp
+            popl %ebp
+            "
+            : "=r"(esp) : "r"(shigh), "r"(arg2), "r"(arg1), "r"(f) : : "volatile");
+
+        let temp_tsd = tsd::TSDInfo::new(kstack as u32);
+        Context {
+            ccontext    : CContext {
+                            eip : transmute(_rust_context_initial_function),
+                            ebp : esp as uintptr_t,
+                            esp : esp as uintptr_t,
+                          },
+            kstack      : kstack as uint,
+            kstack_size : stack_size,
+            pd          : pd,
+            tsd         : box temp_tsd,
+        }
+    }
+
+    unsafe fn make_active(&self) -> ! {
+        gdt::set_kernel_stack((self.kstack + self.kstack_size) as *mut c_void);
+        gdt::set_tsd(transmute_copy(&self.tsd));
+        self.pd.as_mut().expect("pagedir is missing").set_active();
+        asm!("
+            movl $0, %ebp
+            movl $1, %esp
+            push $2
+            ret
+            " : : "r"(self.ccontext.ebp), "r"(self.ccontext.esp),"r"(self.ccontext.eip) : : "volatile");
+
+        panic!("control reached after context switch");
+    }
+
+    unsafe fn switch_to(&mut self, newc : &Context) {
+        use kproc::{CUR_PROC_SLOT, KProc};
+        use core::any::*;
+        use core::prelude::*;
+        {
+            // Let other threads borrow the current process.
+            if let Some(slt) = self.tsd.get_slot(CUR_PROC_SLOT) {
+                slt.downcast_ref::<Weak<ProcRefCell<KProc>>>().expect(add_file!("Item at curproc was not the right type!"))
+                   .clone().upgrade().expect(add_file!("Curproc has already been destroyed!"))
+                   .deref().save_state();
+            }
+        }
+        gdt::set_kernel_stack((newc.kstack + newc.kstack_size) as *mut c_void);
+        gdt::set_tsd(transmute_copy(&newc.tsd));
+
+        newc.pd.as_mut().expect("pagedir is missing").set_active();
+
+        // NOTE LLVM Really doesn't seem to like the inline ASM for some reason. If it even works
+        // it gets incorrect asm. This is a function compiled by GDB.
+        extern "C" {
+            fn do_real_context_switch(cur : *mut CContext, new : *const CContext);
+        }
+        self.ccontext.eip = transmute(failure_func);
+        do_real_context_switch(&mut self.ccontext, &newc.ccontext);
+
+        // Take back ownership of the current process
+        (**gdt::get_tsd().get_slot(CUR_PROC_SLOT).expect(add_file!("CUR_PROC slot not used")))
+                      .downcast_ref::<Weak<ProcRefCell<KProc>>>().expect(add_file!("Item at curproc was not the right type!"))
+                      .clone().upgrade().expect(add_file!("Curproc has already been destroyed!"))
+                      .deref().restore_state();
+    }
+}

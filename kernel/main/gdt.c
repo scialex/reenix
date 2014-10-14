@@ -80,6 +80,17 @@ void gdt_init(void)
         __asm__ volatile("ltr %0" :: "m"(segment));
 }
 
+__attribute__((unused))
+uintptr_t gdt_get_entry_base(uint32_t segment) {
+        KASSERT(segment < GDT_COUNT * 8 && 0 == segment % 8);
+        int index = segment / 8;
+        struct gdt_entry *t = &gdt[index];
+        uintptr_t ret = (uintptr_t)t->ge_baselo;
+        ret |= ((uintptr_t)(t->ge_basemid) << 16);
+        ret |= ((uintptr_t)(t->ge_basehi)  << 24);
+        return ret;
+}
+
 void gdt_set_kernel_stack(void *addr)
 {
         tss.ts_esp0 = (uint32_t)addr;
