@@ -15,7 +15,7 @@ use core::cmp::min;
 use core::intrinsics::transmute;
 use core::{fmt, mem, ptr};
 use libc::{size_t, c_void, c_int};
-use super::lightmap::{LightNode, LightMap};
+use slabmap::SLAB_ALLOCATORS;
 
 pub static SLAB_REDZONE : u32 = 0xdeadbeef;
 
@@ -45,7 +45,7 @@ struct CSlabAllocator {
 
 #[allow(raw_pointer_deriving)]
 #[deriving(Eq,Clone,PartialEq)]
-struct SlabAllocator(*mut CSlabAllocator);
+pub struct SlabAllocator(*mut CSlabAllocator);
 
 extern "C" {
     fn slab_allocators_reclaim(target: c_int) -> c_int;
@@ -75,7 +75,7 @@ impl SlabAllocator {
 
     pub fn get_size(&self) -> size_t {
         let &SlabAllocator(csa) = self;
-        unsafe { ptr::read(csa as *const CSlabAllocator).objsize }
+        unsafe { ptr::read(csa as *const CSlabAllocator).objsize - (2 * mem::size_of::<uint>()) as u32 }
     }
 
     pub fn get_name(&self) -> &'static str {
@@ -120,13 +120,6 @@ impl fmt::Show for SlabAllocator {
     }
 }
 
-static mut NODE_ALLOCATOR: SlabAllocator = SlabAllocator(0 as *mut CSlabAllocator);
-
-unsafe fn create_node() -> *mut LightNode<SlabAllocator> { mem::transmute(NODE_ALLOCATOR.allocate()) }
-
-static mut SLAB_ALLOCATORS: LightMap<SlabAllocator> =
-    LightMap { root: 0 as *mut LightNode<SlabAllocator>, len: 0, alloc: create_node };
-
 extern "C" {
     fn slab_init();
 }
@@ -135,11 +128,8 @@ extern "C" {
 #[deny(dead_code)]
 pub fn init_stage1() {
     unsafe { slab_init(); }
-    let node_size = mem::size_of::<LightNode<*mut SlabAllocator>>();
-    unsafe { NODE_ALLOCATOR = SlabAllocator::new("Map Node Allocator", node_size as size_t); }
     add_kmalloc_slabs();
-    unsafe { SLAB_ALLOCATORS.add(node_size, NODE_ALLOCATOR); }
-    unsafe { dbg!(debug::MM, "Allocator tree is {}", SLAB_ALLOCATORS); }
+    request_slab_allocator("MAX SIZE SLAB", MAX_SLAB_SIZE as u32);
 }
 
 pub fn init_stage2() {}
@@ -152,7 +142,7 @@ pub fn requests_closed() -> bool { unsafe { REQUESTS_CLOSED } }
 
 /// Note that we have finished creating all needed allocators, we can start using liballoc once
 /// this is called.
-pub fn close_requests() { unsafe { REQUESTS_CLOSED = true; } }
+pub fn close_requests() { dbg!(debug::MM, "Requests closed"); unsafe { REQUESTS_CLOSED = true; SLAB_ALLOCATORS.finish() } }
 
 /// Request that a slab allocator be made to service requests of the given size.
 ///
@@ -175,20 +165,12 @@ pub fn request_slab_allocator(name: &'static str, size: size_t) {
         }
     }
     let new_slab = SlabAllocator::new(name, size as size_t);
-    unsafe { SLAB_ALLOCATORS.add(size as uint, new_slab) };
+    unsafe { SLAB_ALLOCATORS.add(new_slab) };
     dbg!(debug::MM, "Added allocator called '{}' for a size of {}", name, size);
 }
 
 fn add_kmalloc_slabs() {
-    // Done in this order so the tree will be somewhat balanced.
-    maybe_add_kmalloc_slab(3);
-    maybe_add_kmalloc_slab(1);
-    maybe_add_kmalloc_slab(5);
-    maybe_add_kmalloc_slab(0);
-    maybe_add_kmalloc_slab(2);
-    maybe_add_kmalloc_slab(4);
-    maybe_add_kmalloc_slab(6);
-    let mut i = 7;
+    let mut i = 0;
     while maybe_add_kmalloc_slab(i) { i += 1 }
 }
 
@@ -205,11 +187,11 @@ fn maybe_add_kmalloc_slab(i: c_int) -> bool {
         return false;
     }
     let new_slab = SlabAllocator(sa);
-    if new_slab.get_size() > super::page::SIZE as size_t {
+    if new_slab.get_size() > (MAX_SLAB_SIZE as u32) + 1 {
         dbg!(debug::MM, "kmalloc object {} was larger than largest size we will use slab objs for", new_slab);
         false
     } else {
-        unsafe { SLAB_ALLOCATORS.add(new_slab.get_size() as uint, new_slab); }
+        unsafe { SLAB_ALLOCATORS.add(new_slab); }
         dbg!(debug::MM, "Added kmalloc object {} {}", i, new_slab);
         true
     }
@@ -244,10 +226,9 @@ pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
             // This should never really happen, truely large ones will get their own page.
             panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
         },
-        Some((alloc_size, sa)) => {
-            dbg!(debug::MM, "Allocating {} of max size of {} from {}", size, alloc_size, sa);
-            assert!(alloc_size >= size, "allocator's size {} was less then required size {}", alloc_size, size);
-            assert!(sa.get_size() as uint >= size, "{} is not large enough for allocation of {}", sa, size);
+        Some(sa) => {
+            dbg!(debug::MM, "Allocating {} from {}", size, sa);
+            assert!(sa.get_size() as uint >= size, "allocator's size {} was less then required size {}", sa.get_size(), size);
             let res = sa.allocate();
             if res.is_null() {
                 dbg!(debug::MM, "Allocation from slab {} failed for request of {} bytes. Reclaiming memory and retrying.", sa, size);
@@ -262,12 +243,14 @@ pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
 
 #[allow(unused_unsafe)]
 #[inline]
-pub unsafe fn reallocate(ptr: *mut u8, size: uint, align: uint,
-                             old_size: uint) -> *mut u8 {
+pub unsafe fn reallocate(ptr: *mut u8, old_size: uint, size: uint,
+                             align: uint) -> *mut u8 {
     use core::intrinsics::copy_nonoverlapping_memory;
-    if reallocate_inplace(ptr, size, align, old_size) {
+    dbg!(debug::MM, "reallocating {:p} from size of {} to size {}", ptr, old_size, size);
+    if reallocate_inplace(ptr, old_size, size, align) {
         ptr
     } else {
+        dbg!(debug::MM, "manually reallocating {:p} of size {} to size {}", ptr, old_size, size);
         let new_ptr = allocate(size, align);
         if !new_ptr.is_null() {
             copy_nonoverlapping_memory(new_ptr, ptr as *const u8, min(size, old_size));
@@ -281,10 +264,12 @@ pub unsafe fn reallocate(ptr: *mut u8, size: uint, align: uint,
 
 #[allow(unused_unsafe)]
 #[inline]
-pub unsafe fn reallocate_inplace(_ptr: *mut u8, size: uint, _align: uint,
-                                    old_size: uint) -> bool {
+pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: uint, size : uint,
+                                    _align: uint) -> bool {
     use super::page;
-    if size >= MAX_SLAB_SIZE && old_size >= MAX_SLAB_SIZE {
+    if old_size == size {
+        true
+    } else if size >= MAX_SLAB_SIZE && old_size >= MAX_SLAB_SIZE {
         let new_pages = page::addr_to_num(page::const_align_up(size as *const u8));
         let old_pages = page::addr_to_num(page::const_align_up(old_size as *const u8));
         old_pages == new_pages
@@ -292,8 +277,11 @@ pub unsafe fn reallocate_inplace(_ptr: *mut u8, size: uint, _align: uint,
         false
     } else {
         // Check if we have the same allocator
-        let (_, new_alloc) = SLAB_ALLOCATORS.find_smallest(size).expect("Unable to find slab allocator that was used.");
-        let (_, old_alloc) = SLAB_ALLOCATORS.find_smallest(old_size).expect("Unable to find slab allocator that was used.");
+        let new_alloc = SLAB_ALLOCATORS.find_smallest(size).expect("Unable to find slab allocator that was used.");
+        let old_alloc = SLAB_ALLOCATORS.find_smallest(old_size).expect("Unable to find slab allocator that was used.");
+        if new_alloc != old_alloc {
+            dbg!(debug::MM, "posibly reallocating from {} (size {}) to {} (size {})", old_alloc, old_size, new_alloc, size);
+        }
         new_alloc == old_alloc
     }
 
@@ -316,7 +304,8 @@ pub unsafe fn deallocate(ptr: *mut u8, size: uint, _align: uint) {
             // This should never really happen, truely large ones will get their own page.
             panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
         },
-        Some((_, sa)) => {
+        Some(sa) => {
+            dbg!(debug::MM, "deallocating {:p} with {} bytes from {}", ptr, size, sa);
             sa.deallocate(ptr);
         }
     }
@@ -334,8 +323,9 @@ pub fn usable_size(size: uint, _align: uint) -> uint {
                 // This should never really happen, truely large ones will get their own page.
                 panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
             },
-            Some((size,_)) => {
-                size
+            Some(sa) => {
+                dbg!(debug::MM, "usable size for {} is {}", size, sa.get_size());
+                sa.get_size() as uint
             }
         }
     }

@@ -42,7 +42,7 @@ extern "C" {
 pub mod pagetable;
 pub mod utils;
 pub mod alloc;
-mod lightmap;
+mod slabmap;
 
 pub mod poison {
     pub const ENABLED : bool = true;
