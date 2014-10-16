@@ -24,7 +24,7 @@ pub mod color {
 }
 
 macro_rules! dbg_modes (
-    ($(($n:ident, $v:expr, $c:expr, $ex:expr)),+) => (
+    ($(($n:ident, $v:expr, $c:expr, $ex:expr, $cfg:ident)),+) => (
         bitmask_create!(flags DbgMode : u64 {
             $($n = (0x1 << $v)),+
         })
@@ -44,7 +44,7 @@ macro_rules! dbg_modes (
 
             pub fn get_default() -> DbgMode {
                 let mut ret : DbgMode = ALL;
-                $(if cfg!($n) { ret = ret - $n })+
+                $(if cfg!($cfg) { ret = ret - $n })+
                 return ret;
             }
         }
@@ -52,43 +52,43 @@ macro_rules! dbg_modes (
 )
 
 dbg_modes!(
-    (CORE,        0,  color::GREEN,   "core boot code"),
-    (MM,          1,  color::RED,     "memory management"),
-    (INIT,        2,  color::NORMAL,  "boot/init code"),
-    (SCHED,       3,  color::GREEN,   "swtch, scheduling"),
-    (DISK,        4,  color::YELLOW,  "disk driver"),
-    (TEMP,        5,  color::NORMAL,  "for resolving temporary problems"),
-    (KMALLOC,     6,  color::MAGENTA, "kmalloc, kmem_cache_alloc"),
-    (PAGEALLOC,   7,  color::WHITE,   "page_alloc, etc."),
-    (INTR,        8,  color::BRED,    "misc. trap/interrupt"),
-    (TERM,        9,  color::BMAGENTA,"the terminal device"),
-    (FORK,        10, color::BYELLOW, "fork(2)"),
-    (PROC,        11, color::BLUE,    "process stuff"),
-    (VNREF,       12, color::CYAN,    "vnode reference counts"),
-    (PFRAME,      13, color::BMAGENTA,"pframe subsys"),
-    (ERROR,       14, color::BWHITE,  "error conditions"),
-    (SYSCALL,     15, color::RED,     "system calls"),
-    (FREF,        16, color::MAGENTA, "file reference counts"),
-    (PGTBL,       17, color::BBLUE,   "page table manipulation"),
-    (BRK,         18, color::YELLOW,  "process break; user memory alloc"),
-    (EXEC,        19, color::BRED,    "new process exec"),
-    (VFS,         20, color::WHITE,   "vfs"),
-    (S5FS,        21, color::BRED,    "system V file system"),
-    (KB,          22, color::BLUE,    "keyboard"),
-    (THR,         23, color::CYAN,    "thread stuff"),
-    (PRINT,       24, color::NORMAL,  "printdbg.c"),
-    (OSYSCALL,    25, color::BMAGENTA,"other system calls"),
-    (VM,          28, color::RED,     "VM"),
-    (TEST,        30, color::RED,     "for testing code"),
-    (TESTPASS,    31, color::GREEN,   "for testing code"),
-    (TESTFAIL,    32, color::RED,     "for testing code"),
-    (MEMDEV,      33, color::BBLUE,   "For memory devices ('null' and 'zero')"),
-    (ANON,        34, color::WHITE,   "anonymous vm objects"),
-    (VMMAP,       35, color::BGREEN,  "vm area mappings"),
-    (ELF,         37, color::BGREEN,  "elf loader"),
-    (USER,        38, color::BYELLOW, "user land"),
+    (CORE,        0,  color::GREEN,   "core boot code", NDEBUG_CORE),
+    (MM,          1,  color::RED,     "memory management", NDEBUG_MM),
+    (INIT,        2,  color::NORMAL,  "boot/init code", NDEBUG_INIT),
+    (SCHED,       3,  color::GREEN,   "swtch, scheduling", NDEBUG_SCHED),
+    (DISK,        4,  color::YELLOW,  "disk driver", NDEBUG_DISK),
+    (TEMP,        5,  color::NORMAL,  "for resolving temporary problems", NDEBUG_TEMP),
+    (KMALLOC,     6,  color::MAGENTA, "kmalloc, kmem_cache_alloc", NDEBUG_KMALLOC),
+    (PAGEALLOC,   7,  color::WHITE,   "page_alloc, etc.", NDEBUG_PAGEALLOC),
+    (INTR,        8,  color::BRED,    "misc. trap/interrupt", NDEBUG_INTR),
+    (TERM,        9,  color::BMAGENTA,"the terminal device", NDEBUG_TERM),
+    (FORK,        10, color::BYELLOW, "fork(2)", NDEBUG_FORK),
+    (PROC,        11, color::BLUE,    "process stuff", NDEBUG_PROC),
+    (VNREF,       12, color::CYAN,    "vnode reference counts", NDEBUG_VNREF),
+    (PFRAME,      13, color::BMAGENTA,"pframe subsys", NDEBUG_PFRAME),
+    (ERROR,       14, color::BWHITE,  "error conditions", NDEBUG_ERROR),
+    (SYSCALL,     15, color::RED,     "system calls", NDEBUG_SYSCALL),
+    (FREF,        16, color::MAGENTA, "file reference counts", NDEBUG_FREF),
+    (PGTBL,       17, color::BBLUE,   "page table manipulation", NDEBUG_PGTBL),
+    (BRK,         18, color::YELLOW,  "process break; user memory alloc", NDEBUG_BRK),
+    (EXEC,        19, color::BRED,    "new process exec", NDEBUG_EXEC),
+    (VFS,         20, color::WHITE,   "vfs", NDEBUG_VFS),
+    (S5FS,        21, color::BRED,    "system V file system", NDEBUG_S5FS),
+    (KB,          22, color::BLUE,    "keyboard", NDEBUG_KB),
+    (THR,         23, color::CYAN,    "thread stuff", NDEBUG_THR),
+    (PRINT,       24, color::NORMAL,  "printdbg.c", NDEBUG_PRINT),
+    (OSYSCALL,    25, color::BMAGENTA,"other system calls", NDEBUG_OSYSCALL),
+    (VM,          28, color::RED,     "VM", NDEBUG_VM),
+    (TEST,        30, color::RED,     "for testing code", NDEBUG_TEST),
+    (TESTPASS,    31, color::GREEN,   "for testing code", NDEBUG_TESTPASS),
+    (TESTFAIL,    32, color::RED,     "for testing code", NDEBUG_TESTFAIL),
+    (MEMDEV,      33, color::BBLUE,   "For memory devices ('null' and 'zero')", NDEBUG_MEMDEV),
+    (ANON,        34, color::WHITE,   "anonymous vm objects", NDEBUG_ANON),
+    (VMMAP,       35, color::BGREEN,  "vm area mappings", NDEBUG_VMMAP),
+    (ELF,         37, color::BGREEN,  "elf loader", NDEBUG_ELF),
+    (USER,        38, color::BYELLOW, "user land", NDEBUG_USER),
 
     // This one should always be last.
-    (PANIC,       63, color::RED,     "PANIC!")
+    (PANIC,       63, color::RED,     "PANIC!", NDEBUG_PANIC)
 )
 
