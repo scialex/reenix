@@ -387,7 +387,7 @@ void apic_setipl(uint8_t ipl)
 
 void apic_setspur(uint8_t intr)
 {
-        dbg(DBG_CORE, "mapping spurious interrupts to %hhu\n", intr);
+        dbg(DBG_CORE, "mapping spurious interrupts to %hu\n", intr);
         __lapic_setspur(intr);
 }
 

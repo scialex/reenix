@@ -160,8 +160,10 @@ pub mod gdt {
     pub fn init_stage1() {
         unsafe { gdt_init(); }
         unsafe {
-            // TODO  This should just use size_of::<TSDInfo>.
-            set_entry(THREAD_SPECIFIC as u32, transmute(&::tsd::INITIAL_TSD), 0x100, 0, 0, 0, 0);
+            // TODO Currently set_entry always makes the segment be sized in pages. This means we
+            // TODO cannot really give any good guidelines about how large it should be. We should maybe
+            // TODO cange this.
+            set_entry(THREAD_SPECIFIC as u32, transmute(&::tsd::INITIAL_TSD), 0x1, 0, 0, 0, 0);
             asm!("mov $$0x40, %ax; mov %ax, %gs": : : "eax");
         }
     }
@@ -170,9 +172,9 @@ pub mod gdt {
 
     #[no_stack_check]
     pub fn set_tsd(ptr: *const ::tsd::TSDInfo) {
-        use core::mem::size_of;
         unsafe {
-            set_entry(THREAD_SPECIFIC as u32, ptr as *const c_void, size_of::<::tsd::TSDInfo>() as u32, 0, 0, 0, 0);
+            set_entry(THREAD_SPECIFIC as u32, ptr as *const c_void, 1, 0, 0, 0, 0);
+            asm!("mov $$0x40, %ax; mov %ax, %gs": : : "eax");
         }
     }
 
