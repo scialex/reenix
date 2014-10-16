@@ -58,11 +58,42 @@ macro_rules! current_proc(
         use procs::pcell::*;
         use alloc::rc::*;
         use core::any::*;
+        use core::intrinsics::transmute;
         use procs::kproc::{CUR_PROC_SLOT, KProc};
-        (**gdt::get_tsd().get_slot(CUR_PROC_SLOT).expect(add_file!("CUR_PROC slot not used")))
-                      .downcast_ref::<Weak<ProcRefCell<KProc>>>().expect(add_file!("Item at curproc was not the right type!"))
-                      .clone().upgrade().expect(add_file!("Curproc has already been destroyed!"))
-                      .deref().try_borrow_mut().expect(add_file!("Curproc is currently being borrowed by something!"))
+        // We get the TSD copy of this data.
+        let r = (**gdt::get_tsd().get_slot(CUR_PROC_SLOT).expect(add_file!("CUR_PROC slot not used")))
+                        .downcast_ref::<Weak<ProcRefCell<KProc>>>().expect(add_file!("Item at curproc was not the right type!"))
+                        .clone().upgrade().expect(add_file!("Curproc has already been destroyed!"));
+        // Now we get the actual borrow.
+        let v = r.deref().try_silent_borrow().expect(add_file!("Curproc is currently being borrowed by something!"));
+        // Now we make that borrow have the 'static lifetime it actually has (for this thread).
+        let out = || { unsafe { transmute::<&KProc, &'static KProc>(v.deref()) } };
+        out()
+    })
+)
+/// Returns an &'static mut KProc.
+/// We do this since really the current process is a 'static but we need to let others access it
+/// to. Therefore we do this stuff with a transmute.
+#[macro_export]
+macro_rules! current_proc_mut(
+    () => ({
+        use core::clone::*;
+        use startup::gdt;
+        use core::ops::Deref;
+        use procs::pcell::*;
+        use alloc::rc::*;
+        use core::any::*;
+        use core::intrinsics::transmute;
+        use procs::kproc::{CUR_PROC_SLOT, KProc};
+        // We get the TSD copy of this data.
+        let r = (**gdt::get_tsd().get_slot(CUR_PROC_SLOT).expect(add_file!("CUR_PROC slot not used")))
+                        .downcast_ref::<Weak<ProcRefCell<KProc>>>().expect(add_file!("Item at curproc was not the right type!"))
+                        .clone().upgrade().expect(add_file!("Curproc has already been destroyed!"));
+        // Now we get the actual borrow.
+        let mut v = r.deref().try_silent_borrow_mut().expect(add_file!("Curproc is currently being borrowed by something!"));
+        // Now we make that borrow have the 'static lifetime it actually has (for this thread).
+        let out = || { unsafe { transmute::<&mut KProc, &'static mut KProc>(v.deref_mut()) } };
+        out()
     })
 )
 

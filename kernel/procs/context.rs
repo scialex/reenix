@@ -194,7 +194,7 @@ impl Context {
             pushl $2
             pushl $3
             pushl $4
-            pushl $$0xDEAD4EAD
+            pushl $$0
             movl %esp, $0
             movl %ebp, %esp
             popl %ebp
@@ -217,8 +217,8 @@ impl Context {
 
     unsafe fn make_active(&self) -> ! {
         gdt::set_kernel_stack((self.kstack + self.kstack_size) as *mut c_void);
-        gdt::set_tsd(transmute_copy(&self.tsd));
         self.pd.as_mut().expect("pagedir is missing").set_active();
+        gdt::set_tsd(transmute_copy(&self.tsd));
         asm!("
             movl $0, %ebp
             movl $1, %esp
@@ -233,24 +233,15 @@ impl Context {
         use kproc::{CUR_PROC_SLOT, KProc};
         use core::any::*;
         use core::prelude::*;
-        {
-            // Let other threads borrow the current process.
-            if let Some(slt) = self.tsd.get_slot(CUR_PROC_SLOT) {
-                slt.downcast_ref::<Weak<ProcRefCell<KProc>>>().expect(add_file!("Item at curproc was not the right type!"))
-                   .clone().upgrade().expect(add_file!("Curproc has already been destroyed!"))
-                   .deref().save_state();
-            }
-        }
+
         gdt::set_kernel_stack((newc.kstack + newc.kstack_size) as *mut c_void);
+        newc.pd.as_mut().expect("pagedir is missing").set_active();
         gdt::set_tsd(transmute_copy(&newc.tsd));
 
-        newc.pd.as_mut().expect("pagedir is missing").set_active();
 
         // NOTE LLVM Really doesn't seem to like the inline ASM for some reason. If it even works
         // it gets incorrect asm. This is a function compiled by GDB.
-        extern "C" {
-            fn do_real_context_switch(cur : *mut CContext, new : *const CContext);
-        }
+        extern "C" { fn do_real_context_switch(cur : *mut CContext, new : *const CContext); }
         self.ccontext.eip = transmute(failure_func);
         do_real_context_switch(&mut self.ccontext, &newc.ccontext);
 
@@ -258,6 +249,6 @@ impl Context {
         (**gdt::get_tsd().get_slot(CUR_PROC_SLOT).expect(add_file!("CUR_PROC slot not used")))
                       .downcast_ref::<Weak<ProcRefCell<KProc>>>().expect(add_file!("Item at curproc was not the right type!"))
                       .clone().upgrade().expect(add_file!("Curproc has already been destroyed!"))
-                      .deref().restore_state();
+                      .deref().ensure_no_borrow();
     }
 }

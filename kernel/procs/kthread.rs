@@ -146,7 +146,6 @@ impl KThread {
             return;
         }
         assert!(self.state != NOSTATE, "Illegal state for a process");
-        assert!(self.state == SLEEP || self.state == SLEEPCANCELLABLE, "State is illegal for canceling");
         self.retval = v;
         if self.state == SLEEPCANCELLABLE {
             if let Some(queue) = unsafe { self.queue.as_mut() } {
@@ -162,7 +161,7 @@ impl KThread {
         assert!(self.state == RUN);
         dbg!(debug::THR, "Thread {} of process {} ended with a status of 0x{:x} ({})",
              self, current_proc!(), v as uint, num::from_uint::<errno::Errno>(v as uint));
-        (current_proc!()).thread_exited(v);
+        (current_proc_mut!()).thread_exited(v);
         self.state = EXITED;
         context::die();
     }

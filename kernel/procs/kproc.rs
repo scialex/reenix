@@ -1,5 +1,6 @@
 // TODO Copyright Header
 
+use core::num;
 use alloc::rc;
 use alloc::rc::{Rc,Weak};
 use alloc::boxed::Box;
@@ -93,7 +94,7 @@ pub struct KProc {
 pub fn init_stage1() {
     use mm::alloc::request_slab_allocator;
     use core::mem::size_of;
-    request_slab_allocator("ProcRefCell<KProc> allocator", size_of::<ProcRefCell<KProc>>() as u32 );
+    request_slab_allocator("ProcRefCell<KProc> allocator", size_of::<ProcRefCell<KProc>>() as u32 + 16);
 }
 
 pub fn init_stage2() {
@@ -139,7 +140,7 @@ impl KProc {
     /// Perform the waitpid syscall. This simply passes the call along to the current process. It
     /// returns Ok((killed_PID,status)) on success and Err(errno) on failure.
     pub fn waitpid(pid: WaitProcId, options : WaitOps) -> Result<(ProcId, ProcStatus),errno::Errno> {
-        (current_proc!()).do_waitpid(pid, options)
+        (current_proc_mut!()).do_waitpid(pid, options)
     }
 
     /// Checks if this process is the one we are currently running in.
@@ -200,7 +201,7 @@ impl KProc {
         // should have been reparented to init in KProc::cleanup. We will just ignore the init-proc
         // and allow it to leak some memory, since we will only get here for it if we are shutting
         // down.
-        assert!(rc::is_unique(&to_kill));
+        assert!(rc::is_unique(&to_kill), "{} is not unique", (*to_kill).borrow());
 
         // Actually destroy the process.
         drop(to_kill);
@@ -225,8 +226,9 @@ impl KProc {
                                                 }) {
                 return Ok((*kproc).clone());
             }
-            if !self.wait.wait(false) {
-                panic!("Process {} interrupted while waiting for any children to exit", self);//describe!(self));
+            if !self.wait.wait(true) {
+                dbg!(debug::PROC, "Process {} interrupted while waiting for any children to exit", self);//describe!(self));
+                return Err(errno::ECANCELED);
             }
         }
     }
@@ -244,8 +246,9 @@ impl KProc {
                         // We need to make sure the borrow isn't held during the sleep. Something
                         // else might want to look at it.
                         drop(b);
-                        if !self.wait.wait(false) {
-                            panic!("Process {} interrupted while waiting for child {} to exit",self, pid); //describe!(self), pid);
+                        if !self.wait.wait(true) {
+                            dbg!(debug::PROC, "Process {} interrupted while waiting for child {} to exit",self, pid); //describe!(self), pid);
+                            return Err(errno::ECANCELED);
                         }
                     }
                 }
@@ -266,6 +269,22 @@ impl KProc {
             }
         }
         return true;
+    }
+
+    pub fn kill_all() -> ! {
+        for p in (proc_list!()).values().map(|v| -> Option<Rc<ProcRefCell<KProc>>> { v.clone().upgrade() }) {
+            match p {
+                Some(pr) => {
+                    let mut canidate = pr.deref().borrow_mut();
+                    if !canidate.is_current_process() && canidate.pid != IDLE_PID && canidate.pid != INIT_PID {
+                        canidate.kill(errno::ECANCELED as ProcStatus);
+                    }
+                }
+                _ => (),
+            }
+        }
+        (current_proc_mut!()).kill(errno::ECANCELED as ProcStatus);
+        panic!("Should not return from killing yourself");
     }
 
     pub fn get_proc(pid: ProcId) -> Option<Rc<ProcRefCell<KProc>>> {
@@ -314,10 +333,10 @@ impl KProc {
         let pid = (*rcp).borrow_mut().pid.clone();
         KProc::add_proc(pid.clone(), rcp.clone().downgrade());
         if !is_idle {
-            (current_proc!()).children.insert(pid.clone(), rcp.clone());
+            (current_proc_mut!()).children.insert(pid.clone(), rcp.clone());
         }
         let mut init_thread = box KThread::new(&(*rcp).borrow_mut().deref().pagedir, init_main, arg1, arg2);
-        // TODO I have no idea if this is right.
+        // TODO This should really actually use a Rc or something.
         let thr_ptr = unsafe { transmute_copy::<Box<KThread>,*mut KThread>(&init_thread) };
         init_thread.ctx.tsd.set_slot(CUR_THREAD_SLOT, box thr_ptr);
         init_thread.ctx.tsd.set_slot(CUR_PROC_SLOT, box rcp.clone().downgrade());
@@ -350,6 +369,23 @@ impl KProc {
         &self.pid
     }
 
+    /// This has nothing to do with signals and kill(1).
+    ///
+    /// This is called to have a process cancel all of its threads.
+    pub fn kill(&mut self, status: ProcStatus) {
+        dbg!(debug::PROC, "proc::kill(status = {} {}) called on {}. Called by {}",
+             status, num::from_int::<errno::Errno>(status), self, current_proc!());
+        for (_, thr) in self.threads.iter_mut() {
+            if !thr.is_current_thread() { thr.exit(status as *mut c_void); }
+            if cfg!(MTP) {
+                not_yet_implemented!("MTP: proc::kill");
+            }
+        }
+        if self.is_current_process() {
+            (current_thread!()).exit(status as *mut c_void);
+        }
+    }
+
     /// This is a callback by a thread when it exits. We need to record that it has exited and
     /// decide if we need to quit. If it is the last thread we clean up what we can then return.
     pub fn thread_exited(&mut self, exit: *mut c_void) {
@@ -371,9 +407,12 @@ impl KProc {
         self.state = DEAD;
         let init = init_proc!();
         for (pid, child) in self.children.iter() {
+            dbg!(debug::PROC, "moving {} to init proc", pid);
             (**child).borrow_mut().parent = Some(init.clone().downgrade());
             init.borrow_mut().children.insert(pid.clone(), child.clone());
         }
+        // get rid of our ref's to the children.
+        self.children.clear();
 
         // TODO VFS CLOSE ALL FILES
         // TODO VFS CLOSE CWD

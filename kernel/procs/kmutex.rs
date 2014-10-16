@@ -24,13 +24,14 @@ pub struct KMutex {
 }
 
 impl KMutex {
+    /// Create a new mutex with the given name.
     pub fn new(name: &'static str) -> KMutex {
         KMutex { name : name, held : Cell::new(false), queue : UnsafeCell::new(KQueue::new()) }
     }
 
     /// Obtain the lock, waiting until it is freed. Note that there are no ordering/fairness
     /// gaurentees on who gets a lock when it is contested.
-    pub fn lock(&self) {
+    pub fn lock_nocancel(&self) {
         dbg!(debug::SCHED, "locking {} for {} of {}", self, current_thread!(), current_proc!());
         while self.held.get() {
             unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait(false) };
@@ -40,11 +41,11 @@ impl KMutex {
     }
 
     /// Returns true if we got the lock, False if we didn't because of being canceled.
-    pub fn lock_cancelable(&self) -> bool {
+    #[warn(unused_result)]
+    pub fn lock(&self) -> bool {
         dbg!(debug::SCHED, "cancelable locking {} for {} of {}", self, current_thread!(), current_proc!());
         while self.held.get() {
-            ;
-            if unsafe { !self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait(false) } {
+            if unsafe { !self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait(true) } {
                 return false;
             }
         }
@@ -52,6 +53,7 @@ impl KMutex {
         return true;
     }
 
+    /// Returns true if we get the lock. False, without sleeping, if we did not.
     pub fn try_lock(&self) -> bool {
         if !self.held.get() {
             dbg!(debug::SCHED, "locking {} for {} of {}", self, current_thread!(), current_proc!());
@@ -63,6 +65,7 @@ impl KMutex {
         }
     }
 
+    /// Unlocks the lock. This should only be called by the thread that originally locked it.
     pub fn unlock(&self) {
         dbg!(debug::SCHED, "unlocking {} for {} of {}", self, current_thread!(), current_proc!());
         assert!(self.held.get());

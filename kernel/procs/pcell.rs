@@ -7,10 +7,13 @@ use core::fmt;
 type Borrowed = uint;
 const UNUSED : Borrowed = 0;
 const WRITING : Borrowed = -1;
+/// A cell data structure that lets you borrow things 'silently'. This is used because the data in
+/// these is associated with a single thread. Within the thread it is basically 'static and may be
+/// treated as such. Outside the thread it is normal data with lifetimes and so on that could be
+/// damaged if left hanging.
 pub struct ProcRefCell<T> {
     value: UnsafeCell<T>,
     borrow: Cell<Borrowed>,
-    prev_borrow: Cell<Option<Borrowed>>,
     nocopy: marker::NoCopy,
     noshare: marker::NoSync,
 }
@@ -20,12 +23,41 @@ impl<T> ProcRefCell<T> {
         ProcRefCell {
             value: UnsafeCell::new(value),
             borrow: Cell::new(UNUSED),
-            prev_borrow: Cell::new(None),
             nocopy: marker::NoCopy,
             noshare: marker::NoSync,
         }
     }
 
+    /// Called to assert that there are no non-silent borrowers.
+    pub fn ensure_no_borrow(&self) {
+        if self.borrow.get() != UNUSED {
+            panic!("Expected no non-silent borrowers but there were some present");
+        }
+    }
+
+    /// Used to borrow within one's own thread where the variable has an implicit lifetime of
+    /// 'static and we are (theoretically) borrowing from a static variable.
+    pub fn try_silent_borrow<'a>(&'a self) -> Option<SilentProcRef<'a, T>> {
+        match self.borrow.get() {
+            WRITING => None,
+            _ => {
+                Some(SilentProcRef { _parent: self })
+            }
+        }
+    }
+
+    /// Used to borrow within one's own thread where the variable has an implicit lifetime of
+    /// 'static and we are (theoretically) borrowing from a static variable.
+    pub fn try_silent_borrow_mut<'a>(&'a self) -> Option<SilentProcRefMut<'a, T>> {
+        match self.borrow.get() {
+            UNUSED => {
+                Some(SilentProcRefMut { _parent: self })
+            },
+            _ => None,
+        }
+    }
+
+    /*
     /// Used to relinquish control of this before going to sleep. Must be paired with a restore
     /// state later. This lets us say we own it during our run but we can go to sleep and release
     /// it. This should only be used with current_proc!().
@@ -47,6 +79,7 @@ impl<T> ProcRefCell<T> {
             panic!("Previous borrow was none during call to restore_state");
         }
     }
+    */
 
     /// Consumes the `ProcRefCell`, returning the wrapped value.
     #[unstable = "may be renamed, depending on global conventions"]
@@ -133,6 +166,59 @@ impl<T: Clone> Clone for ProcRefCell<T> {
 impl<T: PartialEq> PartialEq for ProcRefCell<T> {
     fn eq(&self, other: &ProcRefCell<T>) -> bool {
         *self.borrow() == *other.borrow()
+    }
+}
+
+/// Wraps a silently borrowed reference to a value in a `ProcRefCell` box.
+#[unstable]
+pub struct SilentProcRef<'b, T:'b> {
+    // FIXME #12808: strange name to try to avoid interfering with
+    // field accesses of the contained type via Deref
+    _parent: &'b ProcRefCell<T>
+}
+
+#[unstable = "waiting for `Deref` to become stable"]
+impl<'b, T> Deref<T> for SilentProcRef<'b, T> {
+    #[inline]
+    fn deref<'a>(&'a self) -> &'a T {
+        unsafe { &*self._parent.value.get() }
+    }
+}
+
+/// Wraps a mutable silently borrowed reference to a value in a `ProcRefCell` box.
+#[unstable]
+pub struct SilentProcRefMut<'b, T:'b> {
+    // FIXME #12808: strange name to try to avoid interfering with
+    // field accesses of the contained type via Deref
+    _parent: &'b ProcRefCell<T>
+}
+
+
+#[unstable = "waiting for `Deref` to become stable"]
+impl<'b, T> Deref<T> for SilentProcRefMut<'b, T> {
+    #[inline]
+    fn deref<'a>(&'a self) -> &'a T {
+        unsafe { &*self._parent.value.get() }
+    }
+}
+
+#[unstable = "waiting for `DerefMut` to become stable"]
+impl<'b, T> DerefMut<T> for SilentProcRefMut<'b, T> {
+    #[inline]
+    fn deref_mut<'a>(&'a mut self) -> &'a mut T {
+        unsafe { &mut *self._parent.value.get() }
+    }
+}
+
+impl<'b, T: fmt::Show> fmt::Show for SilentProcRef<'b, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (**self).fmt(f)
+    }
+}
+
+impl<'b, T: fmt::Show> fmt::Show for SilentProcRefMut<'b, T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        (*(self.deref())).fmt(f)
     }
 }
 
