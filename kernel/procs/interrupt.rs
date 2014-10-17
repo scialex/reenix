@@ -595,7 +595,7 @@ pub fn init_stage1() {
 pub fn init_stage2() {}
 
 extern "Rust" fn spurious_intr(regs: &mut Registers) {
-    dbg!(debug::INTR, "Ignoring spurious interrupt\nRegisters were {}\nProcess was {}\nThread was {}",
+    dbg!(debug::INTR, "Ignoring spurious interrupt. Registers were {}. Process was {}. Thread was {}",
          regs, current_proc!(), current_thread!());
 }
 

@@ -5,7 +5,6 @@ use alloc::rc;
 use alloc::rc::{Rc,Weak};
 use alloc::boxed::Box;
 use base::{describe, errno};
-use collections::bitv::BitvSet;
 use collections::hash;
 use collections::string::String;
 use collections::treemap::TreeMap;
@@ -28,38 +27,34 @@ pub const CUR_PID_SLOT  : uint = 2;
 #[deriving(Eq, PartialEq, Show, PartialOrd, Ord, Clone)]
 pub struct ProcId(pub uint);
 
-static mut PID_BITV : *mut BitvSet = 0 as *mut BitvSet;
-
 static mut INIT_PROC : *mut Rc<ProcRefCell<KProc>> = 0 as *mut Rc<ProcRefCell<KProc>>;
 static INIT_PID : ProcId = ProcId(1);
 
 static mut IDLE_PROC : *mut Rc<ProcRefCell<KProc>> = 0 as *mut Rc<ProcRefCell<KProc>>;
 static IDLE_PID : ProcId = ProcId(0);
 
-macro_rules! pid_bitv(
-    () => ({
-        unsafe { PID_BITV.as_mut().expect("pid_bitv not yet initialized") }
-    })
-)
-
+static mut NEXT_PID : uint = 0;
 impl ProcId {
     pub fn new() -> ProcId {
-        loop {
-            let bv = pid_bitv!();
-            let cap = bv.capacity();
-            for i in range(0, bv.capacity()) {
-                if block_interrupts!(bv.insert(i)) {
-                    return ProcId(i);
-                }
-            }
-            block_interrupts!(bv.reserve(cap + 32));
-            kthread::kyield();
-        }
-    }
-    pub fn clear(&self) {
-        let bv = pid_bitv!();
-        let &ProcId(ref p) = self;
-        block_interrupts!(bv.remove(p));
+        use core;
+        block_interrupts!({
+            let nxt = unsafe { NEXT_PID };
+            let res = match range(nxt, core::uint::MAX).map(|i| { ProcId(i) })
+                                                       .filter(|p| { KProc::get_proc(p).is_none() })
+                                                       .nth(0) {
+                None => {
+                    match range(0, nxt).map(|i| { ProcId(i) })
+                                       .filter(|p| { KProc::get_proc(p).is_none() })
+                                       .nth(0) {
+                        Some(pid) => pid,
+                        None => panic!("Could not allocate a thread id!"),
+                    }
+                },
+                Some(pid) => pid,
+            };
+            unsafe { NEXT_PID = (res.0) + 1; }
+            res
+        })
     }
 }
 
@@ -99,10 +94,6 @@ pub fn init_stage1() {
 
 pub fn init_stage2() {
     use core::intrinsics::transmute;
-    unsafe {
-        let x = box BitvSet::with_capacity(0x100);
-        PID_BITV = transmute(x);
-    }
     unsafe {
         let y : Box<TreeMap<ProcId, Rc<ProcRefCell<KProc>>>> = box TreeMap::new();
         PROC_LIST = transmute(y);
@@ -184,7 +175,7 @@ impl KProc {
         (*to_kill).borrow_mut().threads.clear();
 
         // Remove it from the global map.
-        KProc::remove_proc(final_pid);
+        KProc::remove_proc(&final_pid);
 
         // If we are waiting on the init_proc we need to make sure the collect the global init_proc
         // pointer we saved during startup.
@@ -206,7 +197,6 @@ impl KProc {
         // Actually destroy the process.
         drop(to_kill);
 
-        final_pid.clear(); // Allow this PID to be used again by a new process.
         dbg!(debug::PROC, "{} Successfully waited on process {} which exited with {} (0x{:X})", self, final_pid, result, result);
         return Ok((final_pid, result));
     }
@@ -287,10 +277,10 @@ impl KProc {
         panic!("Should not return from killing yourself");
     }
 
-    pub fn get_proc(pid: ProcId) -> Option<Rc<ProcRefCell<KProc>>> {
-        let r = proc_list!().find(&pid);
+    pub fn get_proc(pid: &ProcId) -> Option<Rc<ProcRefCell<KProc>>> {
+        let r = proc_list!().find(pid);
         match r {
-            Some(ref p) => p.clone().upgrade(),
+            Some(ref p) => p.clone().upgrade().or_else(|| { KProc::remove_proc(pid); None }),
             None => None,
         }
     }
@@ -302,10 +292,10 @@ impl KProc {
         });
     }
 
-    fn remove_proc(pid: ProcId) {
+    fn remove_proc(pid: &ProcId) {
         block_interrupts!({
             let lst = proc_list!();
-            lst.remove(&pid);
+            lst.remove(pid);
         })
     }
 
@@ -344,7 +334,7 @@ impl KProc {
         {
             let mut p = (*rcp).borrow_mut();
             if !is_idle {
-                p.parent = Some(KProc::get_proc(current_proc!().pid).clone().expect("Only the idle thread should have no parent").downgrade());
+                p.parent = Some(KProc::get_proc(&current_proc!().pid).clone().expect("Only the idle thread should have no parent").downgrade());
             } else {
                 dbg!(debug::CORE, "IDLE PROCESS BEING CREATED");
                 assert!(pid == ProcId(0));
