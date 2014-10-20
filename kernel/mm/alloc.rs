@@ -15,7 +15,37 @@ use core::cmp::min;
 use core::intrinsics::transmute;
 use core::{fmt, mem, ptr};
 use libc::{size_t, c_void, c_int};
-use slabmap::SLAB_ALLOCATORS;
+use slabmap::{SlabMap, DEFAULT_SLAB_MAP};
+use backup::{BackupAllocator, DEFAULT_BACKUP_ALLOCATOR};
+
+struct Allocator {
+    slabs : SlabMap,
+    pages : PageAllocator,
+    backup : BackupAllocator,
+}
+
+struct PageAllocator;
+impl PageAllocator {
+    pub unsafe fn alloc_n(&self, n: u32) -> *mut u8 {
+        use super::page;
+        page::alloc_n(n) as *mut u8
+    }
+    pub unsafe fn free_n(&self, ptr: *mut u8, n : u32) {
+        use libc::c_void;
+        use super::page;
+        page::free_n(ptr as *mut c_void, n);
+    }
+}
+
+const DEFAULT_PAGE_ALLOCATOR : PageAllocator = PageAllocator;
+
+static mut BASE_ALLOCATOR : Allocator = Allocator {
+    slabs : DEFAULT_SLAB_MAP,
+    pages : DEFAULT_PAGE_ALLOCATOR,
+    backup : DEFAULT_BACKUP_ALLOCATOR,
+};
+
+pub type AllocError = ();
 
 pub static SLAB_REDZONE : u32 = 0xdeadbeef;
 
@@ -128,7 +158,8 @@ extern "C" {
 #[deny(dead_code)]
 pub fn init_stage1() {
     unsafe { slab_init(); }
-    add_kmalloc_slabs();
+    let ba = unsafe { &mut BASE_ALLOCATOR };
+    ba.add_kmalloc_slabs();
     request_slab_allocator("MAX SIZE SLAB", MAX_SLAB_SIZE as u32);
 }
 
@@ -142,7 +173,7 @@ pub fn requests_closed() -> bool { unsafe { REQUESTS_CLOSED } }
 
 /// Note that we have finished creating all needed allocators, we can start using liballoc once
 /// this is called.
-pub fn close_requests() { dbg!(debug::MM, "Requests closed"); unsafe { REQUESTS_CLOSED = true; SLAB_ALLOCATORS.finish() } }
+pub fn close_requests() { dbg!(debug::MM, "Requests closed"); unsafe { REQUESTS_CLOSED = true; (&mut BASE_ALLOCATOR).finish() } }
 
 /// Request that a slab allocator be made to service requests of the given size.
 ///
@@ -153,47 +184,194 @@ pub fn request_slab_allocator(name: &'static str, size: size_t) {
         dbg!(debug::MM, "New Allocator requested after requests closed. ignoring.");
         return;
     }
-    let cur = unsafe { SLAB_ALLOCATORS.find(size as uint) };
-    match cur {
-        None => {},
-        Some(sa) => {
-            // NOTE Rust strings not being (gaurenteed to be) null terminated is extreemly annoying
-            //let r = unsafe { sa.as_ref().expect("Found a null slab allocator") };
-            dbg!(debug::MM, "Request to make allocator '{}' for {} bytes already fullfilled by {}",
-                 name, size as uint, sa);
-            return;
+    let ba = unsafe { &mut BASE_ALLOCATOR };
+    ba.request_slab_allocator(name, size);
+}
+
+impl Allocator {
+    pub fn finish(&mut self) {
+        self.slabs.finish();
+        self.backup.finish();
+    }
+    pub fn request_slab_allocator(&mut self, name: &'static str, size: size_t) {
+        let cur = self.slabs.find(size as uint);
+        match cur {
+            None => {},
+            Some(sa) => {
+                // NOTE Rust strings not being (gaurenteed to be) null terminated is extreemly annoying
+                //let r = unsafe { sa.as_ref().expect("Found a null slab allocator") };
+                dbg!(debug::MM, "Request to make allocator '{}' for {} bytes already fullfilled by {}",
+                    name, size as uint, sa);
+                return;
+            }
+        }
+        let new_slab = SlabAllocator::new(name, size as size_t);
+        self.slabs.add(new_slab);
+        dbg!(debug::MM, "Added allocator called '{}' for a size of {}", name, size);
+    }
+
+    pub fn add_kmalloc_slabs(&mut self) {
+        let mut i = 0;
+        while self.maybe_add_kmalloc_slab(i) { i += 1 }
+    }
+
+    fn maybe_add_kmalloc_slab(&mut self, i: c_int) -> bool {
+        extern "C" {
+            #[link_name="get_kmalloc_allocator"]
+            fn get_alloc(i: c_int) -> *mut CSlabAllocator;
+        }
+
+        let sa = unsafe { get_alloc(i) };
+        if sa.is_null() {
+            dbg!(debug::MM,  "There was no kmalloc object {}, recieved null", i);
+            return false;
+        }
+        let new_slab = SlabAllocator(sa);
+        if new_slab.get_size() > (MAX_SLAB_SIZE as u32) + 1 {
+            dbg!(debug::MM, "kmalloc object {} was larger than largest size we will use slab objs for", new_slab);
+            false
+        } else {
+            self.slabs.add(new_slab);
+            dbg!(debug::MM, "Added kmalloc object {} {}", i, new_slab);
+            true
         }
     }
-    let new_slab = SlabAllocator::new(name, size as size_t);
-    unsafe { SLAB_ALLOCATORS.add(new_slab) };
-    dbg!(debug::MM, "Added allocator called '{}' for a size of {}", name, size);
-}
 
-fn add_kmalloc_slabs() {
-    let mut i = 0;
-    while maybe_add_kmalloc_slab(i) { i += 1 }
-}
-
-extern "C" {
-    #[link_name="get_kmalloc_allocator"]
-    fn get_alloc(i: c_int) -> *mut CSlabAllocator;
-}
-
-
-fn maybe_add_kmalloc_slab(i: c_int) -> bool {
-    let sa = unsafe { get_alloc(i) };
-    if sa.is_null() {
-        dbg!(debug::MM,  "There was no kmalloc object {}, recieved null", i);
-        return false;
+    pub unsafe fn allocate(&self, size: uint, align: uint) -> *mut u8 {
+        let res = self.do_allocate(size, align);
+        if res.is_null() {
+            dbg!(debug::CORE|debug::MM, "Unable to allocate from normal allocators. Trying to use backup");
+            let out = self.backup.allocate(size, align);
+            if out.is_null() { dbg!(debug::CORE|debug::MM, "Unable to allocate from backup allocator!"); }
+            out
+        } else {
+            res
+        }
     }
-    let new_slab = SlabAllocator(sa);
-    if new_slab.get_size() > (MAX_SLAB_SIZE as u32) + 1 {
-        dbg!(debug::MM, "kmalloc object {} was larger than largest size we will use slab objs for", new_slab);
-        false
-    } else {
-        unsafe { SLAB_ALLOCATORS.add(new_slab); }
-        dbg!(debug::MM, "Added kmalloc object {} {}", i, new_slab);
-        true
+
+    #[inline]
+    unsafe fn do_allocate(&self, size: uint, _align: uint) -> *mut u8 {
+        if size >= MAX_SLAB_SIZE {
+            use super::page;
+            let pages = page::addr_to_num(page::const_align_up(size as *const u8));
+            dbg!(debug::MM, "Allocating {} pages to satisfy a request for {} bytes", pages, size);
+            let res = self.pages.alloc_n(pages as u32) as *mut u8;
+            if res.is_null() {
+                dbg!(debug::MM, "Allocation of {} pages failed for request of {} bytes. Reclaiming memory and retrying.", pages, size);
+                reclaim_memory();
+                return self.pages.alloc_n(pages as u32) as *mut u8
+            } else {
+                return res;
+            }
+        }
+        let alloc = self.slabs.find_smallest(size);
+        match alloc {
+            None => {
+                // This should never really happen, truely large ones will get their own page.
+                panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
+            },
+            Some(sa) => {
+                dbg!(debug::MM, "Allocating {} from {}", size, sa);
+                assert!(sa.get_size() as uint >= size, "allocator's size {} was less then required size {}", sa.get_size(), size);
+                let res = sa.allocate();
+                if res.is_null() {
+                    dbg!(debug::MM, "Allocation from slab {} failed for request of {} bytes. Reclaiming memory and retrying.", sa, size);
+                    reclaim_memory();
+                    return sa.allocate();
+                } else {
+                    return res;
+                }
+            }
+        }
+    }
+
+    #[allow(unused_unsafe)]
+    #[inline]
+    pub unsafe fn reallocate(&self, ptr: *mut u8, old_size: uint, size: uint, align: uint) -> *mut u8 {
+        use core::intrinsics::copy_nonoverlapping_memory;
+        dbg!(debug::MM, "reallocating {:p} from size of {} to size {}", ptr, old_size, size);
+        if self.reallocate_inplace(ptr, old_size, size, align) {
+            ptr
+        } else {
+            dbg!(debug::MM, "manually reallocating {:p} of size {} to size {}", ptr, old_size, size);
+            let new_ptr = self.allocate(size, align);
+            if !new_ptr.is_null() {
+                copy_nonoverlapping_memory(new_ptr, ptr as *const u8, min(size, old_size));
+                self.deallocate(ptr, old_size, align);
+            } else {
+                dbg!(debug::MM, "Unable to allocate memory for realloc of {} from {} to {} bytes", ptr, old_size, size);
+                return 0 as *mut u8;
+            }
+            new_ptr
+        }
+    }
+
+    #[allow(unused_unsafe)]
+    #[inline]
+    pub unsafe fn reallocate_inplace(&self, ptr: *mut u8, old_size: uint, size : uint,
+                                        _align: uint) -> bool {
+        use super::page;
+        if self.backup.contains(ptr) && old_size != size {
+            false
+        } else if old_size == size {
+            true
+        } else if size >= MAX_SLAB_SIZE && old_size >= MAX_SLAB_SIZE {
+            let new_pages = page::addr_to_num(page::const_align_up(size as *const u8));
+            let old_pages = page::addr_to_num(page::const_align_up(old_size as *const u8));
+            old_pages == new_pages
+        } else if size >= MAX_SLAB_SIZE || old_size >= MAX_SLAB_SIZE {
+            false
+        } else {
+            // Check if we have the same allocator
+            let new_alloc = self.slabs.find_smallest(size).expect("Unable to find slab allocator that was used.");
+            let old_alloc = self.slabs.find_smallest(old_size).expect("Unable to find slab allocator that was used.");
+            if new_alloc != old_alloc {
+                dbg!(debug::MM, "posibly reallocating from {} (size {}) to {} (size {})", old_alloc, old_size, new_alloc, size);
+            }
+            new_alloc == old_alloc
+        }
+    }
+
+    #[allow(unused_unsafe)]
+    #[inline]
+    pub unsafe fn deallocate(&self, ptr: *mut u8, size: uint, _align: uint) {
+        if self.backup.contains(ptr) {
+            self.backup.deallocate(ptr, size, _align);
+            return;
+        }
+        if size >= MAX_SLAB_SIZE {
+            use super::page;
+            let pages = page::addr_to_num(page::const_align_up(size as *const u8));
+            dbg!(debug::MM, "Deallocating {} pages used to satisfy a request for {} bytes", pages, size);
+            self.pages.free_n(ptr, pages as u32);
+            return;
+        }
+        let alloc = self.slabs.find_smallest(size);
+        match alloc {
+            None => {
+                // This should never really happen, truely large ones will get their own page.
+                panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
+            },
+            Some(sa) => {
+                dbg!(debug::MM, "deallocating {:p} with {} bytes from {}", ptr, size, sa);
+                sa.deallocate(ptr);
+            }
+        }
+    }
+
+    #[inline]
+    pub fn usable_size(&self, size: uint, _align: uint) -> uint {
+        // TODO This depends on which allocator the pointer is in. Since we cannot know that just
+        // from the size we need to say that there is no extra space. If they call realloc we might
+        // not move them anyway.
+        size
+    }
+
+    /// Return's true if we have low memory and have a better then even chance of failing to allocate a
+    /// value if asked. Even when true allocations might continue to succeed.
+    pub fn is_memory_low(&self) -> bool {
+        // We just ask the backup if it feels ok. As long as it does we are good.
+        self.backup.is_memory_low()
     }
 }
 
@@ -207,127 +385,42 @@ pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
         // TODO Decide what I should do here. Panicing might not be best.
         panic!("Attempt to call allocate before we have finished setting up the allocators.");
     }
-    if size >= MAX_SLAB_SIZE {
-        use super::page;
-        let pages = page::addr_to_num(page::const_align_up(size as *const u8));
-        dbg!(debug::MM, "Allocating {} pages to satisfy a request for {} bytes", pages, size);
-        let res = page::alloc_n(pages as u32) as *mut u8;
-        if res.is_null() {
-            dbg!(debug::MM, "Allocation of {} pages failed for request of {} bytes. Reclaiming memory and retrying.", pages, size);
-            reclaim_memory();
-            return page::alloc_n(pages as u32) as *mut u8
-        } else {
-            return res;
-        }
-    }
-    let alloc = SLAB_ALLOCATORS.find_smallest(size);
-    match alloc {
-        None => {
-            // This should never really happen, truely large ones will get their own page.
-            panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
-        },
-        Some(sa) => {
-            dbg!(debug::MM, "Allocating {} from {}", size, sa);
-            assert!(sa.get_size() as uint >= size, "allocator's size {} was less then required size {}", sa.get_size(), size);
-            let res = sa.allocate();
-            if res.is_null() {
-                dbg!(debug::MM, "Allocation from slab {} failed for request of {} bytes. Reclaiming memory and retrying.", sa, size);
-                reclaim_memory();
-                return sa.allocate();
-            } else {
-                return res;
-            }
-        }
-    }
+    let x = &BASE_ALLOCATOR;
+    x.allocate(size, _align)
 }
 
 #[allow(unused_unsafe)]
 #[inline]
 pub unsafe fn reallocate(ptr: *mut u8, old_size: uint, size: uint,
                              align: uint) -> *mut u8 {
-    use core::intrinsics::copy_nonoverlapping_memory;
-    dbg!(debug::MM, "reallocating {:p} from size of {} to size {}", ptr, old_size, size);
-    if reallocate_inplace(ptr, old_size, size, align) {
-        ptr
-    } else {
-        dbg!(debug::MM, "manually reallocating {:p} of size {} to size {}", ptr, old_size, size);
-        let new_ptr = allocate(size, align);
-        if !new_ptr.is_null() {
-            copy_nonoverlapping_memory(new_ptr, ptr as *const u8, min(size, old_size));
-            deallocate(ptr, old_size, align);
-        } else {
-            dbg!(debug::MM, "Unable to allocate memory for realloc of {} from {} to {} bytes", ptr, old_size, size);
-        }
-        new_ptr
-    }
+    let x = &BASE_ALLOCATOR;
+    x.reallocate(ptr, old_size, size, align)
 }
 
 #[allow(unused_unsafe)]
 #[inline]
 pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: uint, size : uint,
                                     _align: uint) -> bool {
-    use super::page;
-    if old_size == size {
-        true
-    } else if size >= MAX_SLAB_SIZE && old_size >= MAX_SLAB_SIZE {
-        let new_pages = page::addr_to_num(page::const_align_up(size as *const u8));
-        let old_pages = page::addr_to_num(page::const_align_up(old_size as *const u8));
-        old_pages == new_pages
-    } else if size >= MAX_SLAB_SIZE || old_size >= MAX_SLAB_SIZE {
-        false
-    } else {
-        // Check if we have the same allocator
-        let new_alloc = SLAB_ALLOCATORS.find_smallest(size).expect("Unable to find slab allocator that was used.");
-        let old_alloc = SLAB_ALLOCATORS.find_smallest(old_size).expect("Unable to find slab allocator that was used.");
-        if new_alloc != old_alloc {
-            dbg!(debug::MM, "posibly reallocating from {} (size {}) to {} (size {})", old_alloc, old_size, new_alloc, size);
-        }
-        new_alloc == old_alloc
-    }
-
+    let x = &BASE_ALLOCATOR;
+    x.reallocate_inplace(_ptr, old_size, size, _align)
 }
 
 #[allow(unused_unsafe)]
 #[inline]
 pub unsafe fn deallocate(ptr: *mut u8, size: uint, _align: uint) {
-    if size >= MAX_SLAB_SIZE {
-        use super::page;
-        use libc::c_void;
-        let pages = page::addr_to_num(page::const_align_up(size as *const u8));
-        dbg!(debug::MM, "Deallocating {} pages used to satisfy a request for {} bytes", pages, size);
-        page::free_n(ptr as *mut c_void, pages as u32);
-        return;
-    }
-    let alloc = SLAB_ALLOCATORS.find_smallest(size);
-    match alloc {
-        None => {
-            // This should never really happen, truely large ones will get their own page.
-            panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
-        },
-        Some(sa) => {
-            dbg!(debug::MM, "deallocating {:p} with {} bytes from {}", ptr, size, sa);
-            sa.deallocate(ptr);
-        }
-    }
+    let x = &BASE_ALLOCATOR;
+    x.deallocate(ptr, size, _align)
 }
 
 #[inline]
 pub fn usable_size(size: uint, _align: uint) -> uint {
-    if size >= MAX_SLAB_SIZE {
-        use super::page;
-        unsafe { page::const_align_up(size as *const u8) as uint }
-    } else {
-        let alloc = unsafe {SLAB_ALLOCATORS.find_smallest(size)};
-        match alloc {
-            None => {
-                // This should never really happen, truely large ones will get their own page.
-                panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
-            },
-            Some(sa) => {
-                dbg!(debug::MM, "usable size for {} is {}", size, sa.get_size());
-                sa.get_size() as uint
-            }
-        }
-    }
+    let x = unsafe { &BASE_ALLOCATOR };
+    x.usable_size(size, _align)
+}
+
+/// Return's true if we have low memory and have a better then even chance of failing to allocate a
+/// value if asked. Even when true allocations might continue to succeed.
+pub fn is_memory_low() -> bool {
+    (unsafe { &BASE_ALLOCATOR }).is_memory_low()
 }
 

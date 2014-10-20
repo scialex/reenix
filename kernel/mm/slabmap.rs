@@ -9,7 +9,7 @@ use core::fmt;
 use alloc::SlabAllocator;
 
 pub const NUM_ALLOCATORS : uint = 256;
-pub static mut SLAB_ALLOCATORS : SlabMap = SlabMap { vals: [None, .. NUM_ALLOCATORS], cnt: 0 };
+pub const DEFAULT_SLAB_MAP : SlabMap = SlabMap { vals: [None, .. NUM_ALLOCATORS], cnt: 0 };
 
 pub struct SlabMap {
     vals: [Option<SlabAllocator>, .. NUM_ALLOCATORS],

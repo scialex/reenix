@@ -8,7 +8,7 @@
 #![crate_type="rlib"]
 #![allow(non_camel_case_types)]
 #![allow(missing_doc)]
-#![feature(phase, globs, struct_variant, macro_rules, asm, if_let)]
+#![feature(phase, globs, struct_variant, macro_rules, asm, if_let, tuple_indexing)]
 #![no_std]
 
 #[phase(link, plugin)] extern crate core;
@@ -39,10 +39,16 @@ extern "C" {
     pub fn realloc(addr: *mut c_void, size: size_t) -> *mut c_void;
 }
 
+mod mm {
+    pub use super::alloc;
+}
+
 pub mod pagetable;
 pub mod utils;
 pub mod alloc;
 mod slabmap;
+mod macros;
+mod backup;
 
 pub mod poison {
     pub const ENABLED : bool = true;
@@ -178,13 +184,16 @@ pub mod page {
 
     #[inline]
     pub fn aligned<T>(x: *const T) -> bool {
-        0 == (unsafe { transmute::<*const T, uint>(x) % SIZE })
+        0 == offset(x)
     }
 
     #[inline]
     pub fn same<T>(x: *const T, y: *const T) -> bool {
         unsafe { const_align_down(x) == const_align_down(y) }
     }
+
+    // TODO Make traits implemented by uint and *const/mut T for these so we don't need to call
+    // them directly.
 }
 
 mod std {
