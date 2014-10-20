@@ -12,8 +12,8 @@ tidy: tidy_kernel tidy_doc
 
 %.pdf : %.tex
 	@ echo " Building $@ document"
-	@ pdflatex $< >/dev/null
-	@ pdflatex $< >/dev/null
+	@ pdflatex -halt-on-error $< >/dev/null
+	@ pdflatex -halt-on-error $< >/dev/null
 
 all_doc: design.pdf
 

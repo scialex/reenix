@@ -106,11 +106,56 @@ as a whole where during phase 1 memory allocation is forbidden (except
 through explicit use of kmalloc/kfree). We then go to phase 2 where
 memory may be allocated and freed normally.
 
-In the future this crate will likely also hold an implementation of
-\texttt{pframes}, although that might go in the \texttt{fs} crate.
-
 This crate depends only upon the \texttt{Core} crate and the \rust{}
 standard library crates \texttt{core} and \texttt{libc}.
+
+\subsubsection{Challenge: Allocation failure}
+One requirement that we must consider is that in general \rust{}
+considers memory allocation to never fail. This is, unfortunately,
+built rather deeply into their language's standard-library, with few
+operations that allocate memory having any way to return that memory
+allocation failed.  The standard \rust{} response to an out-of-memory
+error is to \texttt{fail!()} the current task.  In a normal \rust{}
+runtime this will cause a \texttt{C++} style exception to propagate up
+the call stack calling the finalizes of the locals at each level. It
+is implemented using the \texttt{Call-Frame-Information} (\texttt{CFI})
+exception mechanism popularized by \texttt{C++}. While there do not seem
+to be any serious design obstacles with implementing this form of error
+handling I do not plan to even attempt to do it. Even in places where
+languages implementing this form of exception management are used for
+kernel code (such as in the XNU-kernel's \texttt{I/O kit} driver system)
+exception handling in this manner is generally forbidden. Furthermore
+I do not have any real experience with writing this form of exception
+handler, and do not believe that writing this would be very enlightening.
+
+In order to avoid the requirement of writing this complicated exception
+handling mechanism I am going to emulate it in the following, somewhat
+hacky, manner. Prior to entering the first thread context I will reserve
+several (~16) contiguous pages with the page allocator.  These I will use
+to create a rather simple free-list based allocator, capable of allocating
+page-aligned regions. This will be used as a "backup" allocator for
+the normal allocating scheme, if we, for some reason, fail to allocate
+using the normal slab and page allocators we will fall back on using
+this. However this is not meant to be a real allocator. Instead kernel
+code should periodically (especially after known allocations) check with
+the memory management system to see if this backup allocator is being
+used. If it is the code should act as though the allocation failed.
+
+In order to stop myself from growing to depend on the implementation
+detail that, even in the case of a (theoretical) allocation failure,
+the memory is really allocated I will implement and use a standard macro
+which will make the allocation act as if it was fallible. In Reenix this
+will be implemented by running the allocation then afterwards checking if
+it is using the backup allocator, deallocating it and returning failure
+if so. If either the implementation of \rust{} task failure are ever
+changed or \texttt{CFI} based exception handling is implemented this
+macro will be swapped out for one that uses that mechanism, if possible.
+
+This is, in just about every way, a temporary hack to get around
+the problem. A real-world \rust{} kernel would need to deal with this
+directly. Either by patching the rust compiler (as well as much of it's
+standard library) to be able to have allocations fail more intelligently
+or by implementing this \texttt{CFI} based exception handling.
 
 \subsection{Crate: \texttt{startup}}
 The (somewhat confusingly named) \texttt{startup} crate (name provisional)
@@ -119,7 +164,9 @@ belong anywhere else. This crate will likely move into other parts
 as their places become clearer. The only part likely to remain in the
 \texttt{startup} crate longterm is the \texttt{gdt} support, since this
 is needed to setup the stack overflow detection that \rust{} builds into
-its language.
+its language. For much the same reason thread-specific data support
+is included here as well, since that is implemented using the memory
+segmentation support.
 
 It also currently contains the \texttt{acpi} shim and the \texttt{pci}
 shim. These both might end up being moved later as they are implemented in \rust{}.
@@ -142,12 +189,86 @@ This crate depends upon the \texttt{base} and \texttt{mm} crates. It
 also depends on the \rust{} standard library crates \texttt{alloc}
 and \texttt{collections} for smart pointers and collections respectively.
 
+\subsubsection{Advantages of Rust: Pointer safety}
+There are several quite nice advantages to using \rust{} to define the
+structures and methods needed for procs instead of \texttt{C}. The most obvious
+of these is the fact that using \rust{} we get smart pointer data structures.
+These make defining (and verifying) the relationships between objects much
+easier. For example it means that we now get a free check on memory corruption
+since if we can say that each proc's parent pointer is a \texttt{Weak} pointer.
+Then when we try to dereference it we get the check that the pointer has not
+been freed.
+
+\subsubsection{Module: Context}
+The context module defines the context structs that are used to define
+the execution context in Reenix. These are defined in much the same way
+they are in Weenix, with the only notable difference being that each
+context includes a (boxed) thread specific data structure, which keeps
+track of information such as the current thread and process.
+
+In large part due to how much simpler it is using the \rust{} collections
+types we also implement the run queue in the module, although this
+might be changed later. At the moment it is a simple ring buffer holding
+pointers to context structs. Unlike in Weenix this runqueue is unrelated
+to the waitqueue used in the implementation of mutex's and waiting.
+
+\subsubsection{Module: KQueue}
+This module contains an implementation of a condition variable like data
+structure. Any number of threads may wait on it and when some thread calls
+\texttt{signal} it will wake up all the threads in the queue. Unlike the
+weenix version there is no ordering guarantees, with respect to the order
+of threads waking up. This is implemented using a \rust{} \texttt{Set}
+data structure.
+
+\subsubsection{Module: pcell}
+This is a slightly strange module. Basically we have a problem that
+depending on which process you are in lifetimes can get slightly
+strange. For example to each process their own \texttt{KProc} and
+\texttt{KThread} structs should have a \texttt{'static} lifetime, since
+they are guaranteed to be there as long as the thread is running. This
+is great because it means it should be safe to use them as though they
+were static variables and avoid having to pass it around to each and
+every function that might possibly need it. This module defines a type
+similar to \rust{}'s \texttt{RefCell} data-type, which lets multiple
+parts of a program share data with runtime consistency checks. The only
+difference between the \texttt{ProcRefCell} defined in the \texttt{pcell}
+module is that the pcell gives an escape hatch that is used so that the
+current thread (and only the current thread) can consider the contained
+value \texttt{'static}, and therefore not to bother with keeping track
+of references to it from this thread. We still have the requirement
+that other threads not go to sleep while holding onto a reference to
+any other thread, which makes this totally safe.
+
+The entire reason this module is necessary is basically that \rust{}
+lacks any ability to express this sort of strange lifetime semantics.
+
 \subsection{Crate: \texttt{drivers}}
 The \texttt{drivers} crate will hold most of the code related to drivers
 in Reenix. It will hold implementations for taking in keyboard input,
 reading/writing from disks and displaying text on the screen. It may
-also hold the \texttt{acpi} and \texttt{pci} implementations instead
-of \texttt{startup}.
+also hold the \texttt{acpi} and \texttt{pci} implementations instead of
+\texttt{startup} (although this is only likely if these are eventually
+rewritten into \rust{}).
+
+The overall design of the drivers will be similar to the Weenix
+version. There will be block and byte devices which will each define a
+trait for what they can do. These will have implementations for each
+of the various devices in Weenix. We will need to be careful in here
+as, since most of the implementation of these structures is invoked in
+interrupt handler's we cannot use allocation. Annoyingly verifying this
+is somewhat tricky due to the indirection of \rust{}'s libraries but
+should not be a huge obstacle.
+
+A big improvement we will have writing this in \rust{} over \texttt{C} is
+that we get the indirection of \texttt{vtables}, which weenix implements
+manually, basically for free. This will make the implementation of the
+drivers somewhat easier as well as make their use much less cryptic. Also
+this language support means we do not need many of the somewhat magic
+macros such as \texttt{bd\_to\_ata}. Furthermore we have the nice
+advantage that the language itself will check to make sure that all
+implementors of these interfaces have all the right functions with
+the right types. This makes implementations of new types of drivers
+somewhat easier.
 
 More details about the design and implementation of this crate will be
 added as I get closer to implementing it.
@@ -158,6 +279,11 @@ which implements the common unix file-system contract. This holds an
 implementation of \texttt{vnode} and associated entities. This might
 also include \texttt{s5fs} (and possibly \texttt{ramfs}) or these might
 be in their own crates.
+
+In the future this crate will likely also hold an implementation
+of \texttt{pframes}, although that might go in the \texttt{mm} or
+\texttt{drivers} crate. The decision on where to put it will likely
+depend at least partly on what parts of other crates are needed.
 
 More details about the design and implementation of this crate will be
 added as I get closer to implementing it.
