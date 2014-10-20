@@ -106,7 +106,6 @@ pub fn initial_ctx_switch() -> ! {
 }
 
 pub fn die() -> ! {
-    // TODO
     interrupt::set_ipl(interrupt::HIGH);
     let nxt = pop_runable_ctx();
     assert!(interrupt::HIGH == interrupt::get_ipl());
@@ -142,7 +141,6 @@ extern "C" fn _rust_context_initial_function(f : ContextFunc, i: i32, v: *mut c_
     let result = f(i, v);
     let thr = current_thread!();
     thr.exit(result);
-    //gdt::get_tsd().get_current_thread().exit(result);
 
     panic!("Should never return from kthread.exit()");
 }

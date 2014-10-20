@@ -63,10 +63,6 @@ pub mod interrupt;
 
 // TODO Rewrite this in rust.
 mod apic {
-    pub const KEYBOARD       : u16 = 1;
-    pub const NPX            : u16 = 13;
-    pub const DISK_PRIMARY   : u16 = 14;
-    pub const DISK_SECONDARY : u16 = 15;
     extern "C" {
         fn apic_init();
     }

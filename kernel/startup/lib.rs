@@ -66,7 +66,6 @@ pub mod pit {
     pub const INTERRUPT : u8 = 0xf1;
     pub fn init_stage1() { not_yet_implemented!(pit::init_stage1) }
     pub fn init_stage2() { not_yet_implemented!(pit::init_stage2) }
-    pub fn set_handler(_h: extern fn()) { not_yet_implemented!(pit::set_handler) }
 }
 
 /// Thread specific data support.

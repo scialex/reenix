@@ -111,10 +111,13 @@ struct InterruptInfo {
 }
 
 const TRAP    : u8 = 0x01;
+#[allow(dead_code)]
 const BIT16   : u8 = 0x06;
 const BIT32   : u8 = 0x0E;
 const RING0   : u8 = 0x00;
+#[allow(dead_code)]
 const RING1   : u8 = 0x40;
+#[allow(dead_code)]
 const RING2   : u8 = 0x20;
 const RING3   : u8 = 0x60;
 const PRESENT : u8 = 0x80;
