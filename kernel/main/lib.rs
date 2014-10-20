@@ -4,7 +4,7 @@
 #![crate_type="rlib"]
 #![no_std]
 
-#![feature(globs, phase, macro_rules)]
+#![feature(globs, phase, macro_rules, asm)]
 
 
 #[phase(plugin, link)] extern crate core;
@@ -28,6 +28,7 @@ use libc::c_void;
 use mm::pagetable;
 use core::prelude::*;
 use collections::String;
+use procs::interrupt;
 
 mod proctest;
 
@@ -75,16 +76,17 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
 // TODO
 fn finish_init() { }
 extern "C" fn second_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
-    finish_init();
     dbg!(debug::CORE, "Reached second process");
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
+    proctest::start();
     return 0xdeadbeef as *mut c_void;
 }
 
 extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     finish_init();
+    interrupt::enable();
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
-    proctest::start();
+    KProc::new(String::from_str("test proc"), second_proc_run, 0, 0 as *mut c_void);
     loop {
         let x = KProc::waitpid(kproc::Any, 0);
         match x {

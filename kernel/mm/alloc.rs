@@ -238,7 +238,7 @@ impl Allocator {
     }
 
     pub unsafe fn allocate(&self, size: uint, align: uint) -> *mut u8 {
-        let res = self.do_allocate(size, align);
+        let res = if cfg!(not(TEST_LOW_MEMORY)) { self.do_allocate(size, align) } else { 0 as *mut u8 };
         if res.is_null() {
             dbg!(debug::CORE|debug::MM, "Unable to allocate from normal allocators. Trying to use backup");
             let out = self.backup.allocate(size, align);

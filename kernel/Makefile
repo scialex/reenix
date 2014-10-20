@@ -11,8 +11,8 @@ RSFLAGS   += --cfg kernel
 ###
 
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
+# TODO I need to remove these at some point.
 SRCDIR    := main boot util mm entry procs
-#SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.S) $(wildcard $(dr)/*.rs))
 SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) ) drivers/pci.c
 OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
@@ -64,7 +64,7 @@ clean-$(1):
 	$(HIDE_SIGIL) rm libs/$(notdir $(3)) || true
 	$(HIDE_SIGIL) $(MAKE) $(SILENT_FLAG) -C external/$(1) clean $(4)
 endef
-$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-Wno-maybe-uninitialized -g -m32 -march=i386 -ffreestanding" ARCH=i386))
+$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-Wno-maybe-uninitialized -g3 -gdwarf-3 -m32 -march=i386 -ffreestanding" ARCH=i386))
 
 # $(1) is the directory the library is in
 # $(2) is the name of the crate

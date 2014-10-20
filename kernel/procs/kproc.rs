@@ -116,7 +116,7 @@ pub fn start_idle_proc(init_main : ContextFunc, arg1: i32, arg2: *mut c_void) ->
     assert!(unsafe { IDLE_STARTED } == false, "IDLE THREAD ALREADY STARTED");
     unsafe { IDLE_STARTED = true; }
 
-    let pid = KProc::new(String::from_str("IDLE PROCESS"), init_main, arg1, arg2);
+    let pid = KProc::new(String::from_str("IDLE PROCESS"), init_main, arg1, arg2).expect("Unable to allocate idle proc!");
 
     assert!(pid == IDLE_PID);
     dbg!(debug::CORE, "Starting idle process {} now!", pid);
@@ -315,17 +315,26 @@ impl KProc {
         }
     }
 
-    pub fn new(name: String, init_main : ContextFunc, arg1: i32, arg2: *mut c_void) -> ProcId {
+    pub fn new(name: String, init_main : ContextFunc, arg1: i32, arg2: *mut c_void) -> Option<ProcId> {
         let is_idle = unsafe { IDLE_PROC == null_mut() };
         let is_init = unsafe { !is_idle && INIT_PROC == null_mut() };
 
-        let rcp = Rc::new(ProcRefCell::new(KProc::create(name)));
+        let rcp = match alloc!(try Rc::new(ProcRefCell::new(KProc::create(name)))) {
+            Ok(e) => e,
+            Err(e) => { dbg!(debug::PROC, "Unable to allocate a Process. Error was {}", e); return None; }
+        };
+
+        let mut init_thread = match alloc!(try_box KThread::new(&(*rcp).borrow_mut().deref().pagedir, init_main, arg1, arg2)) {
+            Ok(t) => t,
+            Err(s) => { dbg!(debug::PROC|debug::THR, "Unable to allocate kthread. Error was {}", s); return None; }
+        };
+
         let pid = (*rcp).borrow_mut().pid.clone();
         KProc::add_proc(pid.clone(), rcp.clone().downgrade());
         if !is_idle {
             (current_proc_mut!()).children.insert(pid.clone(), rcp.clone());
         }
-        let mut init_thread = box KThread::new(&(*rcp).borrow_mut().deref().pagedir, init_main, arg1, arg2);
+
         // TODO This should really actually use a Rc or something.
         let thr_ptr = unsafe { transmute_copy::<Box<KThread>,*mut KThread>(&init_thread) };
         init_thread.ctx.tsd.set_slot(CUR_THREAD_SLOT, box thr_ptr);
@@ -352,7 +361,7 @@ impl KProc {
             let tmp = box rcp.clone();
             unsafe { INIT_PROC = transmute(tmp); }
         }
-        return pid;
+        return Some(pid);
     }
 
     pub fn get_pid(&self) -> &ProcId {

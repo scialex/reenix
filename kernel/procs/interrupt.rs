@@ -13,11 +13,11 @@ use super::apic;
 #[repr(C)]
 #[deriving(Clone, Show)]
 pub struct Registers {
-    es   : u32, ds  : u32, gs  : u32,                             /* Pushed manually */
-    edi  : u32, esi : u32, ebp : u32, esp : u32,                  /* pushed by pusha */
-    ebx  : u32, edx : u32, ecx : u32, eax : u32,                  /* pushed by pusha */
-    intr : u32, err : u32,                                        /* Interrupt number and error code */
-    eip  : u32, cs  : u32, eflags : u32, useresp : u32, ss : u32, /* pushed by the processor automatically */
+    pub es   : u32, pub ds  : u32, pub gs  : u32,                                     /* Pushed manually */
+    pub edi  : u32, pub esi : u32, pub ebp : u32, pub esp : u32,                      /* pushed by pusha */
+    pub ebx  : u32, pub edx : u32, pub ecx : u32, pub eax : u32,                      /* pushed by pusha */
+    pub intr : u32, pub err : u32,                                                    /* Interrupt number and error code */
+    pub eip  : u32, pub cs  : u32, pub eflags : u32, pub useresp : u32, pub ss : u32, /* pushed by the processor automatically */
 }
 
 /// The total number of interrupts we can use.
@@ -126,7 +126,7 @@ pub type InterruptHandler = extern "Rust" fn(&mut Registers);
 
 #[allow(unused_unsafe)]
 #[no_stack_check]
-extern "Rust" fn unhandled_intr(r: &mut Registers) {
+pub extern "Rust" fn unhandled_intr(r: &mut Registers) {
     panic!("Unhandled interrupt 0x{:X}.\nRegisters were {}\nProcess was {}\nThread was {}",
            r.intr, r, current_proc!(), current_thread!());
 }
@@ -175,10 +175,10 @@ unsafe fn set_entry(isr: u8, addr: u32, seg: u16, flags: u8) {
 #[no_stack_check]
 #[inline(never)]
 #[allow(dead_code)]
-pub unsafe extern "C" fn _rust_intr_handler(mut r: Registers) {
+pub unsafe extern "C" fn _rust_intr_handler(r: &mut Registers) {
     // TODO I might need to setup the %es stuff as early as here.
     let h = IDT.handlers[r.intr as uint];
-    h(&mut r);
+    h(r);
     if IDT.mappings[r.intr as uint].is_none() {
         apic::set_eoi();
     }
@@ -221,27 +221,29 @@ macro_rules! make_noerr_handlers (
             // unreachable
             dbg!(debug::CORE, "Calling into interrupt entry function to ensure it is not removed");
             asm!("jmp 2f":::: "volatile");
-            asm!("
+            asm!(concat!("
             .global _rust_intr_handler_global
             _rust_intr_handler_global:
             pusha
             push %gs
             push %ds
-            push %es
+            push %es", /* Push each of the segment registers manually. */ "
+            push %esp", /* Push the pointer to be used as the argument to the _rust_intr_handler function */ "
             movl %ss, %edx
             movl %edx, %ds
             movl %edx, %es
             movl $$0, %edx
             mov $$0x40, %dx
-            mov %dx, %gs
-            call _rust_intr_handler
-            pop %es
+            mov %dx, %gs", /* Set up the segment registers appropriately */"
+            call _rust_intr_handler", /* Call the rust interrupt handler function */ "
+            pop %esp", /* Pop the argument off the stack */ "
+            pop %es", /* Pop the segment regsters back off the stack */"
             pop %ds
             pop %gs
-            popa
-            add $$8, %esp
+            popa", /* Pop the other registers off the stack */ "
+            add $$8, %esp", /* Remove the interrupt number and error code from the stack */ "
             iret
-            " : : : : "volatile");
+            ") : : : : "volatile");
             $(
                 asm!(concat!("
                 .global _rust_intr_handler_", stringify!($num),"

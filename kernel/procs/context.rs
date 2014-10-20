@@ -54,7 +54,6 @@ pub fn cleanup_bootstrap_function() {
     }
 }
 
-
 struct SleepingThread(*mut Context);
 struct RunQueue(RingBuf<SleepingThread>);
 

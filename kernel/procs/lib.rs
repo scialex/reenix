@@ -15,7 +15,7 @@
 #[phase(link, plugin)] extern crate core;
 #[phase(link, plugin)] extern crate base;
 #[phase(link, plugin)] extern crate collections;
-extern crate mm;
+#[phase(link, plugin)] extern crate mm;
 extern crate startup;
 extern crate alloc;
 extern crate libc;

@@ -27,7 +27,7 @@ pub struct BackupAllocator {
 }
 
 const DEFAULT_BACKUP_PAGES : uint = 128;
-const DEFAULT_THRESHOLD    : uint = 8;
+const DEFAULT_THRESHOLD    : uint = 16;
 
 pub const DEFAULT_BACKUP_ALLOCATOR : BackupAllocator = BackupAllocator {
     buf             : 0 as *mut u8,
@@ -122,7 +122,9 @@ impl BackupAllocator {
             let recieved_size =  unsafe { (res as *const Tag).offset(-1).as_ref().expect("shouldn't be null").size() };
             dbg!(debug::MM, "allocated {:p}-{:p} which is {} bytes long for request for {}",
                  res, unsafe { res.offset(recieved_size as int) }, recieved_size, size);
-            if self.is_memory_low() { dbg!(debug::MM|debug::CORE, "We are currently low on memory!"); }
+            if self.is_memory_low() {
+                dbg!(debug::MM|debug::CORE, "We are currently low on memory! Largest space is {}", self.largest_space);
+            }
         } else {
             dbg!(debug::MM, "unable to allocate {} bytes from backup", size);
         }
@@ -308,6 +310,6 @@ impl BackupAllocator {
     }
 
     pub fn is_memory_low(&self) -> bool {
-        self.pages - self.largest_space > self.threshold_pages
+        self.is_used() && self.pages - self.largest_space > self.threshold_pages
     }
 }

@@ -48,6 +48,10 @@
            PIPES=0 # pipe(2) functionality
          SHADOWD=0 # shadow page cleanup
 
+# These are some options that can be used for stress testing stuff
+        ADDITIONAL_CFGS= 
+#       ADDITIONAL_CFGS=TEST_LOW_MEMORY
+
 # These are some options that were in-file #defines in the C version. We are making them cfg's now.
  SLAB_CHECK_FREE=1 # Do we have slab checking on.
 # Boolean options specified in this specified in this file that should be
