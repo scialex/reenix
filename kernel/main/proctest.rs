@@ -2,8 +2,6 @@
 
 use procs::kproc;
 use alloc::boxed::*;
-use procs::kmutex::KMutex;
-use procs::kmutex;
 use libc::c_void;
 use core::prelude::*;
 use core::ptr::*;
@@ -14,6 +12,8 @@ use core::mem::transmute_copy;
 use core::intrinsics::transmute;
 use procs::kproc::{ProcStatus, ProcId, KProc};
 use procs::interrupt;
+use procs::sync::*;
+use alloc::rc::*;
 
 const GOOD : *mut c_void = 1 as *mut c_void;
 const BAD  : *mut c_void = 0 as *mut c_void;
@@ -56,6 +56,9 @@ pub fn start() {
     basic_test!(contested_mutex, 1);
     basic_test!(contested_mutex, 2);
     basic_test!(contested_mutex, 5);
+    basic_test!(better_mutex, 1);
+    basic_test!(better_mutex, 2);
+    basic_test!(better_mutex, 5);
     basic_test!(send_ignored_intr);
     basic_test!(test_handle_intr);
     basic_test!(test_modify_intr_regs);
@@ -63,17 +66,19 @@ pub fn start() {
     basic_test!(orphan_procs, 3);
     basic_test!(orphan_procs, 5);
 
-    debug::remove_mode(debug::TEST);
     dbg!(debug::TEST, "passed {} of {} tests", pass, total);
-    for i in range::<i32>(0, 10) {
-        kproc::KProc::new(string::String::from_str("fork fn"), fork_some, i, 0 as *mut c_void);
-        kthread::kyield();
+    if cfg!(all(not(TEST_LOW_MEMORY), TEST_KILL_ALL)) {
+        debug::remove_mode(debug::TEST);
+        for i in range::<i32>(0, 10) {
+            kproc::KProc::new(string::String::from_str("fork fn"), fork_some, i, 0 as *mut c_void);
+            kthread::kyield();
+        }
+        for _ in range::<uint>(0, 10) {
+            kthread::kyield();
+        }
+        dbg!(debug::TEST | debug::CORE, "killing everything");
+        kproc::KProc::kill_all();
     }
-    for _ in range::<uint>(0, 10) {
-        kthread::kyield();
-    }
-    dbg!(debug::TEST, "killing everything");
-    kproc::KProc::kill_all();
 }
 
 extern "Rust" fn regular_intr_handler(r: &mut interrupt::Registers) {
@@ -188,7 +193,7 @@ extern "C" fn kill_other(n: i32, _: *mut c_void) -> *mut c_void {
 
 extern "C" fn uncontested_mutex(_: i32, _: *mut c_void) -> *mut c_void {
     dbg!(debug::TEST, "Attempting to create a mutex and lock it.");
-    let x = kmutex::KMutex::new("test a mutex");
+    let x = KMutex::new("test a mutex");
     if x.lock() {
         dbg!(debug::TEST, "locking of mutex succeeded");
         x.unlock();
@@ -243,6 +248,61 @@ extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
     debug::add_mode(debug::SCHED);
     drop(y);
     return ret;
+}
+
+extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
+    use base::debug;
+    debug::remove_mode(debug::SCHED);
+    let x = Rc::new(Mutex::<i32>::new("contested mutex test", 0));
+
+    let high : i32 = 200;
+
+    for _ in range(0, n) {
+        // TODO How to make this say which number they are?
+        kproc::KProc::new(string::String::from_str("better counter n"), better_counter, high, unsafe { transmute(box x.clone()) });
+    }
+
+    let mut tot : i32 = 0;
+    for _ in range(0, n) {
+        let (p, v) = match kproc::KProc::waitpid(kproc::Any, 0) {
+            Ok(e) => e,
+            Err(_) => { return BAD; },
+        };
+        dbg!(debug::TEST, "pid {} returned {}", p, v);
+        tot += v as i32;
+    }
+    let ret = if tot == (*x).lock().and_then(|g| { Ok(*g) }).unwrap_or(0) {
+        dbg!(debug::TESTPASS, "successfully counted to {} with {} counters, using Mutex", tot, n);
+        GOOD
+    } else {
+        dbg!(debug::TESTFAIL, "failed counted to {} with {} counters, got {}, using Mutex", high, n, tot);
+        BAD
+    };
+    debug::add_mode(debug::SCHED);
+    assert!(is_unique(&x));
+    drop(x);
+    return ret;
+}
+
+extern "C" fn better_counter(h: i32, v : *mut c_void) -> *mut c_void {
+    let mut c : uint = 0;
+    let x : Box<Rc<Mutex<i32>>> = unsafe { transmute(v) };
+    loop {
+        kthread::kyield();
+        let mut v = (**x).force_lock();
+        if c % 2 == 0 {
+            kthread::kyield();
+        }
+        if *v == h {
+            return c as *mut c_void;
+        } else {
+            *(v.deref_mut()) += 1;
+            c += 1;
+            if c % 5 == 0 {
+                kthread::kyield();
+            }
+        }
+    }
 }
 
 extern "C" fn counter(h: i32, _ : *mut c_void) -> *mut c_void {

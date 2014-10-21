@@ -9,6 +9,7 @@ use core::fmt;
 use core::fmt::{Show, Formatter};
 use core::cell::*;
 use core::ptr::*;
+use sync::Wakeup;
 
 pub fn init_stage1() {
     request_slab_allocator("KMutex allocator", unsafe { size_of::<KMutex>() as u32 });

@@ -18,6 +18,7 @@ use libc::c_void;
 use kthread;
 use kthread::{KThread, CUR_THREAD_SLOT};
 use pcell::*;
+use sync::Wakeup;
 use kqueue::KQueue;
 use mm::pagetable::PageDir;
 

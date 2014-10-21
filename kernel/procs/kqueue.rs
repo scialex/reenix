@@ -10,6 +10,7 @@ use core::ptr;
 use core::ptr::*;
 use kthread::KThread;
 use kthread;
+use sync;
 
 pub struct QueuedThread(*mut KThread);
 pub struct KQueue(RefCell<TreeSet<QueuedThread>>);
@@ -36,6 +37,7 @@ impl PartialEq for QueuedThread {
         self.cmp(other) == Equal
     }
 }
+
 impl Eq for QueuedThread {}
 impl KQueue {
     pub fn len(&self) -> uint {
@@ -76,18 +78,6 @@ impl KQueue {
         return !t.cancelled;
     }
 
-    /// Wake up all waiting threads in this queue.
-    pub fn signal(&self) {
-        block_interrupts!({
-            let &KQueue(ref q) = self;
-            dbg!(debug::SCHED, "Waking up {} threads", q.borrow().len());
-            for &QueuedThread(x) in q.borrow().iter() {
-                self.wakeup_one(x);
-            }
-            q.borrow_mut().clear();
-        });
-    }
-
     fn wakeup_one(&self, t: *mut KThread) {
         unsafe {
             let x = t.as_mut().expect("Null thread being waited for!");
@@ -98,5 +88,25 @@ impl KQueue {
 
     pub fn new() -> KQueue {
         KQueue ( RefCell::new(TreeSet::new()) )
+    }
+}
+
+impl sync::Wait<(),()> for KQueue {
+    fn wait_on(&self) -> Result<(),()> {
+        if unsafe { transmute::<&KQueue, &mut KQueue>(self) }.wait(true) { Ok(()) } else { Err(()) }
+    }
+}
+
+impl sync::Wakeup for KQueue {
+    /// Wake up all waiting threads in this queue.
+    fn signal(&self) {
+        block_interrupts!({
+            let &KQueue(ref q) = self;
+            dbg!(debug::SCHED, "Waking up {} threads", q.borrow().len());
+            for &QueuedThread(x) in q.borrow().iter() {
+                self.wakeup_one(x);
+            }
+            q.borrow_mut().clear();
+        });
     }
 }

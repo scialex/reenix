@@ -55,6 +55,7 @@ mod macros;
 mod kqueue;
 mod context;
 
+pub mod sync;
 pub mod kthread;
 pub mod kmutex;
 pub mod kproc;
