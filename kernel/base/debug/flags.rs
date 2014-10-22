@@ -26,9 +26,9 @@ pub mod color {
 macro_rules! dbg_modes (
     ($(($n:ident, $v:expr, $c:expr, $ex:expr, $cfg:ident)),+) => (
         bitmask_create!(flags DbgMode : u64 {
-            $($n = (0x1 << $v)),+
+            $($n = $v),+
+            default NONE,
         })
-        pub const NONE : DbgMode = DbgMode(0);
         pub const ALL : DbgMode = DbgMode(-1);
         impl DbgMode {
             #[allow(dead_code)]

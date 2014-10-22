@@ -5,17 +5,28 @@
 #[macro_export]
 macro_rules! bitmask_create {
     (flags $name:ident : $t:ty
-     { $($f:ident = $v:expr),+ }) => {
-        #[deriving(PartialEq, Eq)]
+     { $($f:ident = $v:expr),+ default $d:ident, }) => {
+        #[deriving(Default, PartialEq, Eq)]
         pub struct $name($t);
-        $(pub const $f : $name = $name($v);)*
+        $(pub const $f : $name = $name(0x1 << $v);)*
+        pub const $d : $name = $name(0);
+        bitmask_create!(inner_flags $name { $($f,)* $d })
+    };
+    (flags $name:ident : $t:ty
+     { $($f:ident = $v:expr),+ }) => {
+        #[deriving(Default, PartialEq, Eq)]
+        pub struct $name($t);
+        $(pub const $f : $name = $name(0x1 << $v);)*
+        bitmask_create!(inner_flags $name { $($f),* })
+    };
+    (inner_flags $name:ident { $($f:ident),+ }) => {
         impl Show for $name {
             fn fmt(&self, fmt: &mut Formatter) -> Result {
                 try!(fmt.write(stringify!($name).as_bytes()))
                 try!(fmt.write("[".as_bytes()))
                 let mut started = false;
                 $(
-                if self & $f != $name(0) {
+                if *self == $f || ($f != $name(0) && self & $f != $name(0)) {
                     if started { try!(fmt.write("|".as_bytes())) } else { started = true; }
                     try!(fmt.write(stringify!($f).as_bytes()))
                 }
@@ -60,5 +71,5 @@ macro_rules! bitmask_create {
                 $name(!val)
             }
         }
-    }
+    };
 }

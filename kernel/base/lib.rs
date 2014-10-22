@@ -58,6 +58,7 @@ mod std {
     pub use core::fmt;
     pub use core::option;
     pub use core::num;
+    pub use core::default;
 }
 // This lets us use the macro's exported from here locally.
 mod base {
