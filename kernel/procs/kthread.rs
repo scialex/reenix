@@ -19,6 +19,7 @@ use kqueue::KQueue;
 use context::{Context, ContextFunc};
 use collections::hash;
 use mm::pagetable::PageDir;
+use mm::AllocError;
 
 pub static CUR_THREAD_SLOT : uint = 0;
 pub static DEFAULT_STACK_PAGES : uint = 16;
@@ -27,19 +28,24 @@ pub static DEFAULT_STACK_PAGES : uint = 16;
 pub struct KStack(uint, *mut u8);
 
 impl KStack {
-    pub fn with_size(pages : uint) -> KStack {
-        KStack(pages, unsafe { page::alloc_n(pages as u32) as *mut u8})
+    pub fn with_size(pages : uint) -> Result<KStack,()> {
+        let real = unsafe { page::alloc_n(pages as u32) as *mut u8 };
+        if real.is_null() {
+            Err(())
+        } else {
+            Ok(KStack(pages, real))
+        }
     }
 
-    pub fn new() -> KStack {
+    pub fn new() -> Result<KStack, ()> {
         KStack::with_size(DEFAULT_STACK_PAGES)
     }
 
-    pub fn copy(&mut self) -> KStack {
+    pub fn copy(&mut self) -> Result<KStack, AllocError> {
         let &KStack(size, _) = self;
-        let mut new = KStack::with_size(size);
+        let mut new = try!(KStack::with_size(size));
         new.copy_from(self);
-        new
+        Ok(new)
     }
 
     pub fn copy_from(&mut self, other: &KStack) {
@@ -102,9 +108,9 @@ impl<S: hash::Writer> hash::Hash<S> for KThread {
 }
 
 impl KThread {
-    pub fn new(pdir: &Box<PageDir>, main: ContextFunc, arg1 : i32, arg2 : *mut c_void) -> KThread {
-        let kstack = KStack::new();
-        KThread {
+    pub fn new(pdir: &Box<PageDir>, main: ContextFunc, arg1 : i32, arg2 : *mut c_void) -> Result<KThread, AllocError> {
+        let kstack = try!(KStack::new());
+        Ok(KThread {
             ctx       : unsafe { Context::new(main, arg1, arg2, kstack.ptr() as *mut u8,
                                               page::num_to_addr::<u8>(kstack.num_pages()) as uint,
                                               transmute_copy(pdir)) },
@@ -115,7 +121,7 @@ impl KThread {
             state     : NOSTATE,
             mode      : KERNEL,
             queue     : 0 as *mut KQueue
-        }
+        })
     }
 
     /// returns true if this is the current thread, false otherwise.

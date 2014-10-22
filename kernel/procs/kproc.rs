@@ -19,8 +19,10 @@ use kthread;
 use kthread::{KThread, CUR_THREAD_SLOT};
 use pcell::*;
 use sync::Wakeup;
-use kqueue::KQueue;
+use kqueue::WQueue;
+use sync::Wait;
 use mm::pagetable::PageDir;
+use mm::AllocError;
 
 pub const CUR_PROC_SLOT : uint = 1;
 pub const CUR_PID_SLOT  : uint = 2;
@@ -75,7 +77,7 @@ pub struct KProc {
     parent   : Option<Weak<ProcRefCell<KProc>>>,/* Our parent */
     pagedir  : Box<PageDir>,
 
-    wait : KQueue,
+    wait : WQueue,
 
     // TODO For VFS
     // files : [Option<KFile>, ..NFILES],
@@ -117,7 +119,7 @@ pub fn start_idle_proc(init_main : ContextFunc, arg1: i32, arg2: *mut c_void) ->
     assert!(unsafe { IDLE_STARTED } == false, "IDLE THREAD ALREADY STARTED");
     unsafe { IDLE_STARTED = true; }
 
-    let pid = KProc::new(String::from_str("IDLE PROCESS"), init_main, arg1, arg2).expect("Unable to allocate idle proc!");
+    let pid = KProc::new(String::from_str("IDLE PROCESS"), init_main, arg1, arg2).ok().expect("Unable to allocate idle proc!");
 
     assert!(pid == IDLE_PID);
     dbg!(debug::CORE, "Starting idle process {} now!", pid);
@@ -217,7 +219,7 @@ impl KProc {
                                                 }) {
                 return Ok((*kproc).clone());
             }
-            if !self.wait.wait(true) {
+            if self.wait.wait().is_err() {
                 dbg!(debug::PROC, "Process {} interrupted while waiting for any children to exit", self);//describe!(self));
                 return Err(errno::ECANCELED);
             }
@@ -237,7 +239,7 @@ impl KProc {
                         // We need to make sure the borrow isn't held during the sleep. Something
                         // else might want to look at it.
                         drop(b);
-                        if !self.wait.wait(true) {
+                        if self.wait.wait().is_err() {
                             dbg!(debug::PROC, "Process {} interrupted while waiting for child {} to exit",self, pid); //describe!(self), pid);
                             return Err(errno::ECANCELED);
                         }
@@ -301,46 +303,46 @@ impl KProc {
     }
 
     /// The base creation function for a process. This should not generally be used.
-    pub fn create(name: String) -> KProc {
-        KProc {
+    pub fn create(name: String) -> Result<KProc, AllocError> {
+        Ok(KProc {
             pid : ProcId::new(),
             command : name,
             // TODO Maybe I should just have this be a box for now.
-            threads : TreeMap::new(),
-            children : TreeMap::new(),
+            threads : try!(alloc!(try TreeMap::new())),
+            children : try!(alloc!(try TreeMap::new())),
             status : 0,
             state : RUNNING,
             parent : None,
-            pagedir : box PageDir::new(),
-            wait : KQueue::new(),
-        }
+            pagedir : try!(alloc!(try_box PageDir::new())),
+            wait : try!(alloc!(try WQueue::new())),
+        })
     }
 
-    pub fn new(name: String, init_main : ContextFunc, arg1: i32, arg2: *mut c_void) -> Option<ProcId> {
+    pub fn new(name: String, init_main : ContextFunc, arg1: i32, arg2: *mut c_void) -> Result<ProcId, AllocError> {
         let is_idle = unsafe { IDLE_PROC == null_mut() };
         let is_init = unsafe { !is_idle && INIT_PROC == null_mut() };
 
-        let rcp = match alloc!(try Rc::new(ProcRefCell::new(KProc::create(name)))) {
+        let rcp = match alloc!(try Rc::new(ProcRefCell::new(try!(KProc::create(name))))) {
             Ok(e) => e,
-            Err(e) => { dbg!(debug::PROC, "Unable to allocate a Process. Error was {}", e); return None; }
+            Err(e) => { dbg!(debug::PROC, "Unable to allocate a Process."); return Err(e); }
         };
 
-        let mut init_thread = match alloc!(try_box KThread::new(&(*rcp).borrow_mut().deref().pagedir, init_main, arg1, arg2)) {
+        let mut init_thread = match alloc!(try_box try!(KThread::new(&(*rcp).borrow_mut().deref().pagedir, init_main, arg1, arg2))) {
             Ok(t) => t,
-            Err(s) => { dbg!(debug::PROC|debug::THR, "Unable to allocate kthread. Error was {}", s); return None; }
+            Err(s) => { dbg!(debug::PROC|debug::THR, "Unable to allocate kthread."); return Err(s); }
         };
 
-        let pid = (*rcp).borrow_mut().pid.clone();
-        KProc::add_proc(pid.clone(), rcp.clone().downgrade());
-        if !is_idle {
-            (current_proc_mut!()).children.insert(pid.clone(), rcp.clone());
-        }
 
+        let hash = hash::hash(&*init_thread);
+        let pid = (*rcp).borrow_mut().pid.clone();
         // TODO This should really actually use a Rc or something.
-        let thr_ptr = unsafe { transmute_copy::<Box<KThread>,*mut KThread>(&init_thread) };
-        init_thread.ctx.tsd.set_slot(CUR_THREAD_SLOT, box thr_ptr);
-        init_thread.ctx.tsd.set_slot(CUR_PROC_SLOT, box rcp.clone().downgrade());
-        init_thread.ctx.tsd.set_slot(CUR_PID_SLOT, box pid.clone());
+        try!(alloc!(try {
+            let thr_ptr = unsafe { transmute_copy::<Box<KThread>,*mut KThread>(&init_thread) };
+            init_thread.ctx.tsd.set_slot(CUR_THREAD_SLOT, box thr_ptr);
+            init_thread.ctx.tsd.set_slot(CUR_PROC_SLOT, box rcp.clone().downgrade());
+            init_thread.ctx.tsd.set_slot(CUR_PID_SLOT, box pid.clone());
+        }));
+
         {
             let mut p = (*rcp).borrow_mut();
             if !is_idle {
@@ -349,20 +351,27 @@ impl KProc {
                 dbg!(debug::CORE, "IDLE PROCESS BEING CREATED");
                 assert!(pid == ProcId(0));
             }
-            init_thread.make_runable();
-            p.threads.insert(hash::hash(&*init_thread), init_thread);
+            try!(alloc!(try p.threads.insert(hash, init_thread)));
         }
+
+        // TODO These few things should also be wraped in try-catch
+        KProc::add_proc(pid.clone(), rcp.clone().downgrade());
+        if !is_idle {
+            (current_proc_mut!()).children.insert(pid.clone(), rcp.clone());
+        }
+
         // We need to set up IDLE and INIT process globals. These are just here.
         if is_idle {
-            dbg!(debug::CORE, "Setting IDLE PROC");
+            dbg!(debug::CORE | debug::PROC, "Setting IDLE PROC");
             let tmp = box rcp.clone();
             unsafe { IDLE_PROC = transmute(tmp); }
         } else if is_init {
-            dbg!(debug::CORE, "Setting INIT PROC");
+            dbg!(debug::CORE | debug::PROC, "Setting INIT PROC");
             let tmp = box rcp.clone();
             unsafe { INIT_PROC = transmute(tmp); }
         }
-        return Some(pid);
+        rcp.borrow_mut().threads.find_mut(&hash).expect("thread must still be present").make_runable();
+        return Ok(pid);
     }
 
     pub fn get_pid(&self) -> &ProcId {
