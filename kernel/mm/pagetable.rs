@@ -34,8 +34,6 @@ pub struct PageDir {
 }
 
 impl PageDir {
-    // TODO I need to make this return something different. That manages the memory by itself.
-    // TODO CURRENTLY I OVERFLOW THE STACK creating this.
     pub fn new() -> PageDir {
         assert!(template_pagedir != null());
         unsafe {

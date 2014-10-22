@@ -17,12 +17,12 @@ macro_rules! alloc(
         use mm::alloc;
         use core::mem;
         if alloc::is_memory_low() {
-            Err(concat!("Allocation of '", stringify!($f), "' failed due to insufficent memory"))
+            Err(())
         } else {
             let x = $f;
             if alloc::is_memory_low() {
                 mem::drop(x);
-                Err(concat!("Allocation of '", stringify!($f), "' failed due to insufficent memory"))
+                Err(())
             } else {
                 Ok(x)
             }
@@ -32,13 +32,13 @@ macro_rules! alloc(
         use mm::alloc;
         use core::mem;
         if alloc::is_memory_low() {
-            Err(concat!("Allocation of '", stringify!($e), "' failed due to insufficent memory"))
+            Err(())
         } else {
             let x = box $e;
 
             if alloc::is_memory_low() {
                 mem::drop(x);
-                Err(concat!("Allocation of '", stringify!($e), "' failed due to insufficent memory"))
+                Err(())
             } else {
                 Ok(x)
             }
