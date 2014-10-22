@@ -21,30 +21,30 @@ pub trait WakeupOne: Wakeup {
 pub trait Wait<R,E> {
     /// Returns true if we successfully waited. False if we were cancelled or something else went
     /// wrong.
-    fn wait_on<'a>(&'a self) -> Result<R,E>;
+    fn wait<'a>(&'a self) -> Result<R,E>;
 }
 
 /// An RAII Based mutex with auto-unlocking.
-pub struct SMutex { inner: KMutex, wqueue: KQueue, }
+pub struct SMutex { inner: KMutex, wqueue: WQueue, }
 
 pub struct SGuard<'a> { lock: &'a SMutex, }
 
 impl<'a> Wait<(),()> for SGuard<'a> {
-    fn wait_on(&self) -> Result<(),()> { self.lock.wait() }
+    fn wait(&self) -> Result<(),()> { self.lock.wait() }
 }
 
 impl SMutex {
     pub fn new(name: &'static str) -> SMutex {
         SMutex {
             inner: KMutex::new(name),
-            wqueue: KQueue::new(),
+            wqueue: WQueue::new(),
         }
     }
     fn unlock(&self) { self.inner.unlock(); }
     fn wait(&self) -> Result<(),()> {
         block_interrupts!({
             self.unlock();
-            let res = self.wqueue.wait_on();
+            let res = self.wqueue.wait();
             // Even if we failed this lock still needs to be valid.
             self.inner.lock_nocancel();
             res
@@ -94,7 +94,7 @@ pub struct MGuard<'a, T: 'a> {
 }
 
 impl<'a, T:'a> Wait<(),()> for MGuard<'a, T> {
-    fn wait_on(&self) -> Result<(), ()> { self._lock.wait_on() }
+    fn wait(&self) -> Result<(), ()> { self._lock.wait() }
 }
 
 impl<T> Mutex<T> {
@@ -154,8 +154,8 @@ pub struct CGuard<'a, T: 'a> {
 }
 
 impl<'a, T: 'a> CGuard<'a, T> {
-    pub fn force_wait_on(&self) -> Result<(),()> {
-        self._lock.wait_on().and_then(|_| { self.wait_on() })
+    pub fn force_wait(&self) -> Result<(),()> {
+        self._lock.wait().and_then(|_| { self.wait() })
     }
 }
 
@@ -168,10 +168,10 @@ impl<'a, T:'a> Drop for CGuard<'a, T> {
 }
 
 impl<'a, T> Wait<(),()> for CGuard<'a, T> {
-    fn wait_on(&self) -> Result<(),()> {
+    fn wait(&self) -> Result<(),()> {
         let r = self._mtx.cond;
         while !r(self.deref()) {
-            try!(self._lock.wait_on());
+            try!(self._lock.wait());
         }
         Ok(())
     }

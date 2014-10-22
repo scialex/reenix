@@ -35,7 +35,7 @@ impl KMutex {
     pub fn lock_nocancel(&self) {
         dbg!(debug::SCHED, "locking {} for {} of {}", self, current_thread!(), current_proc!());
         while self.held.get() {
-            unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait(false) };
+            unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait_on(false) };
         }
         self.held.set(true);
         return;
@@ -46,7 +46,7 @@ impl KMutex {
     pub fn lock(&self) -> bool {
         dbg!(debug::SCHED, "cancelable locking {} for {} of {}", self, current_thread!(), current_proc!());
         while self.held.get() {
-            if unsafe { !self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait(true) } {
+            if unsafe { !self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait_on(true) } {
                 return false;
             }
         }

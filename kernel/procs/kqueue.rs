@@ -61,7 +61,7 @@ impl KQueue {
 
     /// Add a thread into this queue. This returns after some call to signal. false if we were
     /// canceled, true otherwise.
-    pub fn wait(&mut self, cancelable: bool) -> bool {
+    pub fn wait_on(&mut self, cancelable: bool) -> bool {
         let t = current_thread!();
         if cancelable && t.cancelled {
             dbg!(debug::SCHED, "Not waiting for cancelation because thread {} is already canceled", t);
@@ -91,12 +91,6 @@ impl KQueue {
     }
 }
 
-impl sync::Wait<(),()> for KQueue {
-    fn wait_on(&self) -> Result<(),()> {
-        if unsafe { transmute::<&KQueue, &mut KQueue>(self) }.wait(true) { Ok(()) } else { Err(()) }
-    }
-}
-
 impl sync::Wakeup for KQueue {
     /// Wake up all waiting threads in this queue.
     fn signal(&self) {
@@ -109,4 +103,23 @@ impl sync::Wakeup for KQueue {
             q.borrow_mut().clear();
         });
     }
+}
+
+pub struct WQueue(UnsafeCell<KQueue>);
+
+impl WQueue {
+    pub fn new() -> WQueue { WQueue(UnsafeCell::new(KQueue::new())) }
+    #[inline]
+    fn get_inner<'a>(&'a self) -> &'a mut KQueue { let &WQueue(ref kq) = self; unsafe { transmute(kq.get()) } }
+}
+
+impl sync::Wait<(),()> for WQueue {
+    fn wait(&self) -> Result<(),()> {
+        if self.get_inner().wait_on(true) { Ok(()) } else { Err(()) }
+    }
+}
+
+impl sync::Wakeup for WQueue {
+    /// Wake up all waiting threads in this queue.
+    fn signal(&self) { self.get_inner().signal(); }
 }
