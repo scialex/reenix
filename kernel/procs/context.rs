@@ -38,8 +38,8 @@ static mut BOOTSTRAP_FUNC_CTX : *mut Context = 0 as *mut Context;
 pub fn enter_bootstrap_func(f: ContextFunc, i: i32, v: *mut c_void) -> ! {
     dbg!(debug::CORE, "Entering bootstrap");
     unsafe {
-        let bstack = page::alloc_n(4);
-        let ctx = box Context::new(f, i, v, bstack as *mut u8, 4 * page::SIZE, transmute(pagetable::current));
+        let bstack = page::alloc_n::<u8>(4).unwrap_or_else(|_| {panic!("Unable to allocate stack for bootstrap function") });
+        let ctx = box Context::new(f, i, v, bstack, 4 * page::SIZE, transmute(pagetable::current));
         BOOTSTRAP_FUNC_CTX = transmute_copy(&ctx);
         ctx.make_active();
     }

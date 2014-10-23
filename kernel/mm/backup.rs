@@ -98,7 +98,9 @@ impl BackupAllocator {
     /// having low memory when fewer then 'threshold' continuous pages are availible.
     pub fn new(size : uint, threshold : uint) -> BackupAllocator {
         let mut ret = BackupAllocator {
-            buf : unsafe { let x = page::alloc_n(size as u32) as *mut u8; if x.is_null() { panic!("Not enough space for backup allocator") } else { x } },
+            buf : unsafe {
+                page::alloc_n(size).unwrap_or_else(|_| { panic!("Unable to allocate space for backup allocator"); })
+            },
             pages : size,
             largest_space : size - 1,
             threshold_pages : threshold,

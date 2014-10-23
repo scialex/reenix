@@ -4,6 +4,7 @@ use user;
 use page;
 use libc::{uintptr_t,c_void};
 use base::errno;
+use base::errno::KResult;
 use core::u32;
 use core::prelude::*;
 use core::intrinsics::copy_nonoverlapping_memory;
@@ -58,22 +59,18 @@ impl PageDir {
         pt_set(self as *const PageDir);
     }
 
-    pub unsafe fn map(&mut self, vaddr: uint, paddr: uint, pdflags: uint, ptflags: uint) -> Result<(),errno::Errno> {
+    pub unsafe fn map(&mut self, vaddr: uint, paddr: uint, pdflags: uint, ptflags: uint) -> KResult<()> {
         assert!(page::aligned(vaddr as *const c_void));
         assert!(user::MEM_LOW <= vaddr && vaddr <= user::MEM_HIGH);
         assert!((pdflags & !page::MASK) == pdflags);
         let index = vaddr_to_pdindex(vaddr);
         let pt = match self.get_pagetable(index) {
             None => {
-                let paget = page::alloc() as *mut pte;
-                if paget == null_mut() {
-                    return Err(errno::ENOMEM);
-                } else {
-                    zero_memory(paget, ENTRY_COUNT);
-                    self.pd_physical[index] = self.virt_to_phys(paget as uint) | pdflags;
-                    self.pd_virtual[index] = paget;
-                    paget
-                }
+                let paget = try!(page::alloc().or_else(|_| { Err(errno::ENOMEM) }));
+                zero_memory(paget, ENTRY_COUNT);
+                self.pd_physical[index] = self.virt_to_phys(paget as uint) | pdflags;
+                self.pd_virtual[index] = paget;
+                paget
             },
             Some(_) => {
                 self.pd_physical[index] |= pdflags;

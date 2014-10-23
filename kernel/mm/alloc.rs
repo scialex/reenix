@@ -28,7 +28,7 @@ struct PageAllocator;
 impl PageAllocator {
     pub unsafe fn alloc_n(&self, n: u32) -> *mut u8 {
         use super::page;
-        page::alloc_n(n) as *mut u8
+        page::c_alloc_n(n) as *mut u8
     }
     pub unsafe fn free_n(&self, ptr: *mut u8, n : u32) {
         use libc::c_void;
@@ -46,6 +46,7 @@ static mut BASE_ALLOCATOR : Allocator = Allocator {
 };
 
 pub type AllocError = ();
+pub type Allocation<T> = Result<T, AllocError>;
 
 pub static SLAB_REDZONE : u32 = 0xdeadbeef;
 

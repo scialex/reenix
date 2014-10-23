@@ -16,7 +16,7 @@
 extern crate libc;
 
 use libc::{c_void, size_t};
-pub use alloc::AllocError;
+pub use alloc::{AllocError, Allocation};
 
 /// Initialize this crate. This must be called exactly once during startup.
 #[deny(dead_code)]
@@ -119,15 +119,17 @@ pub mod tlb {
 pub mod page {
     use core::intrinsics::transmute;
     use libc::{uintptr_t, c_void};
+    use core::result::*;
+    use core::ptr::*;
     extern "C" {
         #[link_name = "page_add_range"]
-        pub fn add_range(start: uintptr_t, end: uintptr_t);
+        pub fn c_add_range(start: uintptr_t, end: uintptr_t);
         #[link_name = "page_alloc"]
-        pub fn alloc() -> *mut c_void;
+        pub fn c_alloc() -> *mut c_void;
         #[link_name = "page_free"]
         pub fn free(page: *mut c_void);
         #[link_name = "page_alloc_n"]
-        pub fn alloc_n(num: u32) -> *mut c_void;
+        pub fn c_alloc_n(num: u32) -> *mut c_void;
         #[link_name = "page_free_n"]
         pub fn free_n(pages: *mut c_void, num: u32);
         #[link_name = "page_freecount"]
@@ -143,6 +145,16 @@ pub mod page {
     pub const SIZE   : uint = 1 << SHIFT;
     pub const MASK   : uint = (!0) << SHIFT;
     pub const NSIZES : uint = 8;
+
+    pub unsafe fn alloc<T>() -> super::Allocation<*mut T> {
+        let res = c_alloc();
+        if res.is_null() { Err(()) } else { Ok(res as *mut T) }
+    }
+
+    pub unsafe fn alloc_n<T>(pages: uint) -> super::Allocation<*mut T> {
+        let res = c_alloc_n(pages as u32);
+        if res.is_null() { Err(()) } else { Ok(res as *mut T) }
+    }
 
     #[inline]
     pub unsafe fn const_align_down<T>(x: *const T) -> *const T {

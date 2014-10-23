@@ -29,12 +29,7 @@ pub struct KStack(uint, *mut u8);
 
 impl KStack {
     pub fn with_size(pages : uint) -> Result<KStack,()> {
-        let real = unsafe { page::alloc_n(pages as u32) as *mut u8 };
-        if real.is_null() {
-            Err(())
-        } else {
-            Ok(KStack(pages, real))
-        }
+        Ok(KStack(pages, try!(unsafe { page::alloc_n::<u8>(pages) })))
     }
 
     pub fn new() -> Result<KStack, ()> {

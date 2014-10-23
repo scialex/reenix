@@ -25,8 +25,8 @@ pub fn start() {
     macro_rules! basic_test(
         ($name:expr, $v:expr) => ({
             let cnt1 = match kproc::KProc::new(string::String::from_str(stringify!($name)), $name, $v, 0 as *mut c_void) {
-                Some(p) => p,
-                None => { dbg!(debug::TEST, "Failed to allocate new process"); return; },
+                Ok(p) => p,
+                _ => { dbg!(debug::TEST, "Failed to allocate new process"); return; },
             };
             match kproc::KProc::waitpid(kproc::Pid(cnt1), 0) {
                 Ok((_, status)) => {
@@ -173,9 +173,15 @@ extern "C" fn to_kill(n: i32, p: *mut c_void) -> *mut c_void {
 }
 
 extern "C" fn kill_other(n: i32, _: *mut c_void) -> *mut c_void {
-    let target = kproc::KProc::new(string::String::from_str("target fn"), to_die, 0, 0 as *mut c_void).expect("couldn't make proc");
+    let target = match kproc::KProc::new(string::String::from_str("target fn"), to_die, 0, 0 as *mut c_void) {
+        Ok(p) => p,
+        _ => { return BAD; },
+    };
     let rtarget = box target.clone();
-    let sniper = kproc::KProc::new(string::String::from_str("sniper fn"), to_kill, n, unsafe { transmute(rtarget) }).expect("couldn't make proc");
+    let sniper = match kproc::KProc::new(string::String::from_str("sniper fn"), to_kill, n, unsafe { transmute(rtarget) }) {
+        Ok(p) => p,
+        _ => { return BAD; },
+    };
     let (_, sv) = match KProc::waitpid(kproc::Pid(sniper), 0) {
         Ok(e) => e,
         Err(e) => { dbg!(debug::TESTFAIL, "Waitpid returned {}", e); return BAD; }

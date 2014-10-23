@@ -5,8 +5,11 @@
 //!
 
 use core::default::Default;
+use core::result::Result;
 use describe::*;
 use core::fmt;
+
+pub type KResult<T> = Result<T, Errno>;
 
 macro_rules! errnos (
     ($(($n:ident, $v:expr, $ex:expr)),+) => (
