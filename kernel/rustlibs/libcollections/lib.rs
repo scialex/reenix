@@ -10,7 +10,7 @@
 
 //! Collection types.
 //!
-//! See [../std/collections](std::collections) for a detailed discussion of collections in Rust.
+//! See [std::collections](../std/collections) for a detailed discussion of collections in Rust.
 
 
 #![crate_name = "collections"]
@@ -33,7 +33,6 @@ extern crate alloc;
 
 #[cfg(test)] extern crate native;
 #[cfg(test)] extern crate test;
-#[cfg(test)] extern crate debug;
 
 #[cfg(test)] #[phase(plugin, link)] extern crate std;
 #[cfg(test)] #[phase(plugin, link)] extern crate log;
@@ -502,40 +501,6 @@ pub trait Deque<T> : MutableSeq<T> {
     /// assert_eq!(d.front(), Some(&2i));
     /// ```
     fn push_front(&mut self, elt: T);
-
-    /// Inserts an element last in the sequence.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use std::collections::{DList, Deque};
-    ///
-    /// let mut d = DList::new();
-    /// d.push_back(1i);
-    /// d.push_back(2i);
-    /// assert_eq!(d.front(), Some(&1i));
-    /// ```
-    #[deprecated = "use the `push` method"]
-    fn push_back(&mut self, elt: T) { self.push(elt) }
-
-    /// Removes the last element and returns it, or `None` if the sequence is
-    /// empty.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// use std::collections::{RingBuf, Deque};
-    ///
-    /// let mut d = RingBuf::new();
-    /// d.push_back(1i);
-    /// d.push_back(2i);
-    ///
-    /// assert_eq!(d.pop_back(), Some(2i));
-    /// assert_eq!(d.pop_back(), Some(1i));
-    /// assert_eq!(d.pop_back(), None);
-    /// ```
-    #[deprecated = "use the `pop` method"]
-    fn pop_back(&mut self) -> Option<T> { self.pop() }
 
     /// Removes the first element and returns it, or `None` if the sequence is
     /// empty.
