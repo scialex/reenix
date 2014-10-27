@@ -116,7 +116,7 @@ impl SlabAllocator {
         let &SlabAllocator(csa) = self;
         let CSlabAllocator {next: _,
                             name_len: len,
-                            name: name,
+                            name,
                             objsize: _,
                             slabs: _,
                             order: _,
