@@ -15,6 +15,7 @@ extern crate mm;
 extern crate main;
 extern crate startup;
 extern crate libc;
+extern crate drivers;
 
 use libc::c_void;
 
@@ -41,6 +42,8 @@ fn run_init() {
     dbg!(debug::CORE, "startup initialized stage 1");
     procs::init_stage1();
     dbg!(debug::CORE, "procs initialized stage 1");
+    drivers::init_stage1();
+    dbg!(debug::CORE, "drivers initialized stage 1");
     main::init_stage1();
     dbg!(debug::CORE, "main initialized stage 1");
 
@@ -54,6 +57,8 @@ fn run_init() {
     dbg!(debug::CORE, "startup initialized stage 2");
     procs::init_stage2();
     dbg!(debug::CORE, "procs initialized stage 2");
+    drivers::init_stage2();
+    dbg!(debug::CORE, "drivers initialized stage 2");
     main::init_stage2();
     dbg!(debug::CORE, "main initialized stage 2");
 }
