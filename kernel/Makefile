@@ -1,5 +1,5 @@
 CFLAGS    := -ffreestanding
-RSFLAGS   = -L libs -Z gc --opt-level=2
+RSFLAGS   := -L libs -C no-redzone -Z gc -C no-stack-check
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 # XXX should have --omagic?
 
@@ -10,14 +10,17 @@ RSFLAGS   += --cfg kernel
 
 ###
 
+DEFAULT_CRATE_OPT := 2
+DEFAULT_BUILTIN_CRATE_OPT := 3
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
 # TODO I need to remove these at some point.
 SRCDIR    := main boot util mm entry procs
-SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) ) drivers/pci.c
+SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) ) drivers/pci.c drivers/blockdev/disk/ata.c base/timer.c
 OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-MODULES := base mm alloc libc main startup collections procs
+MODULES := base mm alloc libc main startup collections procs drivers
+#MODULES := base mm alloc libc main startup collections procs
 BUILT_MODULES := $(foreach dr, $(MODULES), libs/lib$(dr).rlib)
 
 RSFLAGS += $(foreach dr, $(MODULES), --extern $(dr)=libs/lib$(dr).rlib)
@@ -76,15 +79,18 @@ libs/lib$(2).rlib : $$(shell find $(1) -type f) $$(foreach l,$(3), libs/lib$$(l)
 	$(HIDE_SIGIL) $(RUST) $(RSFLAGS) $(4) --crate-type=rlib $(1)/lib.rs --out-dir libs
 endef
 
+define long-crate-rule
+$(eval $(call base-crate-rule,$(1),$(1),$(2),$(3)))
+endef
 define crate-rule
-$(eval $(call base-crate-rule,$(1),$(1),$(2),))
+$(eval $(call long-crate-rule,$(1),$(2),--opt-level=$(DEFAULT_CRATE_OPT)))
 endef
 
 # A module that is part of rusts stdlib.
 # $(1) is the name of the crate.
 # $(2) is the list of dependencies
 define builtin-crate-rule
-$(eval $(call base-crate-rule,rustlibs/lib$(1),$(1),$(2),--allow=dead-code))
+$(eval $(call base-crate-rule,rustlibs/lib$(1),$(1),$(2),--allow=dead-code --opt-level=$(DEFAULT_BUILTIN_CRATE_OPT)))
 endef
 
 $(eval $(call builtin-crate-rule,libc,))
@@ -95,6 +101,8 @@ $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
 $(eval $(call crate-rule,startup,alloc mm base libc collections))
 $(eval $(call crate-rule,procs,startup alloc base libc mm collections))
+# TODO For some reason LLVM doesn't like --opt-level=2 in drivers.
+$(eval $(call long-crate-rule,drivers,procs alloc mm collections base,--opt-level=1))
 
 
 $(eval $(call crate-rule,main,$(filter-out main,$(MODULES))))
@@ -110,7 +118,7 @@ all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 $(KERNEL): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ echo "  Linking for \"kernel/$@\"..."
 	@ # entry.o included from link.ld. boot/boot.S must be the first file so that the multiboot header is close enough to the front.
-	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T link.ld boot/boot.o $(filter-out boot/boot.o entry/entry.o,$^) -o $@
+	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -O1 --strip-all -T link.ld boot/boot.o $(filter-out boot/boot.o entry/entry.o,$^) -o $@
 
 $(BSYMBOLS): $(SYMBOLS)
 	@ echo "  Generating kernel symbols list..."

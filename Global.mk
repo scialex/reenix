@@ -18,6 +18,9 @@ include ../CheckTools.mk
 RSFLAGS   += $(foreach bool,$(COMPILE_CONFIG_BOOLS),$(if $(findstring 1,$($(bool))),--cfg $(bool),))
 RSFLAGS   += $(foreach r,$(REMOVE_DBG),--cfg NDEBUG_$(r) )
 RSFLAGS   += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
+ifeq ($(USE_STACK_CHECK),FALSE)
+  RSFLAGS += -C no-stack-check --cfg NO_STACK_CHECK
+endif
 
 CFLAGS    += $(foreach bool,$(COMPILE_CONFIG_BOOLS), \
              $(if $(findstring 1,$($(bool))),-D__$(bool)__=$(strip $($(bool)))))

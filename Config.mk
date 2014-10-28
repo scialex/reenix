@@ -6,11 +6,15 @@
 #   basis. Note that variables like CFLAGS are not defined here because they should
 #   generally not be changed.
 
+# Should we use stack check. FALSE we will not. Anything else we will.
+#USE_STACK_CHECK=TRUE
+USE_STACK_CHECK=FALSE
+
 #
 # Setting any of these variables will control which parts of the source tree
 # are built. To enable something set it to 1, otherwise set it to 0.
 #
-     DRIVERS=0
+     DRIVERS=1
          VFS=0
         S5FS=0
           VM=0
@@ -68,8 +72,8 @@
 # Debug message behavior. Note that this can be changed at runtime by
 # modifying the dbg_modes global variable.
 # All debug statements
-        REMOVE_DBG = MM PAGEALLOC
-        DBG = all,-mm,-pagealloc
+        REMOVE_DBG ?= MM PAGEALLOC SCHED
+        DBG ?= all,-mm,-pagealloc
 # Change to this for no debug statements
 #       DBG =-all
 
