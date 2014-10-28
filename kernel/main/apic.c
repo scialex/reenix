@@ -398,7 +398,7 @@ void apic_eoi()
 
 void apic_setredir(uint32_t irq, uint8_t intr)
 {
-        dbg(DBG_CORE, "redirecting irq %u to interrupt %hhu\n", irq, intr);
+        dbg(DBG_CORE, "redirecting irq %u to interrupt %hu\n", irq, intr);
         __ioapic_setredir(irq, intr);
         __ioapic_setmask(irq, 0);
 }
