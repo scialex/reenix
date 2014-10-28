@@ -132,12 +132,16 @@ impl PageDir {
         self.pd_virtual[index] = 0 as *mut uint;
     }
 
-    pub fn virt_to_phys(&mut self, vaddr: uint) -> uint {
+    pub fn virt_to_phys(&self, vaddr: uint) -> uint {
+        // TODO Rewrite this in rust.
+        unsafe { base_virt_to_phys(vaddr as u32) as uint }
+        /*
+        // TODO I am not sure if this is right.
         let table = vaddr_to_pdindex(vaddr);
         let entry = vaddr_to_ptindex(vaddr);
         let offset = vaddr_to_offset(vaddr);
 
-        if let Some(pt) = self.get_pagetable(table) {
+        let res = if let Some(pt) = self.get_pagetable(table) {
             let page = unsafe { *(pt.offset(entry as int)) & page::MASK };
             if page != 0 {
                 page + offset
@@ -146,7 +150,11 @@ impl PageDir {
             }
         } else {
             panic!("Illegal virtual address 0x{:8X} given which isn't mapped", vaddr)
-        }
+        };
+        let real =  unsafe {base_virt_to_phys(vaddr as u32)};
+        assert!(res as uintptr_t == real, "we calculated paddr 0x{:x} but actually is 0x{:x}", res, real);
+        res
+        */
     }
 }
 
