@@ -32,6 +32,10 @@ pub fn init_stage3() {
     get_current_tty().write_to(0, "WEENIX STARTED TTY!\n".as_bytes());
 }
 
+pub fn shutdown() {
+    get_current_tty().write_to(0, "\nWEENIX IS SHUTTING DOWN.\nYou may now shut off your computer\n".as_bytes());
+}
+
 enum ScrollDirection { UP, DOWN, }
 
 pub trait TTYLineDiscipline: RDevice<u8> {
@@ -105,9 +109,7 @@ impl TTY {
     /// This function is called from the interrupt handler to take in the recieved char and echo it
     /// to the driver.
     fn handle_char(&mut self, chr: u8) {
-        let out = self.discipline.recieve_char(chr);
-        dbg!(debug::TERM, "recieved char {} -> '{}'", chr, out);
-        self.driver.echo(out);
+        self.driver.echo(self.discipline.recieve_char(chr));
     }
     /// This function asks the driver to scroll.
     fn scroll(&mut self, dir: ScrollDirection) { self.driver.scroll(dir) }

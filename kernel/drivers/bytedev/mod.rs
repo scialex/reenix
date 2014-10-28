@@ -21,6 +21,9 @@ pub fn init_stage3() {
     tty::init_stage3();
 }
 
+pub fn shutdown() {
+    tty::shutdown();
+}
 static mut DEVICES : *mut TreeMap<DeviceId, Box<Device<u8> + 'static>> = 0 as *mut TreeMap<DeviceId, Box<Device<u8> + 'static>>;
 fn init_device_tree() {
     use core::mem::transmute;
