@@ -131,6 +131,9 @@ pub enum WaitProcId { Any, Pid(ProcId) }
 pub type WaitOps = u32;
 
 impl KProc {
+    pub fn get_pagedir<'a>(&'a self) -> &'a PageDir {
+        &*self.pagedir
+    }
     /// Perform the waitpid syscall. This simply passes the call along to the current process. It
     /// returns Ok((killed_PID,status)) on success and Err(errno) on failure.
     pub fn waitpid(pid: WaitProcId, options : WaitOps) -> Result<(ProcId, ProcStatus),errno::Errno> {

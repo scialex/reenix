@@ -62,14 +62,34 @@ impl RunQueue {
         assert!(interrupt::get_ipl() == interrupt::HIGH);
         let &RunQueue(ref mut b) = self;
         b.push(SleepingThread(unsafe { transmute(ctx) }));
+        dbg!(debug::SCHED, "there are now {} threads waiting to be executed", b.len());
     }
     fn pop(&mut self) -> &mut Context {
         assert!(interrupt::get_ipl() == interrupt::HIGH);
         let &RunQueue(ref mut b) = self;
-        while b.is_empty() {
-            dbg!(debug::SCHED, "No threads waiting to be executed!");
+        loop {
+            if let Some(next) = b.pop_front() {
+                // TODO Put this dbg back in.
+                //dbg!(debug::SCHED, "found context for thead {} in {}", next.get_current_thread(), next.get_current_proc());
+                dbg!(debug::SCHED, "found a thread and executing it");
+                let SleepingThread(c) = next;
+                return unsafe { c.as_mut().expect("Null thread in queue?") };
+            }
             interrupt::disable();
             interrupt::set_ipl(interrupt::LOW);
+            dbg!(debug::SCHED, "No threads waiting to be executed!");
+            interrupt::wait();
+            interrupt::set_ipl(interrupt::HIGH);
+        }
+        /* NB The below does not seem to work. I am unsure why. I think it is trying to be smart
+         * and realizes that since we don't add anything to b it must continue to be false so it
+         * just infinite loops maybe?
+         */
+        /*
+        while b.is_empty() {
+            interrupt::disable();
+            interrupt::set_ipl(interrupt::LOW);
+            dbg!(debug::SCHED, "No threads waiting to be executed!");
             interrupt::wait();
             interrupt::set_ipl(interrupt::HIGH);
         }
@@ -81,6 +101,7 @@ impl RunQueue {
         } else {
             panic!("No context found for next thread despite is_empty returning false!");
         }
+        */
     }
 }
 

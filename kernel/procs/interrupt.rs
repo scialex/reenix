@@ -94,6 +94,20 @@ pub fn set_ipl(ipl: u8) {
     unsafe { apic::set_ipl(ipl); }
 }
 
+pub struct IPLWatchdog { oldipl: u8, }
+pub fn temporary_ipl(ipl: u8) -> IPLWatchdog {
+    let oldipl = get_ipl();
+    set_ipl(ipl);
+    dbg!(debug::INTR, "Setting ipl to {}", ipl);
+    IPLWatchdog { oldipl: oldipl }
+}
+
+impl IPLWatchdog {
+    pub fn set_ipl(&mut self, ipl: u8) { set_ipl(ipl); }
+    pub fn reset_ipl(&mut self) { set_ipl(self.oldipl); }
+}
+impl Drop for IPLWatchdog { fn drop(&mut self) { dbg!(debug::INTR, "reseting ipl to {}", self.oldipl); self.reset_ipl(); } }
+
 #[unsafe_no_drop_flag]
 #[repr(C, packed)]
 struct InterruptDescription {
@@ -182,7 +196,7 @@ pub unsafe extern "C" fn _rust_intr_handler(r: &mut Registers) {
     // TODO I might need to setup the %es stuff as early as here.
     let h = IDT.handlers[r.intr as uint];
     h(r);
-    if IDT.mappings[r.intr as uint].is_none() {
+    if IDT.mappings[r.intr as uint].is_some() {
         apic::set_eoi();
     }
 }

@@ -11,6 +11,7 @@ use core::ptr::*;
 use kthread::KThread;
 use kthread;
 use sync;
+use core::fmt;
 
 pub struct QueuedThread(*mut KThread);
 pub struct KQueue(RefCell<TreeSet<QueuedThread>>);
@@ -68,6 +69,7 @@ impl KQueue {
             return false;
         }
         block_interrupts!({
+            dbg!(debug::SCHED, "{} begining wait", t);
             unsafe {
                 t.queue = transmute_copy(&self);
             }
@@ -83,6 +85,7 @@ impl KQueue {
             let x = t.as_mut().expect("Null thread being waited for!");
             x.queue = ptr::null_mut();
             x.make_runable();
+            dbg!(debug::SCHED, "Waking up {}", x);
         }
     }
 
@@ -122,4 +125,9 @@ impl sync::Wait<(),()> for WQueue {
 impl sync::Wakeup for WQueue {
     /// Wake up all waiting threads in this queue.
     fn signal(&self) { self.get_inner().signal(); }
+}
+impl fmt::Show for WQueue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        block_interrupts!( write!(f, "WQueue {{ waiters: {} }}", self.get_inner().len()) )
+    }
 }

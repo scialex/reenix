@@ -1,9 +1,9 @@
 use core::prelude::*;
 use core::cell::UnsafeCell;
-use kqueue::*;
 use core::ptr::*;
 
 pub use kmutex::KMutex;
+pub use kqueue::WQueue;
 
 /// A type where you can send a signal on. This is usually paired with Wait.
 pub trait Wakeup {
@@ -43,6 +43,7 @@ impl SMutex {
     fn unlock(&self) { self.inner.unlock(); }
     fn wait(&self) -> Result<(),()> {
         block_interrupts!({
+            dbg!(debug::SCHED, "{} going to sleep on mutex {} with queue {}", current_proc!(), self.inner, self.wqueue);
             self.unlock();
             let res = self.wqueue.wait();
             // Even if we failed this lock still needs to be valid.
@@ -50,12 +51,12 @@ impl SMutex {
             res
         })
     }
-    fn force_lock<'a>(&'a self) -> SGuard<'a> {
+    pub fn force_lock<'a>(&'a self) -> SGuard<'a> {
         self.inner.lock_nocancel();
         SGuard { lock: self }
     }
 
-    fn lock<'a>(&'a self) -> Result<SGuard<'a>, ()> {
+    pub fn lock<'a>(&'a self) -> Result<SGuard<'a>, ()> {
         if self.inner.lock() {
             Ok(SGuard { lock: self })
         } else {
@@ -63,7 +64,7 @@ impl SMutex {
         }
     }
 
-    fn try_lock<'a>(&'a self) -> Option<SGuard<'a>> {
+    pub fn try_lock<'a>(&'a self) -> Option<SGuard<'a>> {
         if self.inner.try_lock() {
             Some(SGuard { lock: self })
         } else {
@@ -73,7 +74,7 @@ impl SMutex {
 }
 
 impl Wakeup for SMutex {
-    fn signal(&self) { self.wqueue.signal(); }
+    fn signal(&self) { dbg!(debug::SCHED, "sending wakeup on {} with {}", self.inner, self.wqueue); self.wqueue.signal(); }
 }
 
 #[unsafe_destructor]
