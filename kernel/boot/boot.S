@@ -65,7 +65,7 @@ _start:
 .global sys_stack
 sys_stack:
 .align 4
-.skip 0x4000
+.skip 0x2000
 sys_stack_bottom:
 
 .global _finish_boot
@@ -80,8 +80,8 @@ _finish_boot:
     cli
     hlt
 
-/* We will just give them 0.25 mb to hold all the page tables. This is almost certainly more than enough */
+/* We will just give them 1/16 mb to hold all the page tables. This is almost certainly more than enough */
 .align 0x1000
 initial_page_table:
-.skip 0x40000
+.skip 0x11000
 
