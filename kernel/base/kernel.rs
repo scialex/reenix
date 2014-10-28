@@ -46,3 +46,9 @@ pub fn halt() -> ! {
     }
     loop {}
 }
+
+extern "C" {
+    #[link_name="do_c_ndelay"]
+    pub fn ndelay(n: u32);
+}
+
