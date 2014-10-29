@@ -1,5 +1,5 @@
 CFLAGS    := -ffreestanding
-RSFLAGS   := -L libs -C no-redzone -Z gc -C no-stack-check
+RSFLAGS   := -L libs -C no-redzone -Z gc
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 # XXX should have --omagic?
 

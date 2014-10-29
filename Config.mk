@@ -7,8 +7,8 @@
 #   generally not be changed.
 
 # Should we use stack check. FALSE we will not. Anything else we will.
-#USE_STACK_CHECK=TRUE
-USE_STACK_CHECK=FALSE
+USE_STACK_CHECK=TRUE
+#USE_STACK_CHECK=FALSE
 
 #
 # Setting any of these variables will control which parts of the source tree
@@ -73,7 +73,7 @@ USE_STACK_CHECK=FALSE
 # modifying the dbg_modes global variable.
 # All debug statements
         REMOVE_DBG ?= MM PAGEALLOC SCHED
-        DBG ?= all,-mm,-pagealloc
+        DBG ?= all,-mm,-pagealloc,-sched
 # Change to this for no debug statements
 #       DBG =-all
 

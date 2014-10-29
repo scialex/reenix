@@ -220,7 +220,6 @@ fn get_c_mutex() -> &'static KMutex {
 
 extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
     use base::debug;
-    debug::remove_mode(debug::SCHED);
     let y = unsafe {
         let x = box KMutex::new("contested mutex test");
         c_mutex = transmute_copy(&x);
@@ -251,14 +250,12 @@ extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
         BAD
     };
     unsafe { cnt = 0; c_mutex = 0 as *mut KMutex; }
-    debug::add_mode(debug::SCHED);
     drop(y);
     return ret;
 }
 
 extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
     use base::debug;
-    debug::remove_mode(debug::SCHED);
     let x = Rc::new(Mutex::<i32>::new("contested mutex test", 0));
 
     let high : i32 = 200;
@@ -284,7 +281,6 @@ extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
         dbg!(debug::TESTFAIL, "failed counted to {} with {} counters, got {}, using Mutex", high, n, tot);
         BAD
     };
-    debug::add_mode(debug::SCHED);
     assert!(is_unique(&x));
     drop(x);
     return ret;

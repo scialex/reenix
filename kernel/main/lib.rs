@@ -38,6 +38,7 @@ use collections::String;
 use procs::interrupt;
 
 mod proctest;
+mod kshell;
 
 #[no_stack_check]
 fn clear_screen(background: u16) {
@@ -64,6 +65,7 @@ pub extern "C" fn bootstrap(_: i32, _: *mut c_void) -> *mut c_void {
 }
 
 fn shutdown() -> ! {
+    drivers::bytedev::shutdown();
     kernel::halt();
 }
 
@@ -91,11 +93,11 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
 extern "C" fn second_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     dbg!(debug::CORE, "Reached second process");
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
-    KProc::new(String::from_str("tty proc 0"), tty_proc_run, 0, 0 as *mut c_void);
-    KProc::new(String::from_str("tty proc 1"), tty_proc_run, 1, 0 as *mut c_void);
-    KProc::new(String::from_str("tty proc 2"), tty_proc_run, 2, 0 as *mut c_void);
+    KProc::new(String::from_str("KSHELL proc 0"), tty_proc_run, 0, 0 as *mut c_void);
+    KProc::new(String::from_str("KSHELL proc 1"), tty_proc_run, 1, 0 as *mut c_void);
+    KProc::new(String::from_str("KSHELL proc 2"), tty_proc_run, 2, 0 as *mut c_void);
     KProc::new(String::from_str("blockdev proc1"), block_dev_proc, 0, 0 as *mut c_void);
-    //proctest::start();
+    proctest::start();
     return 0xdeadbeef as *mut c_void;
 }
 
@@ -112,15 +114,9 @@ extern "C" fn block_dev_proc(_: i32, _:*mut c_void) -> *mut c_void {
 
 extern "C" fn tty_proc_run(v:i32, _:*mut c_void) -> *mut c_void {
     let tty = bytedev::lookup_mut(DeviceId::create(2,v as u8)).expect("should have tty");
-    loop {
-        let mut arr : [u8,..256] = [0,..256];
-        let size = match tty.read_from(0, arr) {
-            Ok(v) => { v },
-            Err(e) => { dbg!(debug::TERM, "reading failed because {}", e); return 0 as *mut c_void }
-        };
-        dbg!(debug::TEST, "recieved {}", from_utf8(arr.slice_to(size)).unwrap_or("<unknown>"));
-        write!(bytedev::ByteWriter(tty), "recieved {}\n", from_utf8(arr.slice_to(size - 1)).unwrap_or("<unknown>"));
-    }
+    let mut s = kshell::KShell::new(tty);
+    s.run();
+    0 as *mut c_void
 }
 
 extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
