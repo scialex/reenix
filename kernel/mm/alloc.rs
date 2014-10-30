@@ -243,9 +243,14 @@ impl Allocator {
         if res.is_null() {
             dbg!(debug::CORE|debug::MM, "Unable to allocate from normal allocators. Trying to use backup");
             let out = self.backup.allocate(size, align);
-            if out.is_null() { dbg!(debug::CORE|debug::MM, "Unable to allocate from backup allocator!"); }
+            if out.is_null() {
+                dbg!(debug::CORE|debug::MM, "Unable to allocate from backup allocator!");
+            } else {
+                dbg!(debug::MM, "Allocated {:p} of size {} from backup allocator", out, size);
+            }
             out
         } else {
+            dbg!(debug::MM, "Allocated {:p} of size {}", res, size);
             res
         }
     }
