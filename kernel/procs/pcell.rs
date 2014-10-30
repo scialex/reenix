@@ -31,7 +31,7 @@ impl<T> ProcRefCell<T> {
     /// Called to assert that there are no non-silent borrowers.
     pub fn ensure_no_borrow(&self) {
         if self.borrow.get() != UNUSED {
-            panic!("Expected no non-silent borrowers but there were some present");
+            kpanic!("Expected no non-silent borrowers but there were some present");
         }
     }
 
@@ -76,7 +76,7 @@ impl<T> ProcRefCell<T> {
             self.borrow.set(x);
             self.prev_borrow.set(None);
         } else {
-            panic!("Previous borrow was none during call to restore_state");
+            kpanic!("Previous borrow was none during call to restore_state");
         }
     }
     */

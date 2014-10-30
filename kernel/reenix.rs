@@ -77,7 +77,7 @@ pub extern "C" fn kmain() {
 #[no_mangle]
 #[no_stack_check]
 pub extern "C" fn __morestack() {
-    panic!("__morestack called. This should happen");
+    kpanic!("__morestack called. This should happen");
 }
 
 #[cold]
@@ -99,7 +99,7 @@ pub extern fn rust_begin_unwind(msg: &core::fmt::Arguments,
 #[lang="eh_personality"]
 #[allow(unused_must_use)]
 pub extern fn eh_personality() {
-    panic!("eh_personality called");
+    kpanic!("eh_personality called");
 }
 
 #[cold]
@@ -110,7 +110,7 @@ pub extern fn stack_exhausted(fmt: &core::fmt::Arguments,
                               file: &'static str,
                               line: uint) -> ! {
     unsafe { core::fmt::write(&mut DBG_WRITER, fmt); }
-    panic!("Stack Exhausted at {:s}:{:u}",file, line);
+    kpanic!("Stack Exhausted at {:s}:{:u}",file, line);
 }
 
 mod std {

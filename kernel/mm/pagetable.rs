@@ -146,10 +146,10 @@ impl PageDir {
             if page != 0 {
                 page + offset
             } else {
-                panic!("Illegal virtual address 0x{:8X} given which isn't mapped", vaddr)
+                kpanic!("Illegal virtual address 0x{:8X} given which isn't mapped", vaddr)
             }
         } else {
-            panic!("Illegal virtual address 0x{:8X} given which isn't mapped", vaddr)
+            kpanic!("Illegal virtual address 0x{:8X} given which isn't mapped", vaddr)
         };
         let real =  unsafe {base_virt_to_phys(vaddr as u32)};
         assert!(res as uintptr_t == real, "we calculated paddr 0x{:x} but actually is 0x{:x}", res, real);

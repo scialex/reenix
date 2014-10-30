@@ -41,7 +41,7 @@ macro_rules! dbg(
 )
 
 #[macro_export]
-macro_rules! panic(
+macro_rules! kpanic(
     ($fmt:expr, $($a:expr),*) => ({
         use base::debug;
         use base::kernel;
@@ -51,7 +51,7 @@ macro_rules! panic(
     });
 
     ($fmt:expr) => ({
-        panic!("{}", $fmt);
+        kpanic!("{}", $fmt);
     });
 )
 

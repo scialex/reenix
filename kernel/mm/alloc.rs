@@ -286,7 +286,7 @@ impl Allocator {
         match alloc {
             None => {
                 // This should never really happen, truely large ones will get their own page.
-                panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
+                kpanic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
             },
             Some(sa) => {
                 dbg!(debug::MM, "Allocating {} from {}", size, sa);
@@ -368,7 +368,7 @@ impl Allocator {
         match alloc {
             None => {
                 // This should never really happen, truely large ones will get their own page.
-                panic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
+                kpanic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
             },
             Some(sa) => {
                 dbg!(debug::MM, "deallocating {:p} with {} bytes from {}", ptr, size, sa);
@@ -401,7 +401,7 @@ impl Allocator {
 pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
     if !requests_closed() {
         // TODO Decide what I should do here. Panicing might not be best.
-        panic!("Attempt to call allocate before we have finished setting up the allocators.");
+        kpanic!("Attempt to call allocate before we have finished setting up the allocators.");
     }
     let x = &BASE_ALLOCATOR;
     x.allocate(size, _align)

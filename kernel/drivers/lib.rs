@@ -18,7 +18,6 @@ extern crate collections;
 extern crate alloc;
 extern crate libc;
 
-use core::kinds::Sized;
 use base::errno::KResult;
 use core::fmt::{mod, Formatter, Show};
 use core::prelude::*;
@@ -52,6 +51,7 @@ impl DeviceId {
         (dev & 0xff) as u8
     }
 }
+
 impl Show for DeviceId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "DeviceId({}.{})", self.get_major(), self.get_minor()) }
 }

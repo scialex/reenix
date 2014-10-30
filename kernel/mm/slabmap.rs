@@ -57,7 +57,7 @@ impl SlabMap {
         for i in range(0, self.len()) {
             let size = self.vals[i].expect("shouldn't be null").get_size();
             if size <= prev {
-                panic!("repeated items or out of order slab map. prev {}, cur {}, index {}", prev, size, i);
+                kpanic!("repeated items or out of order slab map. prev {}, cur {}, index {}", prev, size, i);
             } else {
                 prev = size;
             }
@@ -79,7 +79,7 @@ impl SlabMap {
     fn brute_check(&self, k: uint) -> bool {
         for i in range(0, self.cnt) {
             match self.vals[i] {
-                None => { panic!("Should not have nulls in allocated region"); },
+                None => { kpanic!("Should not have nulls in allocated region"); },
                 Some(sa) => { if sa.get_size() as uint == k { return true; } },
             }
         }

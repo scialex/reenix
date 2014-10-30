@@ -38,7 +38,7 @@ static mut BOOTSTRAP_FUNC_CTX : *mut Context = 0 as *mut Context;
 pub fn enter_bootstrap_func(f: ContextFunc, i: i32, v: *mut c_void) -> ! {
     dbg!(debug::CORE, "Entering bootstrap");
     unsafe {
-        let bstack = page::alloc_n::<u8>(4).unwrap_or_else(|_| {panic!("Unable to allocate stack for bootstrap function") });
+        let bstack = page::alloc_n::<u8>(4).unwrap_or_else(|_| {kpanic!("Unable to allocate stack for bootstrap function") });
         let ctx = box Context::new(f, i, v, bstack, 4 * page::SIZE, transmute(pagetable::current));
         BOOTSTRAP_FUNC_CTX = transmute_copy(&ctx);
         ctx.make_active();
@@ -99,7 +99,7 @@ impl RunQueue {
             let SleepingThread(c) = next;
             unsafe { c.as_mut().expect("Null thread in queue?") }
         } else {
-            panic!("No context found for next thread despite is_empty returning false!");
+            kpanic!("No context found for next thread despite is_empty returning false!");
         }
         */
     }
@@ -136,7 +136,7 @@ pub fn die() -> ! {
     assert!(interrupt::HIGH == interrupt::get_ipl());
     let thr = current_thread!();
     unsafe { thr.ctx.switch_to(nxt) };
-    panic!("Returned to killed thread!");
+    kpanic!("Returned to killed thread!");
 }
 
 fn push_runable_ctx(ctx : &mut Context) {
@@ -155,7 +155,7 @@ fn pop_runable_ctx() -> &'static mut Context {
 }
 
 extern "C" fn failure_func() {
-    panic!("Should never reach here. context.eip is not getting properly overriden.");
+    kpanic!("Should never reach here. context.eip is not getting properly overriden.");
 }
 
 extern "C" fn _rust_context_initial_function(f : ContextFunc, i: i32, v: *mut c_void) -> ! {
@@ -169,7 +169,7 @@ extern "C" fn _rust_context_initial_function(f : ContextFunc, i: i32, v: *mut c_
     let thr = current_thread!();
     thr.exit(result);
 
-    panic!("Should never return from kthread.exit()");
+    kpanic!("Should never return from kthread.exit()");
 }
 
 impl Context {
@@ -250,7 +250,7 @@ impl Context {
             ret
             " : : "r"(self.ccontext.ebp), "r"(self.ccontext.esp),"r"(self.ccontext.eip) : : "volatile");
 
-        panic!("control reached after context switch");
+        kpanic!("control reached after context switch");
     }
 
     unsafe fn switch_to(&mut self, newc : &Context) {

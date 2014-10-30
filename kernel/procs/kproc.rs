@@ -50,7 +50,7 @@ impl ProcId {
                                        .filter(|p| { KProc::get_proc(p).is_none() })
                                        .nth(0) {
                         Some(pid) => pid,
-                        None => panic!("Could not allocate a thread id!"),
+                        None => kpanic!("Could not allocate a thread id!"),
                     }
                 },
                 Some(pid) => pid,
@@ -280,7 +280,7 @@ impl KProc {
             }
         }
         (current_proc_mut!()).kill(errno::ECANCELED as ProcStatus);
-        panic!("Should not return from killing yourself");
+        kpanic!("Should not return from killing yourself");
     }
 
     pub fn get_proc(pid: &ProcId) -> Option<Rc<ProcRefCell<KProc>>> {

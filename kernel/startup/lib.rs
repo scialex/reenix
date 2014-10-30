@@ -111,7 +111,7 @@ pub mod tsd {
                     return i;
                 }
             }
-            panic!("Somehow we couldn't add a new item");
+            kpanic!("Somehow we couldn't add a new item");
         }
 
         pub fn is_slot_used(&mut self, i : uint) -> bool { self.data.contains_key(&i) }

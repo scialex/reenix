@@ -144,7 +144,7 @@ pub type InterruptHandler = extern "Rust" fn(&mut Registers);
 #[allow(unused_unsafe)]
 #[no_stack_check]
 pub extern "Rust" fn unhandled_intr(r: &mut Registers) {
-    panic!("Unhandled interrupt 0x{:X}.\nRegisters were {}\nProcess was {}\nThread was {}",
+    kpanic!("Unhandled interrupt 0x{:X}.\nRegisters were {}\nProcess was {}\nThread was {}",
            r.intr, r, current_proc!(), current_thread!());
 }
 
@@ -162,13 +162,13 @@ pub struct InterruptState<'a> {
     data     : InterruptInfo,
 }
 
-/// This just makes a handler which panics with a custom message.
+/// This just makes a handler which kpanics with a custom message.
 macro_rules! make_panic_handler(
     ($int:ident) => ({
         #[allow(unused_unsafe)]
         #[no_stack_check]
         extern "Rust" fn die(r: &mut Registers) {
-            panic!(concat!("Recieved a ", stringify!($int), " interrupt (0x{:X}). Aborting"), r.intr);
+            kpanic!(concat!("Recieved a ", stringify!($int), " interrupt (0x{:X}). Aborting"), r.intr);
         }
         register($int, die);
     })

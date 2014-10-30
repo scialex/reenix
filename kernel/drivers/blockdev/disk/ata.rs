@@ -212,7 +212,7 @@ pub fn init_stage2() {
             loop {
                 let cur_status = c.inb(register::STATUS);
                 if cur_status & status::ERR != 0 {
-                    panic!("Error setting up ATA drive {}, status is 0b{:08t}", c, cur_status);
+                    kpanic!("Error setting up ATA drive {}, status is 0b{:08t}", c, cur_status);
                 }
                 if cur_status & status::DRQ != 0 { break; } else { c.pause(); }
             }
@@ -347,7 +347,7 @@ impl ATADisk {
 
     fn write_single(&mut self, block: uint, buf: &[u8, ..page::SIZE]) -> KResult<uint> {
         if !page::aligned(buf.as_ptr()) {
-            panic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
+            kpanic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
             // TODO I might want to just copy it if we get this.
         }
         unsafe { self.unsafe_do_operation(block, buf.as_ptr() as *mut u8, true).and(Ok(1)) }
@@ -358,7 +358,7 @@ impl ATADisk {
     /// the block.
     fn read_single(&mut self, block: uint, buf: &mut [u8, ..page::SIZE]) -> KResult<uint> {
         if !page::aligned(buf.as_ptr()) {
-            panic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
+            kpanic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
             // TODO I might want to just copy it if we get this.
         }
         unsafe { self.unsafe_do_operation(block, buf.as_ptr() as *mut u8, false).and(Ok(1)) }
@@ -402,6 +402,6 @@ extern "Rust" fn ata_intr_handler(r: &mut interrupt::Registers) {
             }
         }
     }
-    panic!("Recieved an interrupt for a disk on an unknown channel");
+    kpanic!("Recieved an interrupt for a disk on an unknown channel");
 }
 

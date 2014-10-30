@@ -217,7 +217,7 @@ fn do_exit(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     assert!(writeln!(ByteWriter(io), "quiting with status {}", status).is_ok());
     // TODO We should exit with the given status
     (current_thread!()).exit(status as *mut c_void);
-    panic!("Should never reach here");
+    kpanic!("Should never reach here");
 }
 
 fn do_proctest(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {

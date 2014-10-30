@@ -99,7 +99,7 @@ impl BackupAllocator {
     pub fn new(size : uint, threshold : uint) -> BackupAllocator {
         let mut ret = BackupAllocator {
             buf : unsafe {
-                page::alloc_n(size).unwrap_or_else(|_| { panic!("Unable to allocate space for backup allocator"); })
+                page::alloc_n(size).unwrap_or_else(|_| { kpanic!("Unable to allocate space for backup allocator"); })
             },
             pages : size,
             largest_space : size - 1,
