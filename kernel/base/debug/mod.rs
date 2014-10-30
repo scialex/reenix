@@ -6,6 +6,7 @@
 
 /// Reexport flags.
 pub use self::flags::*;
+use core::fmt;
 
 pub mod printing;
 mod flags;
@@ -30,6 +31,17 @@ pub fn add_mode(m: DbgMode) {
 }
 
 mod macros;
+
+#[doc(hidden)]
+#[inline(never)]
+pub fn dbg_print(msg: &fmt::Arguments) {
+    use core::result::Err;
+    use debug::printing::DBG_WRITER;
+    match fmt::write(unsafe { &mut DBG_WRITER }, msg) {
+        Err(_) => (),
+        _ => (),
+    }
+}
 
 //mod langs;
 
