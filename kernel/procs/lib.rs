@@ -64,6 +64,7 @@ pub mod kthread;
 pub mod kmutex;
 pub mod kproc;
 pub mod interrupt;
+pub mod args;
 
 
 // TODO Rewrite this in rust.
