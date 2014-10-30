@@ -114,7 +114,11 @@ pub fn init_stage2() {
         runq = transmute(x);
     }
 }
+pub fn init_stage3() {
+    unsafe { REACHED_IDLE_FUNC = true; }
+}
 
+static mut REACHED_IDLE_FUNC : bool = false;
 static mut INITIAL_SWITCH : bool = false;
 pub fn initial_ctx_switch() -> ! {
     assert!(unsafe { INITIAL_SWITCH } == false);
@@ -156,8 +160,10 @@ extern "C" fn failure_func() {
 
 extern "C" fn _rust_context_initial_function(f : ContextFunc, i: i32, v: *mut c_void) -> ! {
     // TODO Might still want this. We need it off for the idle-proc though :-/
-//    interrupt::set_ipl(interrupt::LOW);
-//    interrupt::enable();
+    if unsafe { REACHED_IDLE_FUNC } {
+        interrupt::set_ipl(interrupt::LOW);
+        interrupt::enable();
+    }
 
     let result = f(i, v);
     let thr = current_thread!();
@@ -252,6 +258,8 @@ impl Context {
         use core::any::*;
         use core::prelude::*;
 
+        let ipl = interrupt::get_ipl();
+        interrupt::set_ipl(interrupt::HIGH);
         gdt::set_kernel_stack((newc.kstack + newc.kstack_size) as *mut c_void);
         newc.pd.as_mut().expect("pagedir is missing").set_active();
         gdt::set_tsd(transmute_copy(&newc.tsd));
@@ -268,5 +276,6 @@ impl Context {
                       .downcast_ref::<Weak<ProcRefCell<KProc>>>().expect(add_file!("Item at curproc was not the right type!"))
                       .clone().upgrade().expect(add_file!("Curproc has already been destroyed!"))
                       .deref().ensure_no_borrow();
+        interrupt::set_ipl(ipl);
     }
 }

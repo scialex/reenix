@@ -42,6 +42,10 @@ pub fn init_stage2() {
     kthread::init_stage2();
     kproc::init_stage2();
 }
+pub fn init_stage3() {
+    // TODO Put ones here for everything else.
+    context::init_stage3();
+}
 
 mod procs {
     pub use super::kproc;
