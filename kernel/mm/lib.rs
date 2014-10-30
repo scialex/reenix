@@ -132,7 +132,7 @@ pub mod page {
         pub fn c_alloc_n(num: u32) -> *mut c_void;
         #[link_name = "page_free_n"]
         pub fn free_n(pages: *mut c_void, num: u32);
-        #[link_name = "page_freecount"]
+        #[link_name = "page_free_count"]
         pub fn free_count() -> u32;
 
         #[deny(dead_code)]

@@ -17,6 +17,8 @@ use core::{fmt, mem, ptr};
 use libc::{size_t, c_void, c_int};
 use slabmap::{SlabMap, DEFAULT_SLAB_MAP};
 use backup::{BackupAllocator, DEFAULT_BACKUP_ALLOCATOR};
+use core::fmt::Show;
+use page;
 
 struct Allocator {
     slabs : SlabMap,
@@ -83,6 +85,7 @@ extern "C" {
     fn slab_allocator_create_full(nsize: size_t, cstr: *const u8, size: size_t) -> *mut CSlabAllocator;
     fn slab_obj_alloc(a: *mut CSlabAllocator) -> *mut u8;
     fn slab_obj_free(a: *mut CSlabAllocator, ptr: *mut u8);
+    fn slab_obj_num_allocated(a: *mut CSlabAllocator) -> u32;
 }
 
 /// Try to free up as much memory as possible.
@@ -129,6 +132,11 @@ impl SlabAllocator {
         }
     }
 
+    pub fn num_allocated(&self) -> uint {
+        let &SlabAllocator(csa) = self;
+        unsafe { slab_obj_num_allocated(csa) as uint }
+    }
+
     pub fn new(name: &'static str, size: size_t) -> SlabAllocator {
         unsafe {
             let v = slab_allocator_create_full(name.len() as size_t, name.as_ptr(), size);
@@ -142,12 +150,7 @@ impl fmt::Show for SlabAllocator {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         let name  = self.get_name();
         let size  = self.get_size();
-        try!(w.write("SlabAllocator { name: '".as_bytes()));
-        try!(name.fmt(w));
-        try!(w.write("', objsize: ".as_bytes()));
-        try!(size.fmt(w));
-        try!(w.write(" }".as_bytes()));
-        Ok(())
+        write!(w, "SlabAllocator {{ name: '{}', objsize: {}, inuse: {} }}", name, size, self.num_allocated())
     }
 }
 
@@ -187,6 +190,15 @@ pub fn request_slab_allocator(name: &'static str, size: size_t) {
     }
     let ba = unsafe { &mut BASE_ALLOCATOR };
     ba.request_slab_allocator(name, size);
+}
+
+impl fmt::Show for Allocator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        try!(writeln!(f, "Weenix allocator"));
+        try!(writeln!(f, "{}", self.slabs));
+        try!(writeln!(f, "free pages: {}", unsafe { page::free_count()} ));
+        writeln!(f, "backup is used? {}", self.backup.is_used())
+    }
 }
 
 impl Allocator {
@@ -422,6 +434,15 @@ pub unsafe fn deallocate(ptr: *mut u8, size: uint, _align: uint) {
 pub fn usable_size(size: uint, _align: uint) -> uint {
     let x = unsafe { &BASE_ALLOCATOR };
     x.usable_size(size, _align)
+}
+
+pub fn stats_print() {
+    dbg!(debug::MM|debug::CORE, "{}", get_stats());
+}
+
+pub fn get_stats() -> &'static fmt::Show + 'static {
+    let x = unsafe { &BASE_ALLOCATOR };
+    x as &'static fmt::Show
 }
 
 /// Return's true if we have low memory and have a better then even chance of failing to allocate a

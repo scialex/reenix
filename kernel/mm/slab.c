@@ -266,6 +266,18 @@ _slab_allocator_grow(struct slab_allocator *allocator)
         return 1;
 }
 
+
+__attribute__((used)) uint32_t
+slab_obj_num_allocated(struct slab_allocator *allocator) {
+        struct slab *slab = allocator->sa_slabs;
+        uint32_t cnt = 0;
+        while (NULL != slab) {
+                cnt += slab->s_inuse;
+                slab = slab->s_next;
+        }
+        return cnt;
+}
+
 void *
 slab_obj_alloc(struct slab_allocator *allocator)
 {

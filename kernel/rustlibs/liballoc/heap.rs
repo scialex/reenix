@@ -123,10 +123,7 @@ mod imp {
     extern crate mm;
     // TODO I'm being f***ing stupid. I have the size on both alloc and free. I have a great
     // TODO opertunity to choose the best slab allocator. (;一_一)
-    pub use self::mm::alloc::{allocate, reallocate, deallocate, reallocate_inplace, usable_size};
-    pub fn stats_print() {
-        // TODO Have this print stats.
-    }
+    pub use self::mm::alloc::{allocate, reallocate, deallocate, reallocate_inplace, usable_size, stats_print};
 }
 
 #[cfg(all(not(kernel), jemalloc))]
