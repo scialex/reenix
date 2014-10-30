@@ -13,6 +13,7 @@ use core::intrinsics::transmute;
 use procs::kproc::{ProcStatus, ProcId, KProc};
 use procs::interrupt;
 use procs::sync::*;
+use procs::args::ProcArgs;
 use alloc::rc::*;
 
 const GOOD : *mut c_void = 1 as *mut c_void;
@@ -20,53 +21,9 @@ const BAD  : *mut c_void = 0 as *mut c_void;
 
 pub fn start() {
     use base::debug;
-    let mut total : uint = 0;
-    let mut pass : uint = 0;
-    macro_rules! basic_test(
-        ($name:expr, $v:expr) => ({
-            let cnt1 = match kproc::KProc::new(string::String::from_str(stringify!($name)), $name, $v, 0 as *mut c_void) {
-                Ok(p) => p,
-                _ => { dbg!(debug::TEST, "Failed to allocate new process"); return; },
-            };
-            match kproc::KProc::waitpid(kproc::Pid(cnt1), 0) {
-                Ok((_, status)) => {
-                    total += 1;
-                    if status == GOOD as kproc::ProcStatus {
-                        dbg!(debug::TESTPASS, "Test {} {} passes", total, stringify!($name));
-                        pass += 1;
-                    } else {
-                        dbg!(debug::TESTFAIL, "Test {} {} failed with {}", total, stringify!($name), status);
-                    }
-                },
-                Err(errno) => {
-                    total += 1;
-                    dbg!(debug::TESTFAIL, "test {} {} failed with errno {}", total, stringify!($name), errno);
-                }
-            }
-        });
-        ($name:expr) => (basic_test!($name, 0))
-    )
-    basic_test!(normal_fork);
-    basic_test!(kill_self);
-    basic_test!(kill_other, 0);
-    basic_test!(kill_other, 1);
-    basic_test!(kill_other, 4);
-    basic_test!(kill_other, 8);
-    basic_test!(uncontested_mutex);
-    basic_test!(contested_mutex, 1);
-    basic_test!(contested_mutex, 2);
-    basic_test!(contested_mutex, 5);
-    basic_test!(better_mutex, 1);
-    basic_test!(better_mutex, 2);
-    basic_test!(better_mutex, 5);
-    basic_test!(send_ignored_intr);
-    basic_test!(test_handle_intr);
-    basic_test!(test_modify_intr_regs);
-    basic_test!(orphan_procs, 1);
-    basic_test!(orphan_procs, 3);
-    basic_test!(orphan_procs, 5);
-
+    let (pass, total) = do_run(true);
     dbg!(debug::TEST, "passed {} of {} tests", pass, total);
+
     if cfg!(all(not(TEST_LOW_MEMORY), TEST_KILL_ALL)) {
         debug::remove_mode(debug::TEST);
         for i in range::<i32>(0, 10) {
@@ -79,6 +36,63 @@ pub fn start() {
         dbg!(debug::TEST | debug::CORE, "killing everything");
         kproc::KProc::kill_all();
     }
+}
+
+pub fn run() -> (uint, uint) {
+    do_run(false)
+}
+
+fn do_run(single: bool) -> (uint, uint) {
+    // TODO Embarrassing. This is not thread safe...
+    use base::debug;
+    let mut total : uint = 0;
+    let mut pass : uint = 0;
+    macro_rules! basic_test(
+        ($name:expr, $v:expr) => ({
+            total += 1;
+            match kproc::KProc::new(string::String::from_str(stringify!($name)), $name, $v, 0 as *mut c_void) {
+                Ok(cnt1) => {
+                    match kproc::KProc::waitpid(kproc::Pid(cnt1), 0) {
+                        Ok((_, status)) => {
+                            if status == GOOD as kproc::ProcStatus {
+                                dbg!(debug::TESTPASS, "Test {} {} passes", total, stringify!($name));
+                                pass += 1;
+                            } else {
+                                dbg!(debug::TESTFAIL, "Test {} {} failed with {}", total, stringify!($name), status);
+                            }
+                        },
+                        Err(errno) => {
+                            dbg!(debug::TESTFAIL, "test {} {} failed with errno {}", total, stringify!($name), errno);
+                        }
+                    }
+                },
+                _ => { dbg!(debug::TEST, "Failed to allocate new process"); },
+            }
+        });
+        ($name:expr) => (basic_test!($name, 0))
+    )
+    basic_test!(normal_fork);
+    basic_test!(kill_self);
+    basic_test!(kill_other, 0);
+    basic_test!(kill_other, 1);
+    basic_test!(kill_other, 4);
+    basic_test!(kill_other, 8);
+    basic_test!(uncontested_mutex);
+    if single {
+        basic_test!(contested_mutex, 1);
+        basic_test!(contested_mutex, 2);
+        basic_test!(contested_mutex, 5);
+    }
+    basic_test!(better_mutex, 1);
+    basic_test!(better_mutex, 2);
+    basic_test!(better_mutex, 5);
+    basic_test!(send_ignored_intr);
+    basic_test!(test_handle_intr);
+    basic_test!(test_modify_intr_regs);
+    basic_test!(orphan_procs, 1);
+    basic_test!(orphan_procs, 3);
+    basic_test!(orphan_procs, 5);
+    (pass, total)
 }
 
 extern "Rust" fn regular_intr_handler(r: &mut interrupt::Registers) {
@@ -262,7 +276,7 @@ extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 
     for _ in range(0, n) {
         // TODO How to make this say which number they are?
-        kproc::KProc::new(string::String::from_str("better counter n"), better_counter, high, unsafe { transmute(box x.clone()) });
+        kproc::KProc::new(string::String::from_str("better counter n"), better_counter, high, unsafe { ProcArgs::new(x.clone()).unwrap().to_arg() });
     }
 
     let mut tot : i32 = 0;
@@ -288,10 +302,10 @@ extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 
 extern "C" fn better_counter(h: i32, v : *mut c_void) -> *mut c_void {
     let mut c : uint = 0;
-    let x : Box<Rc<Mutex<i32>>> = unsafe { transmute(v) };
+    let x : Rc<Mutex<i32>> = unsafe { ProcArgs::from_arg(v).unwrap() };
     loop {
         kthread::kyield();
-        let mut v = (**x).force_lock();
+        let mut v = (*x).force_lock();
         if c % 2 == 0 {
             kthread::kyield();
         }

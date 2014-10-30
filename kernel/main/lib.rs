@@ -4,15 +4,15 @@
 #![crate_type="rlib"]
 #![no_std]
 
-#![feature(globs, phase, macro_rules, asm)]
+#![feature(globs, phase, macro_rules, asm, if_let, unsafe_destructor)]
 
 
 #[phase(plugin, link)] extern crate core;
 #[phase(plugin, link)] extern crate base;
 #[phase(plugin, link)] extern crate procs;
+#[phase(plugin, link)] extern crate mm;
 extern crate alloc;
 extern crate startup;
-extern crate mm;
 extern crate libc;
 extern crate collections;
 extern crate drivers;
@@ -72,6 +72,7 @@ fn shutdown() -> ! {
 // TODO
 fn finish_init() {
     // TODO VFS Setup.
+    procs::init_stage3();
     drivers::init_stage3();
     interrupt::enable();
     interrupt::set_ipl(interrupt::LOW);
@@ -80,7 +81,8 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     cleanup_bootstrap_function();
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
     finish_init();
-    KProc::new(String::from_str("Init Proc"), init_proc_run, 0, 0 as *mut c_void);
+    assert!(KProc::new(String::from_str("Init Proc"), init_proc_run, 0, 0 as *mut c_void).is_ok(),
+            "Unable to create init proc");
     let x = KProc::waitpid(Pid(ProcId(1)), 0);
     dbg!(debug::CORE, "done with waitpid");
     match x {
@@ -90,39 +92,10 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     shutdown();
 }
 
-extern "C" fn second_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
-    dbg!(debug::CORE, "Reached second process");
-    dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
-    KProc::new(String::from_str("KSHELL proc 0"), tty_proc_run, 0, 0 as *mut c_void);
-    KProc::new(String::from_str("KSHELL proc 1"), tty_proc_run, 1, 0 as *mut c_void);
-    KProc::new(String::from_str("KSHELL proc 2"), tty_proc_run, 2, 0 as *mut c_void);
-    KProc::new(String::from_str("blockdev proc1"), block_dev_proc, 0, 0 as *mut c_void);
-    proctest::start();
-    return 0xdeadbeef as *mut c_void;
-}
-
-extern "C" fn block_dev_proc(_: i32, _:*mut c_void) -> *mut c_void {
-    // Try write
-    let disk = blockdev::lookup_mut(DeviceId::create(1,0)).expect("should have tty");
-    let mut buf : Box<[[u8, ..page::SIZE], ..3]> = box [[0, ..page::SIZE], ..3];
-    let res = disk.write_to(0, &*buf);
-    dbg!(debug::TEST, "result is {}", res);
-    let res = disk.read_from(0, &mut *buf);
-    dbg!(debug::TEST, "result is {}", res);
-    0 as *mut c_void
-}
-
-extern "C" fn tty_proc_run(v:i32, _:*mut c_void) -> *mut c_void {
-    let tty = bytedev::lookup_mut(DeviceId::create(2,v as u8)).expect("should have tty");
-    let mut s = kshell::KShell::new(tty);
-    s.run();
-    0 as *mut c_void
-}
-
 extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     interrupt::enable();
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
-    KProc::new(String::from_str("test proc"), second_proc_run, 0, 0 as *mut c_void);
+    kshell::start(0);
     loop {
         let x = KProc::waitpid(kproc::Any, 0);
         match x {
@@ -140,4 +113,5 @@ extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
 
 mod std {
     pub use core::fmt;
+    pub use core::clone;
 }
