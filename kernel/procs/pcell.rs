@@ -117,7 +117,7 @@ impl<T> ProcRefCell<T> {
     pub fn borrow<'a>(&'a self) -> ProcRef<'a, T> {
         match self.try_borrow() {
             Some(ptr) => ptr,
-            None => fail!("ProcRefCell<T> already mutably borrowed")
+            None => kpanic!("ProcRefCell<T> already mutably borrowed")
         }
     }
 
@@ -150,7 +150,7 @@ impl<T> ProcRefCell<T> {
     pub fn borrow_mut<'a>(&'a self) -> ProcRefMut<'a, T> {
         match self.try_borrow_mut() {
             Some(ptr) => ptr,
-            None => fail!("ProcRefCell<T> already borrowed")
+            None => kpanic!("ProcRefCell<T> already borrowed")
         }
     }
 }

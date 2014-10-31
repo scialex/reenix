@@ -504,7 +504,7 @@ impl String {
     /// assert_eq!(s.as_slice(), "he");
     /// ```
     #[inline]
-    #[unstable = "the failure conventions for strings are under development"]
+    #[unstable = "the panic conventions for strings are under development"]
     pub fn truncate(&mut self, new_len: uint) {
         assert!(self.as_slice().is_char_boundary(new_len));
         self.vec.truncate(new_len)
@@ -545,10 +545,10 @@ impl String {
     /// This is a O(n) operation as it requires copying every element in the
     /// buffer.
     ///
-    /// # Failure
+    /// # Panics
     ///
     /// If `idx` does not lie on a character boundary, then this function will
-    /// fail.
+    /// panic.
     ///
     /// # Example
     ///
@@ -559,7 +559,7 @@ impl String {
     /// assert_eq!(s.remove(0), Some('o'));
     /// assert_eq!(s.remove(0), None);
     /// ```
-    #[unstable = "the failure semantics of this function and return type \
+    #[unstable = "the panic semantics of this function and return type \
                   may change"]
     pub fn remove(&mut self, idx: uint) -> Option<char> {
         let len = self.len();
@@ -582,11 +582,11 @@ impl String {
     /// This is a O(n) operation as it requires copying every element in the
     /// buffer.
     ///
-    /// # Failure
+    /// # Panics
     ///
     /// If `idx` does not lie on a character boundary or is out of bounds, then
-    /// this function will fail.
-    #[unstable = "the failure semantics of this function are uncertain"]
+    /// this function will panic.
+    #[unstable = "the panic semantics of this function are uncertain"]
     pub fn insert(&mut self, idx: uint, ch: char) {
         let len = self.len();
         assert!(idx <= len);
@@ -744,6 +744,11 @@ impl ops::Slice<uint, str> for String {
     }
 }
 
+#[experimental = "waiting on Deref stabilization"]
+impl ops::Deref<str> for String {
+    fn deref<'a>(&'a self) -> &'a str { self.as_slice() }
+}
+
 /// Wrapper type providing a `&String` reference via `Deref`.
 #[experimental]
 pub struct DerefString<'a> {
@@ -780,7 +785,7 @@ pub mod raw {
     #[inline]
     pub unsafe fn from_parts(buf: *mut u8, length: uint, capacity: uint) -> String {
         String {
-            vec: Vec::from_raw_parts(length, capacity, buf),
+            vec: Vec::from_raw_parts(buf, length, capacity),
         }
     }
 

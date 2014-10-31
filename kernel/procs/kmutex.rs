@@ -42,7 +42,7 @@ impl KMutex {
     }
 
     /// Returns true if we got the lock, False if we didn't because of being canceled.
-    #[warn(unused_result)]
+    #[warn(unused_results)]
     pub fn lock(&self) -> bool {
         dbg!(debug::SCHED, "cancelable locking {} for {} of {}", self, current_thread!(), current_proc!());
         while self.held.get() {

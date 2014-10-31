@@ -58,6 +58,7 @@ use core::default::Default;
 use core::fmt;
 use core::cmp;
 use core::iter::AdditiveIterator;
+use core::kinds::Sized;
 use core::prelude::{Char, Clone, Collection, Eq, Equiv, ImmutableSlice};
 use core::prelude::{Iterator, MutableSlice, None, Option, Ord, Ordering};
 use core::prelude::{PartialEq, PartialOrd, Result, AsSlice, Some, Tuple2};
@@ -84,7 +85,7 @@ Section: Creating a string
 */
 
 /// Methods for vectors of strings.
-pub trait StrVector {
+pub trait StrVector for Sized? {
     /// Concatenates a vector of strings.
     ///
     /// # Example
@@ -110,7 +111,7 @@ pub trait StrVector {
     fn connect(&self, sep: &str) -> String;
 }
 
-impl<'a, S: Str> StrVector for &'a [S] {
+impl<S: Str> StrVector for [S] {
     fn concat(&self) -> String {
         if self.is_empty() {
             return String::new();
@@ -157,7 +158,7 @@ impl<'a, S: Str> StrVector for &'a [S] {
     }
 }
 
-impl<'a, S: Str> StrVector for Vec<S> {
+impl<S: Str> StrVector for Vec<S> {
     #[inline]
     fn concat(&self) -> String {
         self.as_slice().concat()
@@ -691,17 +692,17 @@ pub trait StrAllocating: Str {
         for (i, sc) in me.chars().enumerate() {
 
             let mut current = i;
-            *dcol.get_mut(0) = current + 1;
+            dcol[0] = current + 1;
 
             for (j, tc) in t.chars().enumerate() {
 
                 let next = dcol[j + 1];
 
                 if sc == tc {
-                    *dcol.get_mut(j + 1) = current;
+                    dcol[j + 1] = current;
                 } else {
-                    *dcol.get_mut(j + 1) = cmp::min(current, next);
-                    *dcol.get_mut(j + 1) = cmp::min(dcol[j + 1], dcol[j]) + 1;
+                    dcol[j + 1] = cmp::min(current, next);
+                    dcol[j + 1] = cmp::min(dcol[j + 1], dcol[j]) + 1;
                 }
 
                 current = next;
@@ -1366,7 +1367,7 @@ mod tests {
         // original problem code path anymore.)
         let s = String::from_str("");
         let _bytes = s.as_bytes();
-        fail!();
+        panic!();
     }
 
     #[test]
@@ -1585,7 +1586,7 @@ mod tests {
             let len = c.encode_utf8(bytes).unwrap_or(0);
             let s = ::core::str::from_utf8(bytes[..len]).unwrap();
             if Some(c) != s.chars().next() {
-                fail!("character {:x}={} does not decode correctly", c as u32, c);
+                panic!("character {:x}={} does not decode correctly", c as u32, c);
             }
         }
     }
@@ -1597,7 +1598,7 @@ mod tests {
             let len = c.encode_utf8(bytes).unwrap_or(0);
             let s = ::core::str::from_utf8(bytes[..len]).unwrap();
             if Some(c) != s.chars().rev().next() {
-                fail!("character {:x}={} does not decode correctly", c as u32, c);
+                panic!("character {:x}={} does not decode correctly", c as u32, c);
             }
         }
     }
@@ -1677,40 +1678,6 @@ mod tests {
     }
 
     #[test]
-    fn test_split_char_iterator() {
-        let data = "\nMäry häd ä little lämb\nLittle lämb\n";
-
-        let split: Vec<&str> = data.split(' ').collect();
-        assert_eq!( split, vec!["\nMäry", "häd", "ä", "little", "lämb\nLittle", "lämb\n"]);
-
-        let mut rsplit: Vec<&str> = data.split(' ').rev().collect();
-        rsplit.reverse();
-        assert_eq!(rsplit, vec!["\nMäry", "häd", "ä", "little", "lämb\nLittle", "lämb\n"]);
-
-        let split: Vec<&str> = data.split(|c: char| c == ' ').collect();
-        assert_eq!( split, vec!["\nMäry", "häd", "ä", "little", "lämb\nLittle", "lämb\n"]);
-
-        let mut rsplit: Vec<&str> = data.split(|c: char| c == ' ').rev().collect();
-        rsplit.reverse();
-        assert_eq!(rsplit, vec!["\nMäry", "häd", "ä", "little", "lämb\nLittle", "lämb\n"]);
-
-        // Unicode
-        let split: Vec<&str> = data.split('ä').collect();
-        assert_eq!( split, vec!["\nM", "ry h", "d ", " little l", "mb\nLittle l", "mb\n"]);
-
-        let mut rsplit: Vec<&str> = data.split('ä').rev().collect();
-        rsplit.reverse();
-        assert_eq!(rsplit, vec!["\nM", "ry h", "d ", " little l", "mb\nLittle l", "mb\n"]);
-
-        let split: Vec<&str> = data.split(|c: char| c == 'ä').collect();
-        assert_eq!( split, vec!["\nM", "ry h", "d ", " little l", "mb\nLittle l", "mb\n"]);
-
-        let mut rsplit: Vec<&str> = data.split(|c: char| c == 'ä').rev().collect();
-        rsplit.reverse();
-        assert_eq!(rsplit, vec!["\nM", "ry h", "d ", " little l", "mb\nLittle l", "mb\n"]);
-    }
-
-    #[test]
     fn test_splitn_char_iterator() {
         let data = "\nMäry häd ä little lämb\nLittle lämb\n";
 
@@ -1729,28 +1696,6 @@ mod tests {
     }
 
     #[test]
-    fn test_rsplitn_char_iterator() {
-        let data = "\nMäry häd ä little lämb\nLittle lämb\n";
-
-        let mut split: Vec<&str> = data.rsplitn(3, ' ').collect();
-        split.reverse();
-        assert_eq!(split, vec!["\nMäry häd ä", "little", "lämb\nLittle", "lämb\n"]);
-
-        let mut split: Vec<&str> = data.rsplitn(3, |c: char| c == ' ').collect();
-        split.reverse();
-        assert_eq!(split, vec!["\nMäry häd ä", "little", "lämb\nLittle", "lämb\n"]);
-
-        // Unicode
-        let mut split: Vec<&str> = data.rsplitn(3, 'ä').collect();
-        split.reverse();
-        assert_eq!(split, vec!["\nMäry häd ", " little l", "mb\nLittle l", "mb\n"]);
-
-        let mut split: Vec<&str> = data.rsplitn(3, |c: char| c == 'ä').collect();
-        split.reverse();
-        assert_eq!(split, vec!["\nMäry häd ", " little l", "mb\nLittle l", "mb\n"]);
-    }
-
-    #[test]
     fn test_split_char_iterator_no_trailing() {
         let data = "\nMäry häd ä little lämb\nLittle lämb\n";
 
@@ -1758,19 +1703,6 @@ mod tests {
         assert_eq!(split, vec!["", "Märy häd ä little lämb", "Little lämb", ""]);
 
         let split: Vec<&str> = data.split_terminator('\n').collect();
-        assert_eq!(split, vec!["", "Märy häd ä little lämb", "Little lämb"]);
-    }
-
-    #[test]
-    fn test_rev_split_char_iterator_no_trailing() {
-        let data = "\nMäry häd ä little lämb\nLittle lämb\n";
-
-        let mut split: Vec<&str> = data.split('\n').rev().collect();
-        split.reverse();
-        assert_eq!(split, vec!["", "Märy häd ä little lämb", "Little lämb", ""]);
-
-        let mut split: Vec<&str> = data.split_terminator('\n').rev().collect();
-        split.reverse();
         assert_eq!(split, vec!["", "Märy häd ä little lämb", "Little lämb"]);
     }
 

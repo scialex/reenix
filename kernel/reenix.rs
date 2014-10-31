@@ -83,7 +83,7 @@ pub extern "C" fn __morestack() {
 #[cold]
 #[no_mangle]
 #[inline(never)]
-#[lang="fail_fmt"]
+#[lang="panic_fmt"]
 #[allow(unused_must_use)]
 pub extern fn rust_begin_unwind(msg: &core::fmt::Arguments,
                                 file: &'static str,
