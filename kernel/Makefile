@@ -109,8 +109,8 @@ $(eval $(call crate-rule,main,$(filter-out main,$(MODULES))))
 
 .PHONY: all cscope clean
 
-%.a:
-	touch $@
+#%.a:
+#	touch $@
 
 .DEFAULT_GOAL := all
 all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
@@ -179,7 +179,7 @@ nyi:
 todo:
 	@ echo "  Not yet done:"
 	@ echo
-	@ git grep --heading --break -Epnh "((\/\/|\/?\*) TODO|^ *\*t )" \
+	@ git grep --heading --break -Epnh "((\/\/|\/?\*) TODO( [^C][^o][^p][^y][^r][^i][^g][^h][^t]|.{1,9}$$)|^ *\*t )" \
 | sed -E "s/^\t?[0-9]+=/  /" \
 | sed -E "/^  .*;$$/d" \
 | awk '                                                       \
