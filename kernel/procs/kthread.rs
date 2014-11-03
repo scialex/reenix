@@ -140,7 +140,9 @@ impl KThread {
         }
     }
 
-    fn cancel(&mut self, v: *mut c_void) {
+    /// This will mark the given thread as cancelled. This will not affect the thread at all until
+    /// this status is checked later.
+    pub fn cancel(&mut self, v: *mut c_void) {
         self.cancelled = true;
         if self.state == EXITED {
             dbg!(debug::THR, "cancel called on an already exited thread");
