@@ -5,7 +5,7 @@
 #![crate_name="base"]
 #![crate_type="rlib"]
 #![no_std]
-#![allow(missing_doc)]
+//#![allow(missing_docs)]
 #![feature(asm, macro_rules, globs, concat_idents,lang_items, trace_macros, phase)]
 
 
