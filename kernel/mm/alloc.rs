@@ -197,7 +197,7 @@ impl fmt::Show for Allocator {
         try!(writeln!(f, "Weenix allocator"));
         try!(writeln!(f, "{}", self.slabs));
         try!(writeln!(f, "free pages: {}", unsafe { page::free_count()} ));
-        writeln!(f, "backup is used? {}", self.backup.is_used())
+        writeln!(f, "{}", self.backup)
     }
 }
 

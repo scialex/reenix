@@ -7,7 +7,7 @@
 #![crate_name="mm"]
 #![crate_type="rlib"]
 #![allow(non_camel_case_types)]
-#![allow(missing_doc)]
+//#![allow(missing_doc)]
 #![feature(phase, globs, struct_variant, macro_rules, asm, if_let, tuple_indexing)]
 #![no_std]
 
@@ -99,7 +99,7 @@ pub mod tlb {
         asm!("invlpg ($0)" : : "r"(vaddr) : "memory" : "volatile")
     }
 
-    #[allow(unused_variable)]
+    #[allow(unused_variables)]
     pub unsafe fn flush_range(vaddr: *mut c_void, pages: uint) {
         use super::page;
         let mut uv = vaddr as uint;

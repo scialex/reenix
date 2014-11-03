@@ -8,6 +8,7 @@ use super::page;
 use core::prelude::*;
 use core::cmp;
 use core;
+use core::fmt;
 
 const FREE_FILL : u8 = 0xF7;
 const ALOC_FILL : u8 = 0x7F;
@@ -27,7 +28,12 @@ pub struct BackupAllocator {
 }
 
 const DEFAULT_BACKUP_PAGES : uint = 128;
+
+#[cfg(not(TEST_LOW_MEMORY))]
 const DEFAULT_THRESHOLD    : uint = 16;
+
+#[cfg(TEST_LOW_MEMORY)]
+const DEFAULT_THRESHOLD    : uint = 120;
 
 pub const DEFAULT_BACKUP_ALLOCATOR : BackupAllocator = BackupAllocator {
     buf             : 0 as *mut u8,
@@ -111,7 +117,7 @@ impl BackupAllocator {
 
     pub fn is_used(&self) -> bool {
         let start_tag = self.read_tag(self.buf as *mut Tag).expect("shouldn't be null");
-        start_tag.is_free() && (self.byte_len() as uint) - size_of::<Tag>() == start_tag.size()
+        !(start_tag.is_free() && (self.byte_len() as uint) - size_of::<Tag>() == start_tag.size())
     }
 
     pub fn allocate(&self, size: uint, align: uint) -> *mut u8 {
@@ -313,5 +319,31 @@ impl BackupAllocator {
 
     pub fn is_memory_low(&self) -> bool {
         self.is_used() && self.pages - self.largest_space > self.threshold_pages
+    }
+    fn calc_total_space(&self) -> uint {
+        let mut tot = 0;
+        let mut prev = self.read_tag(self.buf as *mut Tag).expect("shouldn't be null");
+        if prev.is_free() {
+            tot = prev.size();
+        }
+        'outer: loop {
+            match self.read_tag(prev.next()) {
+                Some(cur) => {
+                    if cur.is_free() {
+                        tot += cur.size();
+                    }
+                    prev = cur;
+                },
+                None => { break 'outer; }
+            }
+        };
+        tot
+    }
+}
+
+impl fmt::Show for BackupAllocator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "BackupAllocator {{ used: {}, npages: {}, threshold: {} (pages), largest_space: {} (pages), total_space: {} }}",
+               self.is_used(), self.pages, self.threshold_pages, self.largest_space, self.calc_total_space())
     }
 }

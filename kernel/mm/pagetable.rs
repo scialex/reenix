@@ -178,7 +178,7 @@ impl Drop for PageDir {
 }
 
 // TODO Maybe make these rust.
-#[allow(ctypes)]
+#[allow(improper_ctypes)]
 extern "C" {
     static template_pagedir : *const PageDir;
     #[link_name = "current_pagedir"]
