@@ -160,6 +160,13 @@ impl TTYLineDiscipline for LineDiscipline {
         match chr as char {
             '\x7f' | '\x08' => { if let Some(prev) = self.cbuf_prev() { self.raw_tail = prev; "\x08 \x08" } else { "" } },
             '\0' => "",
+            '\t' => {
+                if !self.push_char(' ' as u8) { "\x08 "
+                } else if !self.push_char(' ' as u8) { " "
+                } else if !self.push_char(' ' as u8) { "  "
+                } else if !self.push_char(' ' as u8) { "   "
+                } else { "    " }
+            },
             '\r' | '\n' | '\x04' => {
                 let res = self.push_char(chr);
                 self.ckd_tail = self.raw_tail;
