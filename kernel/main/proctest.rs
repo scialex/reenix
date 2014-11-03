@@ -6,7 +6,6 @@ use libc::c_void;
 use core::prelude::*;
 use core::ptr::*;
 use collections::string;
-use core::fmt::*;
 use procs::kthread;
 use core::mem::transmute_copy;
 use core::intrinsics::transmute;
@@ -19,6 +18,7 @@ use alloc::rc::*;
 const GOOD : *mut c_void = 1 as *mut c_void;
 const BAD  : *mut c_void = 0 as *mut c_void;
 
+#[allow(dead_code)]
 pub fn start() {
     use base::debug;
     let (pass, total) = do_run(true);
@@ -44,7 +44,6 @@ pub fn run() -> (uint, uint) {
 
 fn do_run(single: bool) -> (uint, uint) {
     // TODO Embarrassing. This is not thread safe...
-    use base::debug;
     let mut total : uint = 0;
     let mut pass : uint = 0;
     macro_rules! basic_test(
@@ -144,6 +143,7 @@ extern "C" fn kill_self(_: i32, _: *mut c_void) -> *mut c_void {
 
 extern "C" fn normal_fork(_: i32, _:*mut c_void) -> *mut c_void { GOOD }
 
+#[allow(dead_code)]
 extern "C" fn fork_some(n: i32, _: *mut c_void) -> *mut c_void {
     if n > 0 {
         for i in range::<i32>(1, n) {
@@ -233,7 +233,6 @@ fn get_c_mutex() -> &'static KMutex {
 }
 
 extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
-    use base::debug;
     let y = unsafe {
         let x = box KMutex::new("contested mutex test");
         c_mutex = transmute_copy(&x);
@@ -269,7 +268,6 @@ extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 }
 
 extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
-    use base::debug;
     let x = Rc::new(Mutex::<i32>::new("contested mutex test", 0));
 
     let high : i32 = 200;

@@ -304,7 +304,6 @@ impl ATADisk {
                    sec, self.size / self.sectors_per_block);
             return Err(errno::EIO);
         }
-        // TODO This might not be the best IPL to set...
         // RAII ipl. It resets at the end.
         let ipl = interrupt::temporary_ipl(interrupt::DISK_SECONDARY);
 
@@ -348,7 +347,8 @@ impl ATADisk {
     fn write_single(&mut self, block: uint, buf: &[u8, ..page::SIZE]) -> KResult<uint> {
         if !page::aligned(buf.as_ptr()) {
             kpanic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
-            // TODO I might want to just copy it if we get this.
+            // TODO I might want to just copy it if we get this, OTOH It is unlikely to be much of
+            // TODO a problem in practice and we might just want to make sure we always stop it.
         }
         unsafe { self.unsafe_do_operation(block, buf.as_ptr() as *mut u8, true).and(Ok(1)) }
     }
@@ -359,7 +359,8 @@ impl ATADisk {
     fn read_single(&mut self, block: uint, buf: &mut [u8, ..page::SIZE]) -> KResult<uint> {
         if !page::aligned(buf.as_ptr()) {
             kpanic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
-            // TODO I might want to just copy it if we get this.
+            // TODO I might want to just copy it if we get this, OTOH It is unlikely to be much of
+            // TODO a problem in practice and we might just want to make sure we always stop it.
         }
         unsafe { self.unsafe_do_operation(block, buf.as_ptr() as *mut u8, false).and(Ok(1)) }
     }

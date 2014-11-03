@@ -60,7 +60,7 @@ const NORMAL_SCANCODES : &'static str = concat!("\x00",             /* Error */
                                                 "\x00\x00\x00",     /* Rshift, prtscrn, Lalt */
                                                 " "                 /* Space bar */);
 
-const SHIFT_SCANCODES  : &'static str = "\x00\x1b!@#$%^&*()_+\x08\tQWERTYUIOP{}\n\x00ASDFGHJKL:\"~\x00\\ZXCVBNM<>?\x00\x00\x00 ";
+const SHIFT_SCANCODES  : &'static str = "\x00\x1b!@#$%^&*()_+\x08\tQWERTYUIOP{}\n\x00ASDFGHJKL:\"~\x00|ZXCVBNM<>?\x00\x00\x00 ";
 // For some reason the parser does not like the much easier to read concat version.
                                       /*concat!("\x00",
                                                 "\x1b",

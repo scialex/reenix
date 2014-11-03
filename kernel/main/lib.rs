@@ -17,20 +17,11 @@ extern crate libc;
 extern crate collections;
 extern crate drivers;
 
-use alloc::boxed::*;
-
-use core::fmt::FormatWriter;
-use drivers::bytedev;
-use drivers::blockdev;
-use mm::page;
-use drivers::DeviceId;
-use core::str::from_utf8;
 use procs::cleanup_bootstrap_function;
 use base::kernel;
 use base::errno;
 use procs::kproc;
 use procs::kproc::{KProc, Pid, ProcId};
-use core::iter::*;
 use libc::c_void;
 use mm::pagetable;
 use core::prelude::*;
@@ -39,15 +30,6 @@ use procs::interrupt;
 
 mod proctest;
 mod kshell;
-
-#[no_stack_check]
-fn clear_screen(background: u16) {
-    for i in range(0u, 80 * 25) {
-        unsafe {
-            *((0xb8000 + i * 2) as *mut u16) = background << 12;
-        }
-    }
-}
 
 pub fn init_stage1() { }
 pub fn init_stage2() { }

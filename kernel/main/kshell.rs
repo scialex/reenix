@@ -1,22 +1,16 @@
 // TODO Copyright Header
 
-use core::cell::*;
 use base::errno;
 use mm::page;
 use mm::alloc;
-use procs::kproc;
 use alloc::boxed::*;
+use core::cell::*;
 use libc::c_void;
 use core::prelude::*;
 use core::ptr::*;
-use collections::string;
-use procs::kthread;
-use core::mem::transmute_copy;
-use core::intrinsics::transmute;
-use procs::kproc::{ProcStatus, ProcId, KProc};
 use procs::interrupt;
-use procs::sync::*;
-use alloc::rc::*;
+use procs::kproc::{KProc, mod};
+use core::mem::*;
 use drivers::*;
 use base::errno::KResult;
 use core::str::from_utf8;
@@ -27,13 +21,19 @@ use core::iter::*;
 use base::from_str::*;
 use procs::args::ProcArgs;
 
+macro_rules! twriteln(
+    ($t:expr, $($e:expr),*) => (assert!(writeln!(ByteWriter($t), $($e),*).is_ok()))
+)
+macro_rules! twrite(
+    ($t:expr, $($e:expr),*) => (assert!(write!(ByteWriter($t), $($e),*).is_ok()))
+)
 pub fn start(i: i32) {
     let tty = ProcArgs::new(bytedev::lookup_mut(DeviceId::create(2,i as u8)).unwrap()).unwrap();
     assert!(KProc::new(String::from_str("KSHELL proc"), tty_proc_run, 0, unsafe { tty.to_arg() }).is_ok());
 }
 
 extern "C" fn tty_proc_run(_:i32, t:*mut c_void) -> *mut c_void {
-    let tty = unsafe { ProcArgs::from_arg(t) };
+    let tty = unsafe { ProcArgs::<&mut Device<u8>>::from_arg(t) };
     let mut s = KShell::new(tty.unwrap());
     s.add_normal_functions();
     s.run();
@@ -41,42 +41,63 @@ extern "C" fn tty_proc_run(_:i32, t:*mut c_void) -> *mut c_void {
 }
 
 
-pub type ShellFunc = fn(io: &mut Device<u8>, argv: &[&str]) -> KResult<()>;
+pub type ExternShellFunc = fn(io: &mut Device<u8>, argv: &[&str]) -> KResult<()>;
+type InternShellFunc = fn<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()>;
+
+#[deriving(Clone)]
+enum ShellFunc {
+    External(ExternShellFunc),
+    Internal(InternShellFunc),
+}
+
 #[deriving(Clone)]
 pub struct KFunction<'a> {
     name : &'a str,
     description : &'a str,
     func : ShellFunc,
 }
+macro_rules! KFunc_i(
+    ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: Internal($f) } );
+    ($n:expr, $f:ident) => (KFunc!($n, $n, $f));
+    ($f:ident) => (KFunc!(stringify!($f),$f));
+)
 macro_rules! KFunc(
-    ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: $f } );
+    ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: External($f) } );
     ($n:expr, $f:ident) => (KFunc!($n, $n, $f));
     ($f:ident) => (KFunc!(stringify!($f),$f));
 )
 
 impl<'a> KFunction<'a> {
-    pub fn create<'a>(name: &'a str, func: ShellFunc) -> KFunction<'a> {
-        KFunction { name : name, description: name, func : func }
+    #[allow(dead_code)]
+    pub fn create<'a>(name: &'a str, func: ExternShellFunc) -> KFunction<'a> {
+        KFunction { name : name, description: name, func : External(func) }
     }
-    pub fn new<'a>(name: &'a str, description: &'a str, func: ShellFunc) -> KFunction<'a> {
-        KFunction { name: name, description: description, func: func }
+    #[allow(dead_code)]
+    pub fn new<'a>(name: &'a str, description: &'a str, func: ExternShellFunc) -> KFunction<'a> {
+        KFunction { name: name, description: description, func: External(func) }
     }
-    pub fn call<'b, I: Iterator<&'b str>>(&'a self, io: &'b mut Device<u8>, args: I) -> KResult<()> {
-        let f = self.func;
-        let mut v = Vec::new();
-        v.extend(args);
-        f(io, v.as_slice())
+    pub fn call<'b>(&'a self, ksh: &'a KShell<'b>, args: &[&str]) -> KResult<()> {
+        match self.func {
+            External(f) => f(ksh.get_tty(), args),
+            Internal(f) => f(ksh, args),
+        }
     }
 }
 
 pub struct KShell<'a> {
-    tty: &'a mut Device<u8>,
+    tty: UnsafeCell<&'a mut Device<u8>>,
     // TODO A list of KFunction's
     funcs: TreeMap<&'a str, KFunction<'a>>,
 }
 
 static NFUNCS : &'static [KFunction<'static>] = &[
-    KFunc!("exit", "exits the current process with the given value", do_exit),
+    KFunc_i!("help", "Show this help message", do_help),
+    KFunc_i!("repeat", "repeat the given command", do_repeat),
+    // TODO This parallel repeat command.
+    KFunc_i!("prepeat", "repeat the given command in parallel", do_prepeat),
+    KFunc_i!("parallel", "run commands seperated by || in parallel", do_parallel),
+    KFunc!("exit", "exits the current process with the given value. (Actually just cancel it to allow for memory cleanup)", do_exit),
+    KFunc!("hard-exit", "exits the current process with the given value, This may leak memory or cause Undefined Behavior from the KSHELL", do_exit),
     KFunc!("echo", "echos its arguments to the output.", do_echo),
     KFunc!("kshell", "create a new kshell on given tty", do_newkshell),
     KFunc!("proctest", "test procs", do_proctest),
@@ -88,7 +109,11 @@ static NFUNCS : &'static [KFunction<'static>] = &[
 
 impl<'a> KShell<'a> {
     pub fn new<'b>(dev: &'b mut Device<u8>) -> KShell<'b> {
-        KShell { tty: dev, funcs: TreeMap::new() }
+        KShell { tty: UnsafeCell::new(dev), funcs: TreeMap::new() }
+    }
+
+    pub fn get_tty<'b>(&'b self) -> &'b mut Device<u8> {
+        unsafe { *self.tty.get() }
     }
 
     pub fn add_normal_functions(&mut self) {
@@ -102,100 +127,80 @@ impl<'a> KShell<'a> {
         self.funcs.insert(n, f)
     }
 
-    pub fn run(&mut self) {
+    #[allow(unused_must_use)]
+    pub fn run(&self) {
         // TODO Do stuff.
         loop {
             let mut buf : [u8, ..256] = [0, ..256];
-            assert!(write!(ByteWriter(self.tty), "ksh# ").is_ok());
-            let req = self.tty.read_from(0, &mut buf);
+            twrite!(self.get_tty(), "ksh# ");
+            let req = self.get_tty().read_from(0, &mut buf);
             let cmd = match from_utf8(
                         match req {
                             Ok(v) => buf.slice_to(v - 1),
                             Err(e) => {
-                                assert!(writeln!(ByteWriter(self.tty), "An error occured while reading command. Error was {}. Quiting.",
-                                                 e).is_ok());
+                                twriteln!(self.get_tty(), "An error occured while reading command. Error was {}. Quiting.", e);
                                 return;
                             }
                         }) {
                 Some(v) => v,
                 None => {
-                    assert!(writeln!(ByteWriter(self.tty), "Given command included illegal charecters. Ignoring.").is_ok());
+                    twriteln!(self.get_tty(), "Given command included illegal charecters. Ignoring.");
                     continue;
                 },
             };
-            self.run_command(cmd);
+            self.run_command(cmd.split(' ').filter(|s| { s.len() != 0 }).collect::<Vec<&str>>().as_slice());
+
+            if (current_thread!()).cancelled {
+                return;
+            }
         }
     }
 
-    pub fn run_command(&mut self, cmd: &str) {
-        macro_rules! early_return(
-            ($v:expr, $($a:expr),*) => ({
-                match $v {
-                    Some(x) => x,
-                    None => {
-                        assert!(writeln!(ByteWriter(self.tty), $($a),*).is_ok());
-                        return;
-                    }
-                }
-            })
-        )
-        let f = cmd.split(' ').nth(0).unwrap_or(cmd);
-        if f == "help" {
-            assert!(writeln!(ByteWriter(self.tty), "Loaded commands are: ").is_ok());
-            assert!(writeln!(ByteWriter(self.tty), "help - print this message").is_ok());
-            assert!(writeln!(ByteWriter(self.tty), "repeat - Repeat a command the given number of times").is_ok());
-            for i in self.funcs.values() {
-                assert!(writeln!(ByteWriter(self.tty), "{} - {}", i.name, i.description).is_ok());
-            }
-        } else if f == "repeat" {
-            let v = early_return!(cmd.split(' ').filter(|s| { s.len() != 0 }).nth(1), "Usage: repeat num cmd ...");
-            let reps = early_return!(from_str::<uint>(v), "'{}' is not a valid number. Usage: repeat num cmd ...", v);
-            let r = early_return!(cmd.split(' ').filter(|s| { s.len() != 0 }).nth(2), "Usage: repeat num cmd ...");
-            if let Some(func) = self.funcs.find_with(|x| { r.cmp(x) }) {
-                for _ in range(0, reps) {
-                    match func.call(self.tty, cmd.split(' ').filter(|s| { s.len() != 0 }).skip(2)) {
-                        Ok(_) => {},
-                        Err(v) => {
-                            assert!(writeln!(ByteWriter(self.tty), "execution of command '{}' returned errno {}", f, v).is_ok());
-                        },
-                    }
-                }
-            } else {
-                assert!(writeln!(ByteWriter(self.tty), "execution of command '{}' returned errno {}", f, v).is_ok());
-            }
-        } else if f == "" {
-            return;
-        } else if let Some(func) = self.funcs.find_with(|x| { f.cmp(x) }) {
-            match func.call(self.tty, cmd.split(' ').filter(|s| { s.len() != 0 })) {
-                Ok(_) => {},
+    pub fn run_command(&self, argv: &[&str]) -> KResult<()> {
+        if argv.len() == 0 {
+            return Err(errno::ENOMSG);
+        }
+        let f = argv[0];
+        if let Some(func) = self.funcs.find_with(|x| { f.cmp(x) }) {
+            match func.call(self, argv) {
+                Ok(_) => Ok(()),
                 Err(v) => {
-                    assert!(writeln!(ByteWriter(self.tty), "execution of command '{}' returned errno {}", f, v).is_ok());
+                    twriteln!(self.get_tty(), "execution of command '{}' returned errno {}", f, v);
+                    Err(v)
                 },
             }
         } else {
-            assert!(writeln!(ByteWriter(self.tty), "unable to find command '{}'", f).is_ok());
+            twriteln!(self.get_tty(), "unable to find command '{}'", f);
+            Err(errno::ENOMSG)
+        }
+    }
+
+    pub fn print_help(&self) {
+        twriteln!(self.get_tty(), "KSHELL COMMANDS");
+        for v in self.funcs.values() {
+            twriteln!(self.get_tty(), "{} - {}", v.name, v.description);
         }
     }
 }
 
 fn do_memstats(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {
-    assert!(writeln!(ByteWriter(io), "{}", alloc::get_stats()).is_ok());
+    twriteln!(io, "{}", alloc::get_stats());
     alloc::stats_print();
     Ok(())
 }
 
 fn do_ipl(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {
-    assert!(writeln!(ByteWriter(io), "ipl is {:x}", interrupt::get_ipl()).is_ok());
+    twriteln!(io, "ipl is {:x}", interrupt::get_ipl());
     Ok(())
 }
 
 fn do_echo(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     let mut first = true;
     for i in argv.iter().skip(1) {
-        assert!(write!(ByteWriter(io), "{}{}", if !first { " " } else { "" }, i).is_ok());
+        twrite!(io, "{}{}", if !first { " " } else { "" }, i);
         first = false;
     }
-    assert!(writeln!(ByteWriter(io), "").is_ok());
+    twriteln!(io, "");
     Ok(())
 }
 
@@ -203,62 +208,68 @@ fn do_exit(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     let status : uint = if argv.len() < 2 {
         0
     } else if argv.len() > 2 {
-        assert!(writeln!(ByteWriter(io), "usage: exit [number]").is_ok());
+        twriteln!(io, "usage: exit [number]");
         return Ok(());
     } else {
         match from_str(argv[1]) {
             Some(v) => v,
             None => {
-                assert!(writeln!(ByteWriter(io), "usage: exit [number]").is_ok());
+                twriteln!(io, "usage: exit [number]");
                 return Ok(());
             },
         }
     };
-    assert!(writeln!(ByteWriter(io), "quiting with status {}", status).is_ok());
+    twriteln!(io, "quiting with status {}", status);
     // TODO We should exit with the given status
-    (current_thread!()).exit(status as *mut c_void);
-    kpanic!("Should never reach here");
+    if argv[0] != "hard-exit" {
+        (current_thread!()).cancel(status as *mut c_void);
+    } else {
+        twriteln!(io, "WARNING: This will likely leak memory (unless I somehow get CFI unwinding working)");
+        (current_thread!()).exit(status as *mut c_void);
+        kpanic!("Should never reach here");
+    }
+    Ok(())
 }
 
 fn do_proctest(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {
     let (pass, total) = super::proctest::run();
-    assert!(writeln!(ByteWriter(io), "passed {} of {} tests", pass, total).is_ok());
+    twriteln!(io, "passed {} of {} tests", pass, total);
     if pass == total { Ok(()) } else { Err(errno::EAGAIN) }
 }
 
 fn do_newkshell(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     if argv.len() != 2 {
-        assert!(writeln!(ByteWriter(io), "Usage: kshell [tty id]").is_ok());
+        twriteln!(io, "Usage: kshell [tty id]");
         return Ok(());
     }
     let id : u8 = match from_str(argv[1]) {
         Some(v) => v,
         None => {
-            assert!(writeln!(ByteWriter(io), "Usage: kshell [tty id]").is_ok());
+            twriteln!(io, "Usage: kshell [tty id]");
             return Err(errno::EINVAL);
         },
     };
     let tty = try!(ProcArgs::new(match bytedev::lookup_mut(DeviceId::create(2, id)) {
         Some(v) => v,
         None => {
-            assert!(writeln!(ByteWriter(io), "{} is not a valid tty!", id).is_ok());
+            twriteln!(io, "{} is not a valid tty!", id);
             return Err(errno::ENOTTY);
         },
     }).or_else(|_| Err(errno::ENOMEM)));
-    assert!(writeln!(ByteWriter(io), "Creating new shell on tty {}", id).is_ok());
+    twriteln!(io, "Creating new shell on tty {}", id);
     KProc::new(String::from_str("KSHELL proc"), tty_proc_run, 0, unsafe { tty.to_arg() }).and(Ok(())).or_else(|_| Err(errno::ENOMEM))
 }
 
 fn do_bdread(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     use core::str::is_utf8;
     if argv.len() != 2 {
-        assert!(writeln!(ByteWriter(io), "Usage: read-block block_num").is_ok());
+        twriteln!(io, "Usage: read-block block_num");
         return Ok(());
     }
     let blk = match from_str(argv[1]) {
         Some(v) => v,
         None => {
-            assert!(writeln!(ByteWriter(io), "Illegal block number {}, Usage: read_block block_num", argv[1]).is_ok());
+            twriteln!(io, "Illegal block number {}, Usage: read_block block_num", argv[1]);
             return Ok(());
         }
     };
@@ -266,7 +277,7 @@ fn do_bdread(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     let disk = blockdev::lookup_mut(DeviceId::create(1,0)).expect("should have disk 0");
     let res = disk.read_from(blk, &mut *buf).and(Ok(()));
     if res.is_err() {
-        assert!(writeln!(ByteWriter(io), "failed to read block {}", blk).is_ok());
+        twriteln!(io, "failed to read block {}", blk);
         return res;
     }
     let mut cnt = 0;
@@ -279,32 +290,33 @@ fn do_bdread(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     }
     let s = buf[0].slice_to(cnt);
     match from_utf8(s) {
-        Some(v) => { assert!(writeln!(ByteWriter(io), "{}", v).is_ok()) },
-        None => { assert!(writeln!(ByteWriter(io), "**read succeeded but contained unprintable chars**").is_ok()) },
+        Some(v) => { twriteln!(io, "{}", v); },
+        None => { twriteln!(io, "**read succeeded but contained unprintable chars**"); }
     }
     Ok(())
 }
+
 fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     if argv.len() < 4 {
-        assert!(writeln!(ByteWriter(io), "Usage: write-blocks block_num reps text [...]").is_ok());
+        twriteln!(io, "Usage: write-blocks block_num reps text [...]");
         return Ok(());
     }
     let start = match from_str(argv[1]) {
         Some(v) => v,
         None => {
-            assert!(writeln!(ByteWriter(io), "Illegal block number {}, Usage: write-blocks block_num reps text [...]", argv[1]).is_ok());
+            twriteln!(io, "Illegal block number {}, Usage: write-blocks block_num reps text [...]", argv[1]);
             return Ok(());
         }
     };
     let blks : uint = match from_str(argv[2]) {
         Some(v) => v,
         None => {
-            assert!(writeln!(ByteWriter(io), "Illegal reps number {}, Usage: write-blocks block_num reps text [...]", argv[2]).is_ok());
+            twriteln!(io, "Illegal reps number {}, Usage: write-blocks block_num reps text [...]", argv[2]);
             return Ok(());
         },
     };
     if blks > 8 {
-        assert!(writeln!(ByteWriter(io), "Will not write more than 8 blocks for performance reasons").is_ok());
+        twriteln!(io, "Will not write more than 8 blocks for performance reasons");
         return Ok(());
     }
     let mut example : [u8, ..page::SIZE] = [0, ..page::SIZE];
@@ -324,7 +336,7 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
 
     let mut buf : Vec<[u8, ..page::SIZE]> = try!(alloc!(try Vec::with_capacity(blks)).or_else(
             |_| {
-                assert!(writeln!(ByteWriter(io), "Unable to allocate a large enough buffer for {} pages.", blks).is_ok());
+                twriteln!(io, "Unable to allocate a large enough buffer for {} pages.", blks);
                 Err(errno::ENOMEM)
             }
         ));
@@ -336,6 +348,105 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     }
     let disk = blockdev::lookup_mut(DeviceId::create(1,0)).expect("should have disk 0");
     disk.write_to(start, buf.as_slice()).and(Ok(()))
+}
+
+fn do_help<'a>(sh: &KShell<'a>, _: &[&str]) -> KResult<()> {
+    sh.print_help();
+    Ok(())
+}
+
+#[deriving(Clone)]
+struct Instr { ksh: &'static KShell<'static>, line: &'static[&'static str] }
+extern "C" fn parallel_run(_: i32, v:*mut c_void) -> *mut c_void {
+    let i: Instr = unsafe { ProcArgs::from_arg(v).unwrap() };
+    match i.ksh.run_command(i.line) {
+        Ok(_) => 0 as *mut c_void,
+        Err(e) => e as uint as *mut c_void,
+    }
+}
+
+fn do_prepeat<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
+    if argv.len() < 3 {
+        twriteln!(sh.get_tty(), "Usage: prepeat cnt cmd ..");
+        return Ok(());
+    }
+    let reps = match from_str::<uint>(argv[1]) {
+        Some(v) => v,
+        None => {
+            twriteln!(sh.get_tty(), "Usage: prepeat cnt cmd ..");
+            return Ok(());
+        },
+    };
+    let mut cmd = Vec::with_capacity((argv.len() - 1) * reps + 1);
+    cmd.push("parallel");
+    for i in range(0, reps) {
+        if i != 0 {
+            cmd.push("||");
+        }
+        cmd.push_all(argv.slice_from(2));
+    }
+    do_parallel(sh, cmd.as_slice())
+}
+#[allow(unused_must_use)]
+fn do_parallel<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
+    if argv.len() < 2 {
+        twriteln!(sh.get_tty(), "Usage: parallel cmd1 .. || cmd2 .. || cmd3 .. || ...");
+        return Ok(());
+    }
+    let mut pids = Vec::new();
+    let all_commands = argv.slice_from(1);
+    for cmd in all_commands.split(|x| { *x == "||" }) {
+        if cmd.len() == 0 {
+            continue;
+        } else if cmd[0] == "hard-exit" {
+            twriteln!(sh.get_tty(), "Will not call hard-exit parallel, will cause memory leaks");
+        }
+        let args = Instr { ksh: unsafe { transmute(sh) }, line: unsafe { transmute(cmd) } };
+        let pa = unsafe {
+            match ProcArgs::new(args) {
+                Ok(v) => v,
+                Err(_) => { continue; },
+            }.to_arg()
+        };
+        match KProc::new(String::from_str("KSHELL parallel proc"), parallel_run, 0, pa) {
+            Ok(pid) => pids.push(pid),
+            Err(v) => {
+                twriteln!(sh.get_tty(), "Unable to create process for command {}, error was {}", cmd, v);
+                drop(unsafe { ProcArgs::<Instr>::from_arg(pa).unwrap() });
+            },
+        }
+    }
+    // TODO Wait on everything.
+    for pid in pids.iter() {
+        let x = KProc::waitpid(kproc::Pid(*pid), 0);
+        match x {
+            Ok((_, _)) => {},
+            Err(errno) => {
+                twriteln!(sh.get_tty(), "Unable to wait for {}, error was {}", pid, errno);
+            }
+        }
+    }
+    Ok(())
+}
+
+#[allow(unused_must_use)]
+fn do_repeat<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
+    if argv.len() < 3 {
+        twriteln!(sh.get_tty(), "Usage: repeat num cmd ...");
+        return Err(errno::EBADMSG);
+    }
+    match from_str::<uint>(argv[1]) {
+        Some(c) => {
+            for _ in range(0, c) {
+                sh.run_command(argv.slice_from(2));
+            }
+            Ok(())
+        },
+        None => {
+            twriteln!(sh.get_tty(), "{} is not a number, usage: repeat num cmd ...", argv[1]);
+            Err(errno::EBADMSG)
+        },
+    }
 }
 
 /*
