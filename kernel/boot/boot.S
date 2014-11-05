@@ -76,7 +76,12 @@ _finish_boot:
     mov     %ax, %es
     /* Copy the multiboot information */
     movl    %ebx, (boot_info)
-    ljmp    $0x08, $kernel_start_text
+
+    /* By referencing the entry function this way we can activate the
+     * --gc-sections `ld` option which results in significantly smaller kenrel
+     * binary sizes.
+     */
+    ljmp    $0x08, $entry
     cli
     hlt
 

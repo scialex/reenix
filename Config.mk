@@ -6,6 +6,14 @@
 #   basis. Note that variables like CFLAGS are not defined here because they should
 #   generally not be changed.
 
+# Should we show the build commands as we run them?
+HIDE ?= "true"
+
+# Should we run ld with --gc-sections flag. If ttrue then we will remove unused
+# sections, making the binary much smaller, we could lose some debug
+# information.
+LD_OPT ?= "true"
+
 # Should we use stack check. FALSE we will not. Anything else we will.
 USE_STACK_CHECK=TRUE
 #USE_STACK_CHECK=FALSE

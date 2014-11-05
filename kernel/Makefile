@@ -1,6 +1,7 @@
 CFLAGS    := -ffreestanding
 RSFLAGS   := -L libs -C no-redzone -Z gc
 LDFLAGS   := -m elf_i386 -z nodefaultlib
+KERNEL_LDFLAGS := --strip-all
 # XXX should have --omagic?
 
 include ../Global.mk
@@ -31,13 +32,16 @@ PREBUILT  :=
 EXTERNAL_LIBS  := openlibm
 EXTERNAL := $(foreach l, $(EXTERNAL_LIBS), libs/lib$(l).a)
 
-HIDE ?= "true"
 ifeq ("true",$(HIDE))
 HIDE_SIGIL := @
 SILENT_FLAG := --silent
 else
 HIDE_SIGIL :=
 SILENT_FLAG :=
+endif
+
+ifeq ("true",$(LD_OPT))
+LDFLAGS += --gc-sections
 endif
 
 SYMBOLS   := weenix.dbg
@@ -101,6 +105,7 @@ $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
 $(eval $(call crate-rule,startup,alloc mm base libc collections))
 $(eval $(call crate-rule,procs,startup alloc base libc mm collections))
+$(eval $(call crate-rule,util,startup alloc base libc mm collections))
 # TODO For some reason LLVM doesn't like --opt-level=2 in drivers.
 $(eval $(call long-crate-rule,drivers,procs alloc mm collections base,--opt-level=1))
 
@@ -118,7 +123,7 @@ all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 $(KERNEL): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ echo "  Linking for \"kernel/$@\"..."
 	@ # entry.o included from link.ld. boot/boot.S must be the first file so that the multiboot header is close enough to the front.
-	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -O1 --strip-all -T link.ld boot/boot.o $(filter-out boot/boot.o entry/entry.o,$^) -o $@
+	$(HIDE_SIGIL) $(LD) $(LDFLAGS) $(KERNEL_LDFLAGS) -T link.ld boot/boot.o $(filter-out boot/boot.o entry/entry.o,$^) -o $@
 
 $(BSYMBOLS): $(SYMBOLS)
 	@ echo "  Generating kernel symbols list..."
