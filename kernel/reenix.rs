@@ -10,12 +10,13 @@
 
 #[phase(plugin, link)] extern crate core;
 #[phase(plugin, link)] extern crate base;
-#[phase(plugin, link)] extern crate procs;
+extern crate procs;
 extern crate mm;
 extern crate main;
 extern crate startup;
 extern crate libc;
 extern crate drivers;
+extern crate util;
 
 use libc::c_void;
 
@@ -27,6 +28,7 @@ extern "C" { fn dbg_init(); }
 fn run_init() {
     use mm;
     use main;
+    use util;
     use procs;
     use startup;
     unsafe { dbg_init(); }
@@ -40,6 +42,8 @@ fn run_init() {
     dbg!(debug::CORE, "mm initialized stage 1");
     startup::init_stage1();
     dbg!(debug::CORE, "startup initialized stage 1");
+    util::init_stage1();
+    dbg!(debug::CORE, "util initialized stage 1");
     procs::init_stage1();
     dbg!(debug::CORE, "procs initialized stage 1");
     drivers::init_stage1();
@@ -55,6 +59,8 @@ fn run_init() {
     dbg!(debug::CORE, "mm initialized stage 2");
     startup::init_stage2();
     dbg!(debug::CORE, "startup initialized stage 2");
+    util::init_stage2();
+    dbg!(debug::CORE, "util initialized stage 2");
     procs::init_stage2();
     dbg!(debug::CORE, "procs initialized stage 2");
     drivers::init_stage2();
@@ -76,8 +82,13 @@ pub extern "C" fn kmain() {
 #[cold]
 #[no_mangle]
 #[no_stack_check]
+#[allow(unused_must_use)]
 pub extern "C" fn __morestack() {
-    kpanic!("__morestack called. This should happen");
+    use base::debug::printing::DBG_WRITER;
+    use core::fmt::*;
+    use base::kernel;
+    unsafe { DBG_WRITER.write(b"\n__morestack was called. We ran out of stack space!\n"); }
+    kernel::halt();
 }
 
 #[cold]

@@ -20,8 +20,7 @@ SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]) ) drivers/pci.c d
 OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-MODULES := base mm alloc libc main startup collections procs drivers
-#MODULES := base mm alloc libc main startup collections procs
+MODULES := base mm alloc libc main startup collections procs drivers util
 BUILT_MODULES := $(foreach dr, $(MODULES), libs/lib$(dr).rlib)
 
 RSFLAGS += $(foreach dr, $(MODULES), --extern $(dr)=libs/lib$(dr).rlib)
@@ -105,7 +104,7 @@ $(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
 $(eval $(call crate-rule,startup,alloc mm base libc collections))
 $(eval $(call crate-rule,procs,startup alloc base libc mm collections))
-$(eval $(call crate-rule,util,startup alloc base libc mm collections))
+$(eval $(call crate-rule,util,alloc base libc mm collections))
 # TODO For some reason LLVM doesn't like --opt-level=2 in drivers.
 $(eval $(call long-crate-rule,drivers,procs alloc mm collections base,--opt-level=1))
 

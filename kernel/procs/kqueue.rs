@@ -114,6 +114,8 @@ impl WQueue {
     pub fn new() -> WQueue { WQueue(UnsafeCell::new(KQueue::new())) }
     #[inline]
     fn get_inner<'a>(&'a self) -> &'a mut KQueue { let &WQueue(ref kq) = self; unsafe { transmute(kq.get()) } }
+    pub fn len(&self) -> uint { self.get_inner().len() }
+    pub fn force_wait(&self) -> Result<(),()> { if self.get_inner().wait_on(false) { Ok(()) } else { Err(()) } }
 }
 
 impl sync::Wait<(),()> for WQueue {
