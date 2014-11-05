@@ -16,6 +16,7 @@ extern crate startup;
 extern crate libc;
 extern crate collections;
 extern crate drivers;
+extern crate util;
 
 use procs::cleanup_bootstrap_function;
 use base::kernel;
@@ -27,6 +28,7 @@ use mm::pagetable;
 use core::prelude::*;
 use collections::String;
 use procs::interrupt;
+use core::fmt;
 
 mod proctest;
 mod kshell;
@@ -51,6 +53,7 @@ fn shutdown() -> ! {
     kernel::halt();
 }
 
+pub static mut IS_PROCS_UP : bool = false;
 // TODO
 fn finish_init() {
     // TODO VFS Setup.
@@ -58,6 +61,7 @@ fn finish_init() {
     drivers::init_stage3();
     interrupt::enable();
     interrupt::set_ipl(interrupt::LOW);
+    unsafe { IS_PROCS_UP = true; }
 }
 extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     cleanup_bootstrap_function();
@@ -92,6 +96,17 @@ extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     }
     return 0 as *mut c_void;
 }
+
+struct Estr;
+impl fmt::Show for Estr { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "\x08") } }
+static EMPTY_STR : Estr = Estr;
+
+#[no_mangle]
+#[no_stack_check]
+pub extern "C" fn get_dbg_pid() -> &'static fmt::Show + 'static {
+    if unsafe { !IS_PROCS_UP } { &EMPTY_STR as &'static fmt::Show } else { ((current_pid!()) as &'static fmt::Show) }
+}
+
 
 mod std {
     pub use core::fmt;

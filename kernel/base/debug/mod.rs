@@ -32,6 +32,12 @@ pub fn add_mode(m: DbgMode) {
 
 mod macros;
 
+extern "C" { fn get_dbg_pid() -> &'static fmt::Show; }
+pub fn dbg_pid() -> &'static fmt::Show + 'static {
+    unsafe { get_dbg_pid() }
+}
+
+#[no_stack_check]
 #[doc(hidden)]
 #[inline(never)]
 pub fn dbg_print(msg: &fmt::Arguments) {
@@ -42,6 +48,4 @@ pub fn dbg_print(msg: &fmt::Arguments) {
         _ => (),
     }
 }
-
-//mod langs;
 

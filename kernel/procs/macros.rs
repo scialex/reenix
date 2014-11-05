@@ -39,11 +39,13 @@ macro_rules! add_file(
 
 /// Returns the current pid. This is useful to avoid borrowing the current proc when it might
 /// already be taken.
+#[macro_export]
 macro_rules! current_pid(
     () => ({
         use startup::gdt;
         use core::any::*;
-        (*(**gdt::get_tsd().get_slot(CUR_PID_SLOT).expect(add_file!("CUR_PID slot not used")))
+        use procs::kproc::CUR_PID_SLOT;
+        ((**gdt::get_tsd().get_slot(CUR_PID_SLOT).expect(add_file!("CUR_PID slot not used")))
                            .downcast_ref::<ProcId>().expect(add_file!("Item at curpid was not the right type!")))
     })
 )

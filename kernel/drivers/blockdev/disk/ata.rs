@@ -300,8 +300,8 @@ impl ATADisk {
         let lock = self.mutex.force_lock();
         let sec = block * self.sectors_per_block;
         if sec + self.sectors_per_block >  self.size {
-            dbger!(debug::DISK, errno::EIO, "ERROR: request to write at block {} when disk is only {} blocks long",
-                   sec, self.size / self.sectors_per_block);
+            dbger!(debug::DISK, errno::EIO, "ERROR: request to {} block {} when disk is only {} blocks long",
+                   if to_write { "write" } else { "read" }, block, self.size / self.sectors_per_block);
             return Err(errno::EIO);
         }
         // RAII ipl. It resets at the end.

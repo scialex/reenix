@@ -142,7 +142,7 @@ impl KProc {
 
     /// Checks if this process is the one we are currently running in.
     pub fn is_current_process(&self) -> bool {
-        (current_pid!()) == self.pid
+        *(current_pid!()) == self.pid
     }
 
     /// Wait on a process.

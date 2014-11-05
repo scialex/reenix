@@ -17,8 +17,8 @@ macro_rules! dbger(
     ($d:expr, $err:expr, $fmt:expr, $($a:expr),*) => ({
         use base::debug;
         if (debug::get_debug_active() & ($d)) != debug::NONE {
-            dbg_write!(concat!("{}{} {}:{:u} <errno:{}> : ", $fmt, "\n"),
-                       $d.get_color(), $d, file!(), line!(), $err, $($a),*);
+            dbg_write!(concat!("{}{} {} {}:{:u} <errno:{}> : ", $fmt, "\n"),
+                       $d.get_color(), $d, debug::dbg_pid(), file!(), line!(), $err, $($a),*);
         }
     });
     ($d:expr, $err:expr, $fmt:expr) => ({
@@ -31,8 +31,8 @@ macro_rules! dbg(
     ($d:expr, $fmt:expr, $($a:expr),*) => ({
         use base::debug;
         if (debug::get_debug_active() & ($d)) != debug::NONE {
-            dbg_write!(concat!("{}{} {}:{:u} : ", $fmt, "\n"),
-                       $d.get_color(), $d, file!(), line!(), $($a),*);
+            dbg_write!(concat!("{}{} {} {}:{:u} : ", $fmt, "\n"),
+                       $d.get_color(), $d, debug::dbg_pid(), file!(), line!(), $($a),*);
         }
     });
     ($d:expr, $fmt:expr) => ({
@@ -45,8 +45,8 @@ macro_rules! kpanic(
     ($fmt:expr, $($a:expr),*) => ({
         use base::debug;
         use base::kernel;
-        dbg_write!(concat!("{}{} {}:{:u} : ", $fmt, "\n"),
-                    debug::PANIC.get_color(), debug::PANIC, file!(), line!(), $($a),*);
+        dbg_write!(concat!("{}{} {} {}:{:u} : ", $fmt, "\n"),
+                    debug::PANIC.get_color(), debug::PANIC, debug::dbg_pid(), file!(), line!(), $($a),*);
         kernel::halt();
     });
 
