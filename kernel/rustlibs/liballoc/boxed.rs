@@ -16,6 +16,7 @@ use core::cmp::{PartialEq, PartialOrd, Eq, Ord, Ordering};
 use core::default::Default;
 use core::fmt;
 use core::intrinsics;
+use core::kinds::Sized;
 use core::mem;
 use core::option::Option;
 use core::raw::TraitObject;
@@ -60,12 +61,16 @@ impl<T: Clone> Clone for Box<T> {
     }
 }
 
+// NOTE(stage0): remove impl after a snapshot
+#[cfg(stage0)]
 impl<T:PartialEq> PartialEq for Box<T> {
     #[inline]
     fn eq(&self, other: &Box<T>) -> bool { *(*self) == *(*other) }
     #[inline]
     fn ne(&self, other: &Box<T>) -> bool { *(*self) != *(*other) }
 }
+// NOTE(stage0): remove impl after a snapshot
+#[cfg(stage0)]
 impl<T:PartialOrd> PartialOrd for Box<T> {
     #[inline]
     fn partial_cmp(&self, other: &Box<T>) -> Option<Ordering> {
@@ -80,13 +85,49 @@ impl<T:PartialOrd> PartialOrd for Box<T> {
     #[inline]
     fn gt(&self, other: &Box<T>) -> bool { *(*self) > *(*other) }
 }
+// NOTE(stage0): remove impl after a snapshot
+#[cfg(stage0)]
 impl<T: Ord> Ord for Box<T> {
     #[inline]
     fn cmp(&self, other: &Box<T>) -> Ordering {
         (**self).cmp(&**other)
     }
 }
+// NOTE(stage0): remove impl after a snapshot
+#[cfg(stage0)]
 impl<T: Eq> Eq for Box<T> {}
+
+#[cfg(not(stage0))]  // NOTE(stage0): remove cfg after a snapshot
+impl<Sized? T: PartialEq> PartialEq for Box<T> {
+    #[inline]
+    fn eq(&self, other: &Box<T>) -> bool { PartialEq::eq(&**self, &**other) }
+    #[inline]
+    fn ne(&self, other: &Box<T>) -> bool { PartialEq::ne(&**self, &**other) }
+}
+#[cfg(not(stage0))]  // NOTE(stage0): remove cfg after a snapshot
+impl<Sized? T: PartialOrd> PartialOrd for Box<T> {
+    #[inline]
+    fn partial_cmp(&self, other: &Box<T>) -> Option<Ordering> {
+        PartialOrd::partial_cmp(&**self, &**other)
+    }
+    #[inline]
+    fn lt(&self, other: &Box<T>) -> bool { PartialOrd::lt(&**self, &**other) }
+    #[inline]
+    fn le(&self, other: &Box<T>) -> bool { PartialOrd::le(&**self, &**other) }
+    #[inline]
+    fn ge(&self, other: &Box<T>) -> bool { PartialOrd::ge(&**self, &**other) }
+    #[inline]
+    fn gt(&self, other: &Box<T>) -> bool { PartialOrd::gt(&**self, &**other) }
+}
+#[cfg(not(stage0))]  // NOTE(stage0): remove cfg after a snapshot
+impl<Sized? T: Ord> Ord for Box<T> {
+    #[inline]
+    fn cmp(&self, other: &Box<T>) -> Ordering {
+        Ord::cmp(&**self, &**other)
+    }
+}
+#[cfg(not(stage0))]  // NOTE(stage0): remove cfg after a snapshot
+impl<Sized? T: Eq> Eq for Box<T> {}
 
 /// Extension methods for an owning `Any` trait object.
 #[unstable = "post-DST and coherence changes, this will not be a trait but \
@@ -120,7 +161,7 @@ impl BoxAny for Box<Any+'static> {
     }
 }
 
-impl<T: fmt::Show> fmt::Show for Box<T> {
+impl<Sized? T: fmt::Show> fmt::Show for Box<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (**self).fmt(f)
     }
@@ -148,11 +189,11 @@ mod test {
 
         match a.downcast::<uint>() {
             Ok(a) => { assert!(a == box 8u); }
-            Err(..) => fail!()
+            Err(..) => panic!()
         }
         match b.downcast::<Test>() {
             Ok(a) => { assert!(a == box Test); }
-            Err(..) => fail!()
+            Err(..) => panic!()
         }
 
         let a = box 8u as Box<Any>;

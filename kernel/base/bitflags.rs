@@ -26,7 +26,7 @@ macro_rules! bitmask_create {
                 try!(fmt.write("[".as_bytes()))
                 let mut started = false;
                 $(
-                if *self == $f || ($f != $name(0) && self & $f != $name(0)) {
+                if *self == $f || ($f != $name(0) && *self & $f != $name(0)) {
                     if started { try!(fmt.write("|".as_bytes())) } else { started = true; }
                     try!(fmt.write(stringify!($f).as_bytes()))
                 }
@@ -62,7 +62,7 @@ macro_rules! bitmask_create {
         }
         impl Sub<$name,$name> for $name {
             #[inline] fn sub(&self, r: &$name) -> $name {
-                self & r.not()
+                *self & r.not()
             }
         }
         impl Not<$name> for $name {

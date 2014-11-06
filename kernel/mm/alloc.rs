@@ -308,7 +308,7 @@ impl Allocator {
     pub unsafe fn reallocate(&self, ptr: *mut u8, old_size: uint, size: uint, align: uint) -> *mut u8 {
         use core::intrinsics::copy_nonoverlapping_memory;
         dbg!(debug::MM, "reallocating {:p} from size of {} to size {}", ptr, old_size, size);
-        if self.reallocate_inplace(ptr, old_size, size, align) {
+        if self.can_reallocate_inplace(ptr, old_size, size, align) {
             ptr
         } else {
             dbg!(debug::MM, "manually reallocating {:p} of size {} to size {}", ptr, old_size, size);
@@ -326,7 +326,7 @@ impl Allocator {
 
     #[allow(unused_unsafe)]
     #[inline]
-    pub unsafe fn reallocate_inplace(&self, ptr: *mut u8, old_size: uint, size : uint,
+    pub unsafe fn can_reallocate_inplace(&self, ptr: *mut u8, old_size: uint, size : uint,
                                         _align: uint) -> bool {
         use super::page;
         if self.backup.contains(ptr) && old_size != size {
@@ -418,9 +418,13 @@ pub unsafe fn reallocate(ptr: *mut u8, old_size: uint, size: uint,
 #[allow(unused_unsafe)]
 #[inline]
 pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: uint, size : uint,
-                                    _align: uint) -> bool {
+                                    _align: uint) -> uint {
     let x = &BASE_ALLOCATOR;
-    x.reallocate_inplace(_ptr, old_size, size, _align)
+    if x.can_reallocate_inplace(_ptr, old_size, size, _align) {
+        size
+    } else {
+        old_size
+    }
 }
 
 #[allow(unused_unsafe)]

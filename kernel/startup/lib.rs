@@ -89,7 +89,7 @@ pub mod tsd {
     pub struct TSDInfo {
         vlow : [u8, ..0x30],
         stack_high : u32, // At offset 0x30
-        data : SmallIntMap<Box<Any>>,
+        data : VecMap<Box<Any>>,
     }
 
     // TODO Write an implementation like pthread_setspecific.
@@ -97,7 +97,7 @@ pub mod tsd {
     impl TSDInfo {
         #[cfg(target_arch="x86")]
         pub fn new(high: u32) -> TSDInfo {
-            TSDInfo{vlow: [0, ..0x30], stack_high: high, data : SmallIntMap::with_capacity(4) }
+            TSDInfo{vlow: [0, ..0x30], stack_high: high, data : VecMap::with_capacity(4) }
         }
 
         pub fn set_slot(&mut self, i: uint, v: Box<Any>) { self.data.insert(i, v); }

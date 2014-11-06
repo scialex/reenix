@@ -8,7 +8,7 @@ use startup::{gdt, tsd};
 use libc::{c_void, uintptr_t};
 use interrupt;
 use core::mem::{transmute, transmute_copy, drop};
-use collections::{RingBuf, Deque, Collection, MutableSeq};
+use collections::RingBuf;
 use core::ptr::*;
 use core::option::*;
 use alloc::rc::*;

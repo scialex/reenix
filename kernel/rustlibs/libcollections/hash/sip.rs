@@ -235,7 +235,7 @@ impl SipHasher {
 
 impl Hasher<SipState> for SipHasher {
     #[inline]
-    fn hash<T: Hash<SipState>>(&self, value: &T) -> u64 {
+    fn hash<Sized? T: Hash<SipState>>(&self, value: &T) -> u64 {
         let mut state = SipState::new_with_keys(self.k0, self.k1);
         value.hash(&mut state);
         state.result()
@@ -278,8 +278,6 @@ mod tests {
 
     use super::super::{Hash, Writer};
     use super::{SipState, hash, hash_with_keys};
-
-    use MutableSeq;
 
     // Hash just the bytes of the slice, without length prefix
     struct Bytes<'a>(&'a [u8]);

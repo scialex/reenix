@@ -11,8 +11,7 @@
 //! # The Rust core allocation library
 //!
 //! This is the lowest level library through which allocation in Rust can be
-//! performed where the allocation is assumed to succeed. This library will
-//! abort the process when allocation fails.
+//! performed.
 //!
 //! This library, like libcore, is not intended for general usage, but rather as
 //! a building block of other libraries. The types and interfaces in this
@@ -54,11 +53,8 @@
 //!
 //! ## Heap interfaces
 //!
-//! The [`heap`](heap/index.html) and [`libc_heap`](libc_heap/index.html)
-//! modules are the unsafe interfaces to the underlying allocation systems. The
-//! `heap` module is considered the default heap, and is not necessarily backed
-//! by libc malloc/free.  The `libc_heap` module is defined to be wired up to
-//! the system malloc/free.
+//! The [`heap`](heap/index.html) module defines the low-level interface to the
+//! default global allocator. It is not compatible with the libc allocator API.
 
 #![crate_name = "alloc"]
 #![experimental]
@@ -77,7 +73,6 @@ extern crate libc;
 
 // Allow testing this library
 
-#[cfg(test)] extern crate debug;
 #[cfg(test)] extern crate native;
 #[cfg(test)] #[phase(plugin, link)] extern crate std;
 #[cfg(test)] #[phase(plugin, link)] extern crate log;
@@ -91,7 +86,6 @@ pub use boxed as owned;
 // Heaps provided for low-level allocation strategies
 
 pub mod heap;
-pub mod libc_heap;
 
 // Primitive types using the heaps above
 
@@ -100,8 +94,10 @@ pub mod boxed;
 pub mod arc;
 pub mod rc;
 
-/// Common OOM routine used by liballoc
-fn oom() -> ! {
+/// Common out-of-memory routine
+#[cold]
+#[inline(never)]
+pub fn oom() -> ! {
     // FIXME(#14674): This really needs to do something other than just abort
     //                here, but any printing done must be *guaranteed* to not
     //                allocate.

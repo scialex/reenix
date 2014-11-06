@@ -27,7 +27,6 @@ use core::ptr;
 use core::raw::Slice as RawSlice;
 use core::uint;
 
-use {Mutable, MutableSeq};
 use slice::{CloneableVector};
 
 /// An owned, growable vector.
@@ -507,9 +506,16 @@ impl<T: PartialEq> PartialEq for Vec<T> {
 
 #[unstable = "waiting on PartialOrd stability"]
 impl<T: PartialOrd> PartialOrd for Vec<T> {
+    // NOTE(stage0): remove method after a snapshot
+    #[cfg(stage0)]
     #[inline]
     fn partial_cmp(&self, other: &Vec<T>) -> Option<Ordering> {
         self.as_slice().partial_cmp(&other.as_slice())
+    }
+    #[cfg(not(stage0))]  // NOTE(stage0): remove cfg after a snapshot
+    #[inline]
+    fn partial_cmp(&self, other: &Vec<T>) -> Option<Ordering> {
+        self.as_slice().partial_cmp(other.as_slice())
     }
 }
 
@@ -524,18 +530,16 @@ impl<T: PartialEq, V: AsSlice<T>> Equiv<V> for Vec<T> {
 
 #[unstable = "waiting on Ord stability"]
 impl<T: Ord> Ord for Vec<T> {
+    // NOTE(stage0): remove method after a snapshot
+    #[cfg(stage0)]
     #[inline]
     fn cmp(&self, other: &Vec<T>) -> Ordering {
         self.as_slice().cmp(&other.as_slice())
     }
-}
-
-#[experimental = "waiting on Collection stability"]
-impl<T> Collection for Vec<T> {
+    #[cfg(not(stage0))]  // NOTE(stage0): remove cfg after a snapshot
     #[inline]
-    #[stable]
-    fn len(&self) -> uint {
-        self.len
+    fn cmp(&self, other: &Vec<T>) -> Ordering {
+        self.as_slice().cmp(other.as_slice())
     }
 }
 
@@ -639,6 +643,7 @@ impl<T> Vec<T> {
                                .expect("capacity overflow");
             unsafe {
                 self.ptr = alloc_or_realloc(self.ptr, self.cap * mem::size_of::<T>(), size);
+                if self.ptr.is_null() { ::alloc::oom() }
             }
             self.cap = capacity;
         }
@@ -676,6 +681,7 @@ impl<T> Vec<T> {
                                       self.cap * mem::size_of::<T>(),
                                       self.len * mem::size_of::<T>(),
                                       mem::min_align_of::<T>()) as *mut T;
+                if self.ptr.is_null() { ::alloc::oom() }
             }
             self.cap = self.len;
         }
@@ -927,7 +933,7 @@ impl<T> Vec<T> {
     ///
     /// ```
     /// let mut vec = vec![1i, 2, 3, 4];
-    /// vec.retain(|x| x%2 == 0);
+    /// vec.retain(|&x| x%2 == 0);
     /// assert_eq!(vec, vec![2, 4]);
     /// ```
     #[unstable = "the closure argument may become an unboxed closure"]
@@ -969,15 +975,108 @@ impl<T> Vec<T> {
             self.push(f(i));
         }
     }
-}
 
-#[experimental = "waiting on Mutable stability"]
-impl<T> Mutable for Vec<T> {
+    /// Appends an element to the back of a collection.
+    ///
+    /// # Failure
+    ///
+    /// Fails if the number of elements in the vector overflows a `uint`.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut vec = vec!(1i, 2);
+    /// vec.push(3);
+    /// assert_eq!(vec, vec!(1, 2, 3));
+    /// ```
     #[inline]
     #[stable]
-    fn clear(&mut self) {
+    pub fn push(&mut self, value: T) {
+        if mem::size_of::<T>() == 0 {
+            // zero-size types consume no memory, so we can't rely on the address space running out
+            self.len = self.len.checked_add(&1).expect("length overflow");
+            unsafe { mem::forget(value); }
+            return
+        }
+        if self.len == self.cap {
+            let old_size = self.cap * mem::size_of::<T>();
+            let size = max(old_size, 2 * mem::size_of::<T>()) * 2;
+            if old_size > size { panic!("capacity overflow") }
+            unsafe {
+                self.ptr = alloc_or_realloc(self.ptr, old_size, size);
+                if self.ptr.is_null() { ::alloc::oom() }
+            }
+            self.cap = max(self.cap, 2) * 2;
+        }
+
+        unsafe {
+            let end = (self.ptr as *const T).offset(self.len as int) as *mut T;
+            ptr::write(&mut *end, value);
+            self.len += 1;
+        }
+    }
+
+    /// Removes the last element from a vector and returns it, or `None` if
+    /// it is empty.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut vec = vec![1i, 2, 3];
+    /// assert_eq!(vec.pop(), Some(3));
+    /// assert_eq!(vec, vec![1, 2]);
+    /// ```
+    #[inline]
+    #[stable]
+    pub fn pop(&mut self) -> Option<T> {
+        if self.len == 0 {
+            None
+        } else {
+            unsafe {
+                self.len -= 1;
+                Some(ptr::read(self.as_slice().unsafe_get(self.len())))
+            }
+        }
+    }
+
+    /// Clears the vector, removing all values.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut v = vec![1i, 2, 3];
+    /// v.clear();
+    /// assert!(v.is_empty());
+    /// ```
+    #[inline]
+    #[stable]
+    pub fn clear(&mut self) {
         self.truncate(0)
     }
+
+    /// Return the number of elements in the vector
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let a = vec![1i, 2, 3];
+    /// assert_eq!(a.len(), 3);
+    /// ```
+    #[inline]
+    #[stable]
+    pub fn len(&self) -> uint { self.len }
+
+    /// Returns true if the vector contains no elements
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// let mut v = Vec::new();
+    /// assert!(v.is_empty());
+    /// v.push(1i);
+    /// assert!(!v.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
 }
 
 impl<T: PartialEq> Vec<T> {
@@ -1138,61 +1237,6 @@ impl<T> Default for Vec<T> {
 impl<T:fmt::Show> fmt::Show for Vec<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.as_slice().fmt(f)
-    }
-}
-
-#[experimental = "waiting on MutableSeq stability"]
-impl<T> MutableSeq<T> for Vec<T> {
-    /// Appends an element to the back of a collection.
-    ///
-    /// # Failure
-    ///
-    /// Fails if the number of elements in the vector overflows a `uint`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// let mut vec = vec!(1i, 2);
-    /// vec.push(3);
-    /// assert_eq!(vec, vec!(1, 2, 3));
-    /// ```
-    #[inline]
-    #[stable]
-    fn push(&mut self, value: T) {
-        if mem::size_of::<T>() == 0 {
-            // zero-size types consume no memory, so we can't rely on the address space running out
-            self.len = self.len.checked_add(&1).expect("length overflow");
-            unsafe { mem::forget(value); }
-            return
-        }
-        if self.len == self.cap {
-            let old_size = self.cap * mem::size_of::<T>();
-            let size = max(old_size, 2 * mem::size_of::<T>()) * 2;
-            if old_size > size { panic!("capacity overflow") }
-            unsafe {
-                self.ptr = alloc_or_realloc(self.ptr, old_size, size);
-            }
-            self.cap = max(self.cap, 2) * 2;
-        }
-
-        unsafe {
-            let end = (self.ptr as *const T).offset(self.len as int) as *mut T;
-            ptr::write(&mut *end, value);
-            self.len += 1;
-        }
-    }
-
-    #[inline]
-    #[stable]
-    fn pop(&mut self) -> Option<T> {
-        if self.len == 0 {
-            None
-        } else {
-            unsafe {
-                self.len -= 1;
-                Some(ptr::read(self.as_slice().unsafe_get(self.len())))
-            }
-        }
     }
 }
 
@@ -1636,8 +1680,6 @@ mod tests {
     use test::Bencher;
     use super::{as_vec, unzip, raw, Vec};
 
-    use MutableSeq;
-
     struct DropCounter<'a> {
         count: &'a mut int
     }
@@ -1772,7 +1814,7 @@ mod tests {
             let (left, right) = values.split_at_mut(2);
             {
                 let left: &[_] = left;
-                assert!(left[0..left.len()] == [1, 2]);
+                assert!(left[0..left.len()] == [1, 2][]);
             }
             for p in left.iter_mut() {
                 *p += 1;
@@ -1780,7 +1822,7 @@ mod tests {
 
             {
                 let right: &[_] = right;
-                assert!(right[0..right.len()] == [3, 4, 5]);
+                assert!(right[0..right.len()] == [3, 4, 5][]);
             }
             for p in right.iter_mut() {
                 *p += 2;
@@ -1835,7 +1877,7 @@ mod tests {
     #[test]
     fn test_retain() {
         let mut vec = vec![1u, 2, 3, 4];
-        vec.retain(|x| x%2 == 0);
+        vec.retain(|&x| x % 2 == 0);
         assert!(vec == vec![2u, 4]);
     }
 

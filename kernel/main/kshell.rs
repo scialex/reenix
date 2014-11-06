@@ -161,7 +161,7 @@ impl<'a> KShell<'a> {
             return Err(errno::ENOMSG);
         }
         let f = argv[0];
-        if let Some(func) = self.funcs.find_with(|x| { f.cmp(x) }) {
+        if let Some(func) = self.funcs.find_with(|&x| { f.cmp(x) }) {
             match func.call(self, argv) {
                 Ok(_) => Ok(()),
                 Err(v) => {

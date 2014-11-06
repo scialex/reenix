@@ -8,43 +8,17 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-//! Maps are collections of unique keys with corresponding values, and sets are
-//! just unique keys without a corresponding value. The `Map` and `Set` traits in
-//! `std::container` define the basic interface.
-//!
-//! This crate defines the `TreeMap` and `TreeSet` types. Their keys must implement `Ord`.
-//!
-//! `TreeMap`s are ordered.
-//!
-//! ## Example
-//!
-//! ```{rust}
-//! use std::collections::TreeSet;
-//!
-//! let mut tree_set = TreeSet::new();
-//!
-//! tree_set.insert(2i);
-//! tree_set.insert(1i);
-//! tree_set.insert(3i);
-//!
-//! for i in tree_set.iter() {
-//!    println!("{}", i) // prints 1, then 2, then 3
-//! }
-//! ```
-
 use core::prelude::*;
 
 use alloc::boxed::Box;
 use core::default::Default;
 use core::fmt;
 use core::fmt::Show;
-use core::iter::Peekable;
 use core::iter;
 use core::mem::{replace, swap};
 use core::ptr;
 use std::hash::{Writer, Hash};
 
-use {Mutable, Set, MutableSet, MutableMap, Map, MutableSeq};
 use vec::Vec;
 
 /// This is implemented as an AA tree, which is a simplified variation of
@@ -203,45 +177,6 @@ impl<K: Ord + Show, V: Show> Show for TreeMap<K, V> {
         }
 
         write!(f, "}}")
-    }
-}
-
-impl<K: Ord, V> Collection for TreeMap<K, V> {
-    fn len(&self) -> uint { self.length }
-}
-
-impl<K: Ord, V> Mutable for TreeMap<K, V> {
-    fn clear(&mut self) {
-        self.root = None;
-        self.length = 0
-    }
-}
-
-impl<K: Ord, V> Map<K, V> for TreeMap<K, V> {
-    // See comments on tree_find_with
-    #[inline]
-    fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
-        tree_find_with(&self.root, |k2| key.cmp(k2))
-    }
-}
-
-impl<K: Ord, V> MutableMap<K, V> for TreeMap<K, V> {
-    // See comments on tree_find_with_mut
-    #[inline]
-    fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
-        tree_find_with_mut(&mut self.root, |x| key.cmp(x))
-    }
-
-    fn swap(&mut self, key: K, value: V) -> Option<V> {
-        let ret = insert(&mut self.root, key, value);
-        if ret.is_none() { self.length += 1 }
-        ret
-    }
-
-    fn pop(&mut self, key: &K) -> Option<V> {
-        let ret = remove(&mut self.root, key);
-        if ret.is_some() { self.length -= 1 }
-        ret
     }
 }
 
@@ -418,7 +353,7 @@ impl<K: Ord, V> TreeMap<K, V> {
         RevMutEntries{iter: self.iter_mut()}
     }
 
-    /// Gets a lazy iterator that consumes the treemap.
+    /// Gets a lazy iterator that consumes the TreeMap.
     ///
     /// # Example
     ///
@@ -444,6 +379,184 @@ impl<K: Ord, V> TreeMap<K, V> {
             remaining: length
         }
     }
+
+    /// Return the number of elements in the map.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut a = TreeMap::new();
+    /// assert_eq!(a.len(), 0);
+    /// a.insert(1u, "a");
+    /// assert_eq!(a.len(), 1);
+    /// ```
+    pub fn len(&self) -> uint { self.length }
+
+    /// Return true if the map contains no elements.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut a = TreeMap::new();
+    /// assert!(a.is_empty());
+    /// a.insert(1u, "a");
+    /// assert!(!a.is_empty());
+    /// ```
+    #[inline]
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
+
+    /// Clears the map, removing all values.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut a = TreeMap::new();
+    /// a.insert(1u, "a");
+    /// a.clear();
+    /// assert!(a.is_empty());
+    /// ```
+    pub fn clear(&mut self) {
+        self.root = None;
+        self.length = 0
+    }
+
+    /// Returns a reference to the value corresponding to the key.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut map = TreeMap::new();
+    /// map.insert(1u, "a");
+    /// assert_eq!(map.find(&1), Some(&"a"));
+    /// assert_eq!(map.find(&2), None);
+    /// ```
+    #[inline]
+    pub fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
+        tree_find_with(&self.root, |k2| key.cmp(k2))
+    }
+
+    /// Returns true if the map contains a value for the specified key.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut map = TreeMap::new();
+    /// map.insert(1u, "a");
+    /// assert_eq!(map.contains_key(&1), true);
+    /// assert_eq!(map.contains_key(&2), false);
+    /// ```
+    #[inline]
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.find(key).is_some()
+    }
+
+    /// Returns a mutable reference to the value corresponding to the key.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut map = TreeMap::new();
+    /// map.insert(1u, "a");
+    /// match map.find_mut(&1) {
+    ///     Some(x) => *x = "b",
+    ///     None => (),
+    /// }
+    /// assert_eq!(map[1], "b");
+    /// ```
+    #[inline]
+    pub fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
+        tree_find_with_mut(&mut self.root, |x| key.cmp(x))
+    }
+
+    /// Inserts a key-value pair into the map. An existing value for a
+    /// key is replaced by the new value. Returns `true` if the key did
+    /// not already exist in the map.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut map = TreeMap::new();
+    /// assert_eq!(map.insert(2u, "value"), true);
+    /// assert_eq!(map.insert(2, "value2"), false);
+    /// assert_eq!(map[2], "value2");
+    /// ```
+    #[inline]
+    pub fn insert(&mut self, key: K, value: V) -> bool {
+        self.swap(key, value).is_none()
+    }
+
+    /// Removes a key-value pair from the map. Returns `true` if the key
+    /// was present in the map.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut map = TreeMap::new();
+    /// assert_eq!(map.remove(&1u), false);
+    /// map.insert(1, "a");
+    /// assert_eq!(map.remove(&1), true);
+    /// ```
+    #[inline]
+    pub fn remove(&mut self, key: &K) -> bool {
+        self.pop(key).is_some()
+    }
+
+    /// Inserts a key-value pair from the map. If the key already had a value
+    /// present in the map, that value is returned. Otherwise, `None` is returned.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut map = TreeMap::new();
+    /// assert_eq!(map.swap(37u, "a"), None);
+    /// assert_eq!(map.is_empty(), false);
+    ///
+    /// map.insert(37, "b");
+    /// assert_eq!(map.swap(37, "c"), Some("b"));
+    /// assert_eq!(map[37], "c");
+    /// ```
+    pub fn swap(&mut self, key: K, value: V) -> Option<V> {
+        let ret = insert(&mut self.root, key, value);
+        if ret.is_none() { self.length += 1 }
+        ret
+    }
+
+    /// Removes a key from the map, returning the value at the key if the key
+    /// was previously in the map.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut map = TreeMap::new();
+    /// map.insert(1u, "a");
+    /// assert_eq!(map.pop(&1), Some("a"));
+    /// assert_eq!(map.pop(&1), None);
+    /// ```
+    pub fn pop(&mut self, key: &K) -> Option<V> {
+        let ret = remove(&mut self.root, key);
+        if ret.is_some() { self.length -= 1 }
+        ret
+    }
 }
 
 impl<K, V> TreeMap<K, V> {
@@ -454,7 +567,7 @@ impl<K, V> TreeMap<K, V> {
     /// # Example
     ///
     /// ```
-    /// use collections::treemap::TreeMap;
+    /// use std::collections::TreeMap;
     ///
     /// fn get_headers() -> TreeMap<String, String> {
     ///     let mut result = TreeMap::new();
@@ -466,7 +579,7 @@ impl<K, V> TreeMap<K, V> {
     /// let headers = get_headers();
     /// let ua_key = "User-Agent";
     /// let ua = headers.find_with(|k| {
-    ///    ua_key.cmp(&k.as_slice())
+    ///    ua_key.cmp(k.as_slice())
     /// });
     ///
     /// assert_eq!((*ua.unwrap()).as_slice(), "Curl-Rust/0.1");
@@ -483,12 +596,14 @@ impl<K, V> TreeMap<K, V> {
     /// # Example
     ///
     /// ```
-    /// let mut t = collections::treemap::TreeMap::new();
+    /// use std::collections::TreeMap;
+    ///
+    /// let mut t = TreeMap::new();
     /// t.insert("Content-Type", "application/xml");
     /// t.insert("User-Agent", "Curl-Rust/0.1");
     ///
     /// let new_ua = "Safari/156.0";
-    /// match t.find_with_mut(|k| "User-Agent".cmp(k)) {
+    /// match t.find_with_mut(|&k| "User-Agent".cmp(k)) {
     ///    Some(x) => *x = new_ua,
     ///    None => panic!(),
     /// }
@@ -937,491 +1052,6 @@ impl<K, V> Iterator<(K, V)> for MoveEntries<K,V> {
 
 }
 
-impl<'a, T> Iterator<&'a T> for SetItems<'a, T> {
-    #[inline]
-    fn next(&mut self) -> Option<&'a T> {
-        self.iter.next().map(|(value, _)| value)
-    }
-}
-
-impl<'a, T> Iterator<&'a T> for RevSetItems<'a, T> {
-    #[inline]
-    fn next(&mut self) -> Option<&'a T> {
-        self.iter.next().map(|(value, _)| value)
-    }
-}
-
-/// An implementation of the `Set` trait on top of the `TreeMap` container. The
-/// only requirement is that the type of the elements contained ascribes to the
-/// `Ord` trait.
-///
-/// ## Example
-///
-/// ```{rust}
-/// use std::collections::TreeSet;
-///
-/// let mut set = TreeSet::new();
-///
-/// set.insert(2i);
-/// set.insert(1i);
-/// set.insert(3i);
-///
-/// for i in set.iter() {
-///    println!("{}", i) // prints 1, then 2, then 3
-/// }
-///
-/// set.remove(&3);
-///
-/// if !set.contains(&3) {
-///     println!("set does not contain a 3 anymore");
-/// }
-/// ```
-///
-/// The easiest way to use `TreeSet` with a custom type is to implement `Ord`.
-/// We must also implement `PartialEq`, `Eq` and `PartialOrd`.
-///
-/// ```
-/// use std::collections::TreeSet;
-///
-/// // We need `Eq` and `PartialEq`, these can be derived.
-/// #[deriving(Eq, PartialEq)]
-/// struct Troll<'a> {
-///     name: &'a str,
-///     level: uint,
-/// }
-///
-/// // Implement `Ord` and sort trolls by level.
-/// impl<'a> Ord for Troll<'a> {
-///     fn cmp(&self, other: &Troll) -> Ordering {
-///         // If we swap `self` and `other`, we get descending ordering.
-///         self.level.cmp(&other.level)
-///     }
-/// }
-///
-/// // `PartialOrd` needs to be implemented as well.
-/// impl<'a> PartialOrd for Troll<'a> {
-///     fn partial_cmp(&self, other: &Troll) -> Option<Ordering> {
-///         Some(self.cmp(other))
-///     }
-/// }
-///
-/// let mut trolls = TreeSet::new();
-///
-/// trolls.insert(Troll { name: "Orgarr", level: 2 });
-/// trolls.insert(Troll { name: "Blargarr", level: 3 });
-/// trolls.insert(Troll { name: "Kron the Smelly One", level: 4 });
-/// trolls.insert(Troll { name: "Wartilda", level: 1 });
-///
-/// println!("You are facing {} trolls!", trolls.len());
-///
-/// // Print the trolls, ordered by level with smallest level first
-/// for x in trolls.iter() {
-///     println!("level {}: {}!", x.level, x.name);
-/// }
-///
-/// // Kill all trolls
-/// trolls.clear();
-/// assert_eq!(trolls.len(), 0);
-/// ```
-#[deriving(Clone)]
-pub struct TreeSet<T> {
-    map: TreeMap<T, ()>
-}
-
-impl<T: PartialEq + Ord> PartialEq for TreeSet<T> {
-    #[inline]
-    fn eq(&self, other: &TreeSet<T>) -> bool { self.map == other.map }
-}
-
-impl<T: Eq + Ord> Eq for TreeSet<T> {}
-
-impl<T: Ord> PartialOrd for TreeSet<T> {
-    #[inline]
-    fn partial_cmp(&self, other: &TreeSet<T>) -> Option<Ordering> {
-        self.map.partial_cmp(&other.map)
-    }
-}
-
-impl<T: Ord> Ord for TreeSet<T> {
-    #[inline]
-    fn cmp(&self, other: &TreeSet<T>) -> Ordering {
-        iter::order::cmp(self.iter(), other.iter())
-    }
-}
-
-impl<T: Ord + Show> Show for TreeSet<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        try!(write!(f, "{{"));
-
-        for (i, x) in self.iter().enumerate() {
-            if i != 0 { try!(write!(f, ", ")); }
-            try!(write!(f, "{}", *x));
-        }
-
-        write!(f, "}}")
-    }
-}
-
-impl<T: Ord> Collection for TreeSet<T> {
-    #[inline]
-    fn len(&self) -> uint { self.map.len() }
-}
-
-impl<T: Ord> Mutable for TreeSet<T> {
-    #[inline]
-    fn clear(&mut self) { self.map.clear() }
-}
-
-impl<T: Ord> Set<T> for TreeSet<T> {
-    #[inline]
-    fn contains(&self, value: &T) -> bool {
-        self.map.contains_key(value)
-    }
-
-    fn is_disjoint(&self, other: &TreeSet<T>) -> bool {
-        self.intersection(other).next().is_none()
-    }
-
-    fn is_subset(&self, other: &TreeSet<T>) -> bool {
-        let mut x = self.iter();
-        let mut y = other.iter();
-        let mut a = x.next();
-        let mut b = y.next();
-        while a.is_some() {
-            if b.is_none() {
-                return false;
-            }
-
-            let a1 = a.unwrap();
-            let b1 = b.unwrap();
-
-            match b1.cmp(a1) {
-                Less => (),
-                Greater => return false,
-                Equal => a = x.next(),
-            }
-
-            b = y.next();
-        }
-        true
-    }
-}
-
-impl<T: Ord> MutableSet<T> for TreeSet<T> {
-    #[inline]
-    fn insert(&mut self, value: T) -> bool { self.map.insert(value, ()) }
-
-    #[inline]
-    fn remove(&mut self, value: &T) -> bool { self.map.remove(value) }
-}
-
-impl<T: Ord> Default for TreeSet<T> {
-    #[inline]
-    fn default() -> TreeSet<T> { TreeSet::new() }
-}
-
-impl<T: Ord> TreeSet<T> {
-    /// Creates an empty `TreeSet`.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    /// let mut set: TreeSet<int> = TreeSet::new();
-    /// ```
-    #[inline]
-    pub fn new() -> TreeSet<T> { TreeSet{map: TreeMap::new()} }
-
-    /// Gets a lazy iterator over the values in the set, in ascending order.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    /// let set: TreeSet<int> = [1i, 4, 3, 5, 2].iter().map(|&x| x).collect();
-    ///
-    /// // Will print in ascending order.
-    /// for x in set.iter() {
-    ///     println!("{}", x);
-    /// }
-    /// ```
-    #[inline]
-    pub fn iter<'a>(&'a self) -> SetItems<'a, T> {
-        SetItems{iter: self.map.iter()}
-    }
-
-    /// Gets a lazy iterator over the values in the set, in descending order.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    /// let set: TreeSet<int> = [1i, 4, 3, 5, 2].iter().map(|&x| x).collect();
-    ///
-    /// // Will print in descending order.
-    /// for x in set.rev_iter() {
-    ///     println!("{}", x);
-    /// }
-    /// ```
-    #[inline]
-    pub fn rev_iter<'a>(&'a self) -> RevSetItems<'a, T> {
-        RevSetItems{iter: self.map.rev_iter()}
-    }
-
-    /// Creates a consuming iterator, that is, one that moves each value out of the
-    /// set in ascending order. The set cannot be used after calling this.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    /// let set: TreeSet<int> = [1i, 4, 3, 5, 2].iter().map(|&x| x).collect();
-    ///
-    /// // Not possible with a regular `.iter()`
-    /// let v: Vec<int> = set.into_iter().collect();
-    /// assert_eq!(v, vec![1, 2, 3, 4, 5]);
-    /// ```
-    #[inline]
-    pub fn into_iter(self) -> MoveSetItems<T> {
-        self.map.into_iter().map(|(value, _)| value)
-    }
-
-    /// Gets a lazy iterator pointing to the first value not less than `v` (greater or equal).
-    /// If all elements in the set are less than `v` empty iterator is returned.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    /// let set: TreeSet<int> = [2, 4, 6, 8].iter().map(|&x| x).collect();
-    ///
-    /// assert_eq!(set.lower_bound(&4).next(), Some(&4));
-    /// assert_eq!(set.lower_bound(&5).next(), Some(&6));
-    /// assert_eq!(set.lower_bound(&10).next(), None);
-    /// ```
-    #[inline]
-    pub fn lower_bound<'a>(&'a self, v: &T) -> SetItems<'a, T> {
-        SetItems{iter: self.map.lower_bound(v)}
-    }
-
-    /// Gets a lazy iterator pointing to the first value greater than `v`.
-    /// If all elements in the set are less than or equal to `v` an
-    /// empty iterator is returned.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    /// let set: TreeSet<int> = [2, 4, 6, 8].iter().map(|&x| x).collect();
-    ///
-    /// assert_eq!(set.upper_bound(&4).next(), Some(&6));
-    /// assert_eq!(set.upper_bound(&5).next(), Some(&6));
-    /// assert_eq!(set.upper_bound(&10).next(), None);
-    /// ```
-    #[inline]
-    pub fn upper_bound<'a>(&'a self, v: &T) -> SetItems<'a, T> {
-        SetItems{iter: self.map.upper_bound(v)}
-    }
-
-    /// Visits the values representing the difference, in ascending order.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    ///
-    /// let a: TreeSet<int> = [1, 2, 3].iter().map(|&x| x).collect();
-    /// let b: TreeSet<int> = [3, 4, 5].iter().map(|&x| x).collect();
-    ///
-    /// // Can be seen as `a - b`.
-    /// for x in a.difference(&b) {
-    ///     println!("{}", x); // Print 1 then 2
-    /// }
-    ///
-    /// let diff: TreeSet<int> = a.difference(&b).map(|&x| x).collect();
-    /// assert_eq!(diff, [1, 2].iter().map(|&x| x).collect());
-    ///
-    /// // Note that difference is not symmetric,
-    /// // and `b - a` means something else:
-    /// let diff: TreeSet<int> = b.difference(&a).map(|&x| x).collect();
-    /// assert_eq!(diff, [4, 5].iter().map(|&x| x).collect());
-    /// ```
-    pub fn difference<'a>(&'a self, other: &'a TreeSet<T>) -> DifferenceItems<'a, T> {
-        DifferenceItems{a: self.iter().peekable(), b: other.iter().peekable()}
-    }
-
-    /// Visits the values representing the symmetric difference, in ascending order.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    ///
-    /// let a: TreeSet<int> = [1, 2, 3].iter().map(|&x| x).collect();
-    /// let b: TreeSet<int> = [3, 4, 5].iter().map(|&x| x).collect();
-    ///
-    /// // Print 1, 2, 4, 5 in ascending order.
-    /// for x in a.symmetric_difference(&b) {
-    ///     println!("{}", x);
-    /// }
-    ///
-    /// let diff1: TreeSet<int> = a.symmetric_difference(&b).map(|&x| x).collect();
-    /// let diff2: TreeSet<int> = b.symmetric_difference(&a).map(|&x| x).collect();
-    ///
-    /// assert_eq!(diff1, diff2);
-    /// assert_eq!(diff1, [1, 2, 4, 5].iter().map(|&x| x).collect());
-    /// ```
-    pub fn symmetric_difference<'a>(&'a self, other: &'a TreeSet<T>)
-        -> SymDifferenceItems<'a, T> {
-        SymDifferenceItems{a: self.iter().peekable(), b: other.iter().peekable()}
-    }
-
-    /// Visits the values representing the intersection, in ascending order.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    ///
-    /// let a: TreeSet<int> = [1, 2, 3].iter().map(|&x| x).collect();
-    /// let b: TreeSet<int> = [2, 3, 4].iter().map(|&x| x).collect();
-    ///
-    /// // Print 2, 3 in ascending order.
-    /// for x in a.intersection(&b) {
-    ///     println!("{}", x);
-    /// }
-    ///
-    /// let diff: TreeSet<int> = a.intersection(&b).map(|&x| x).collect();
-    /// assert_eq!(diff, [2, 3].iter().map(|&x| x).collect());
-    /// ```
-    pub fn intersection<'a>(&'a self, other: &'a TreeSet<T>)
-        -> IntersectionItems<'a, T> {
-        IntersectionItems{a: self.iter().peekable(), b: other.iter().peekable()}
-    }
-
-    /// Visits the values representing the union, in ascending order.
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use std::collections::TreeSet;
-    ///
-    /// let a: TreeSet<int> = [1, 2, 3].iter().map(|&x| x).collect();
-    /// let b: TreeSet<int> = [3, 4, 5].iter().map(|&x| x).collect();
-    ///
-    /// // Print 1, 2, 3, 4, 5 in ascending order.
-    /// for x in a.union(&b) {
-    ///     println!("{}", x);
-    /// }
-    ///
-    /// let diff: TreeSet<int> = a.union(&b).map(|&x| x).collect();
-    /// assert_eq!(diff, [1, 2, 3, 4, 5].iter().map(|&x| x).collect());
-    /// ```
-    pub fn union<'a>(&'a self, other: &'a TreeSet<T>) -> UnionItems<'a, T> {
-        UnionItems{a: self.iter().peekable(), b: other.iter().peekable()}
-    }
-}
-
-/// A lazy forward iterator over a set.
-pub struct SetItems<'a, T:'a> {
-    iter: Entries<'a, T, ()>
-}
-
-/// A lazy backward iterator over a set.
-pub struct RevSetItems<'a, T:'a> {
-    iter: RevEntries<'a, T, ()>
-}
-
-/// A lazy forward iterator over a set that consumes the set while iterating.
-pub type MoveSetItems<T> = iter::Map<'static, (T, ()), T, MoveEntries<T, ()>>;
-
-/// A lazy iterator producing elements in the set difference (in-order).
-pub struct DifferenceItems<'a, T:'a> {
-    a: Peekable<&'a T, SetItems<'a, T>>,
-    b: Peekable<&'a T, SetItems<'a, T>>,
-}
-
-/// A lazy iterator producing elements in the set symmetric difference (in-order).
-pub struct SymDifferenceItems<'a, T:'a> {
-    a: Peekable<&'a T, SetItems<'a, T>>,
-    b: Peekable<&'a T, SetItems<'a, T>>,
-}
-
-/// A lazy iterator producing elements in the set intersection (in-order).
-pub struct IntersectionItems<'a, T:'a> {
-    a: Peekable<&'a T, SetItems<'a, T>>,
-    b: Peekable<&'a T, SetItems<'a, T>>,
-}
-
-/// A lazy iterator producing elements in the set union (in-order).
-pub struct UnionItems<'a, T:'a> {
-    a: Peekable<&'a T, SetItems<'a, T>>,
-    b: Peekable<&'a T, SetItems<'a, T>>,
-}
-
-/// Compare `x` and `y`, but return `short` if x is None and `long` if y is None
-fn cmp_opt<T: Ord>(x: Option<&T>, y: Option<&T>,
-                        short: Ordering, long: Ordering) -> Ordering {
-    match (x, y) {
-        (None    , _       ) => short,
-        (_       , None    ) => long,
-        (Some(x1), Some(y1)) => x1.cmp(y1),
-    }
-}
-
-impl<'a, T: Ord> Iterator<&'a T> for DifferenceItems<'a, T> {
-    fn next(&mut self) -> Option<&'a T> {
-        loop {
-            match cmp_opt(self.a.peek(), self.b.peek(), Less, Less) {
-                Less    => return self.a.next(),
-                Equal   => { self.a.next(); self.b.next(); }
-                Greater => { self.b.next(); }
-            }
-        }
-    }
-}
-
-impl<'a, T: Ord> Iterator<&'a T> for SymDifferenceItems<'a, T> {
-    fn next(&mut self) -> Option<&'a T> {
-        loop {
-            match cmp_opt(self.a.peek(), self.b.peek(), Greater, Less) {
-                Less    => return self.a.next(),
-                Equal   => { self.a.next(); self.b.next(); }
-                Greater => return self.b.next(),
-            }
-        }
-    }
-}
-
-impl<'a, T: Ord> Iterator<&'a T> for IntersectionItems<'a, T> {
-    fn next(&mut self) -> Option<&'a T> {
-        loop {
-            let o_cmp = match (self.a.peek(), self.b.peek()) {
-                (None    , _       ) => None,
-                (_       , None    ) => None,
-                (Some(a1), Some(b1)) => Some(a1.cmp(b1)),
-            };
-            match o_cmp {
-                None          => return None,
-                Some(Less)    => { self.a.next(); }
-                Some(Equal)   => { self.b.next(); return self.a.next() }
-                Some(Greater) => { self.b.next(); }
-            }
-        }
-    }
-}
-
-impl<'a, T: Ord> Iterator<&'a T> for UnionItems<'a, T> {
-    fn next(&mut self) -> Option<&'a T> {
-        loop {
-            match cmp_opt(self.a.peek(), self.b.peek(), Greater, Less) {
-                Less    => return self.a.next(),
-                Equal   => { self.b.next(); return self.a.next() }
-                Greater => return self.b.next(),
-            }
-        }
-    }
-}
 
 
 // Nodes keep track of their level in the tree, starting at 1 in the
@@ -1645,30 +1275,6 @@ impl<S: Writer, K: Ord + Hash<S>, V: Hash<S>> Hash<S> for TreeMap<K, V> {
     }
 }
 
-impl<T: Ord> FromIterator<T> for TreeSet<T> {
-    fn from_iter<Iter: Iterator<T>>(iter: Iter) -> TreeSet<T> {
-        let mut set = TreeSet::new();
-        set.extend(iter);
-        set
-    }
-}
-
-impl<T: Ord> Extendable<T> for TreeSet<T> {
-    #[inline]
-    fn extend<Iter: Iterator<T>>(&mut self, mut iter: Iter) {
-        for elem in iter {
-            self.insert(elem);
-        }
-    }
-}
-
-impl<S: Writer, T: Ord + Hash<S>> Hash<S> for TreeSet<T> {
-    fn hash(&self, state: &mut S) {
-        for elt in self.iter() {
-            elt.hash(state);
-        }
-    }
-}
 
 #[cfg(test)]
 mod test_treemap {
@@ -1676,7 +1282,6 @@ mod test_treemap {
     use std::rand::Rng;
     use std::rand;
 
-    use {Map, MutableMap, Mutable, MutableSeq};
     use super::{TreeMap, TreeNode};
 
     #[test]
@@ -1697,7 +1302,7 @@ mod test_treemap {
     #[test]
     fn find_with_empty() {
         let m: TreeMap<&'static str,int> = TreeMap::new();
-        assert!(m.find_with(|k| "test".cmp(k)) == None);
+        assert!(m.find_with(|&k| "test".cmp(k)) == None);
     }
 
     #[test]
@@ -1706,7 +1311,7 @@ mod test_treemap {
         assert!(m.insert("test1", 2i));
         assert!(m.insert("test2", 3i));
         assert!(m.insert("test3", 3i));
-        assert_eq!(m.find_with(|k| "test4".cmp(k)), None);
+        assert_eq!(m.find_with(|&k| "test4".cmp(k)), None);
     }
 
     #[test]
@@ -1715,7 +1320,7 @@ mod test_treemap {
         assert!(m.insert("test1", 2i));
         assert!(m.insert("test2", 3i));
         assert!(m.insert("test3", 4i));
-        assert_eq!(m.find_with(|k| "test2".cmp(k)), Some(&3i));
+        assert_eq!(m.find_with(|&k| "test2".cmp(k)), Some(&3i));
     }
 
     #[test]
@@ -1738,10 +1343,10 @@ mod test_treemap {
         assert!(m.insert("t2", 8));
         assert!(m.insert("t5", 14));
         let new = 100;
-        match m.find_with_mut(|k| "t5".cmp(k)) {
+        match m.find_with_mut(|&k| "t5".cmp(k)) {
           None => panic!(), Some(x) => *x = new
         }
-        assert_eq!(m.find_with(|k| "t5".cmp(k)), Some(&new));
+        assert_eq!(m.find_with(|&k| "t5".cmp(k)), Some(&new));
     }
 
     #[test]
@@ -2186,6 +1791,22 @@ mod test_treemap {
 
         map[4];
     }
+
+    #[test]
+    fn test_swap() {
+        let mut m = TreeMap::new();
+        assert_eq!(m.swap(1u, 2i), None);
+        assert_eq!(m.swap(1u, 3i), Some(2));
+        assert_eq!(m.swap(1u, 4i), Some(3));
+    }
+
+    #[test]
+    fn test_pop() {
+        let mut m = TreeMap::new();
+        m.insert(1u, 2i);
+        assert_eq!(m.pop(&1), Some(2));
+        assert_eq!(m.pop(&1), None);
+    }
 }
 
 #[cfg(test)]
@@ -2195,59 +1816,73 @@ mod bench {
     use test::{Bencher, black_box};
 
     use super::TreeMap;
-    use MutableMap;
-    use deque::bench::{insert_rand_n, insert_seq_n, find_rand_n, find_seq_n};
+    use bench::{insert_rand_n, insert_seq_n, find_rand_n, find_seq_n};
 
-    // Find seq
     #[bench]
     pub fn insert_rand_100(b: &mut Bencher) {
         let mut m : TreeMap<uint,uint> = TreeMap::new();
-        insert_rand_n(100, &mut m, b);
+        insert_rand_n(100, &mut m, b,
+                      |m, i| { m.insert(i, 1); },
+                      |m, i| { m.remove(&i); });
     }
 
     #[bench]
     pub fn insert_rand_10_000(b: &mut Bencher) {
         let mut m : TreeMap<uint,uint> = TreeMap::new();
-        insert_rand_n(10_000, &mut m, b);
+        insert_rand_n(10_000, &mut m, b,
+                      |m, i| { m.insert(i, 1); },
+                      |m, i| { m.remove(&i); });
     }
 
     // Insert seq
     #[bench]
     pub fn insert_seq_100(b: &mut Bencher) {
         let mut m : TreeMap<uint,uint> = TreeMap::new();
-        insert_seq_n(100, &mut m, b);
+        insert_seq_n(100, &mut m, b,
+                     |m, i| { m.insert(i, 1); },
+                     |m, i| { m.remove(&i); });
     }
 
     #[bench]
     pub fn insert_seq_10_000(b: &mut Bencher) {
         let mut m : TreeMap<uint,uint> = TreeMap::new();
-        insert_seq_n(10_000, &mut m, b);
+        insert_seq_n(10_000, &mut m, b,
+                     |m, i| { m.insert(i, 1); },
+                     |m, i| { m.remove(&i); });
     }
 
     // Find rand
     #[bench]
     pub fn find_rand_100(b: &mut Bencher) {
         let mut m : TreeMap<uint,uint> = TreeMap::new();
-        find_rand_n(100, &mut m, b);
+        find_rand_n(100, &mut m, b,
+                    |m, i| { m.insert(i, 1); },
+                    |m, i| { m.find(&i); });
     }
 
     #[bench]
     pub fn find_rand_10_000(b: &mut Bencher) {
         let mut m : TreeMap<uint,uint> = TreeMap::new();
-        find_rand_n(10_000, &mut m, b);
+        find_rand_n(10_000, &mut m, b,
+                    |m, i| { m.insert(i, 1); },
+                    |m, i| { m.find(&i); });
     }
 
     // Find seq
     #[bench]
     pub fn find_seq_100(b: &mut Bencher) {
         let mut m : TreeMap<uint,uint> = TreeMap::new();
-        find_seq_n(100, &mut m, b);
+        find_seq_n(100, &mut m, b,
+                   |m, i| { m.insert(i, 1); },
+                   |m, i| { m.find(&i); });
     }
 
     #[bench]
     pub fn find_seq_10_000(b: &mut Bencher) {
         let mut m : TreeMap<uint,uint> = TreeMap::new();
-        find_seq_n(10_000, &mut m, b);
+        find_seq_n(10_000, &mut m, b,
+                   |m, i| { m.insert(i, 1); },
+                   |m, i| { m.find(&i); });
     }
 
     fn bench_iter(b: &mut Bencher, size: uint) {
@@ -2281,312 +1916,3 @@ mod bench {
     }
 }
 
-#[cfg(test)]
-mod test_set {
-    use std::prelude::*;
-    use std::hash;
-
-    use {Set, MutableSet, Mutable, MutableMap, MutableSeq};
-    use super::{TreeMap, TreeSet};
-
-    #[test]
-    fn test_clear() {
-        let mut s = TreeSet::new();
-        s.clear();
-        assert!(s.insert(5i));
-        assert!(s.insert(12));
-        assert!(s.insert(19));
-        s.clear();
-        assert!(!s.contains(&5));
-        assert!(!s.contains(&12));
-        assert!(!s.contains(&19));
-        assert!(s.is_empty());
-    }
-
-    #[test]
-    fn test_disjoint() {
-        let mut xs = TreeSet::new();
-        let mut ys = TreeSet::new();
-        assert!(xs.is_disjoint(&ys));
-        assert!(ys.is_disjoint(&xs));
-        assert!(xs.insert(5i));
-        assert!(ys.insert(11i));
-        assert!(xs.is_disjoint(&ys));
-        assert!(ys.is_disjoint(&xs));
-        assert!(xs.insert(7));
-        assert!(xs.insert(19));
-        assert!(xs.insert(4));
-        assert!(ys.insert(2));
-        assert!(ys.insert(-11));
-        assert!(xs.is_disjoint(&ys));
-        assert!(ys.is_disjoint(&xs));
-        assert!(ys.insert(7));
-        assert!(!xs.is_disjoint(&ys));
-        assert!(!ys.is_disjoint(&xs));
-    }
-
-    #[test]
-    fn test_subset_and_superset() {
-        let mut a = TreeSet::new();
-        assert!(a.insert(0i));
-        assert!(a.insert(5));
-        assert!(a.insert(11));
-        assert!(a.insert(7));
-
-        let mut b = TreeSet::new();
-        assert!(b.insert(0i));
-        assert!(b.insert(7));
-        assert!(b.insert(19));
-        assert!(b.insert(250));
-        assert!(b.insert(11));
-        assert!(b.insert(200));
-
-        assert!(!a.is_subset(&b));
-        assert!(!a.is_superset(&b));
-        assert!(!b.is_subset(&a));
-        assert!(!b.is_superset(&a));
-
-        assert!(b.insert(5));
-
-        assert!(a.is_subset(&b));
-        assert!(!a.is_superset(&b));
-        assert!(!b.is_subset(&a));
-        assert!(b.is_superset(&a));
-    }
-
-    #[test]
-    fn test_iterator() {
-        let mut m = TreeSet::new();
-
-        assert!(m.insert(3i));
-        assert!(m.insert(0));
-        assert!(m.insert(4));
-        assert!(m.insert(2));
-        assert!(m.insert(1));
-
-        let mut n = 0;
-        for x in m.iter() {
-            assert_eq!(*x, n);
-            n += 1
-        }
-    }
-
-    #[test]
-    fn test_rev_iter() {
-        let mut m = TreeSet::new();
-
-        assert!(m.insert(3i));
-        assert!(m.insert(0));
-        assert!(m.insert(4));
-        assert!(m.insert(2));
-        assert!(m.insert(1));
-
-        let mut n = 4;
-        for x in m.rev_iter() {
-            assert_eq!(*x, n);
-            n -= 1;
-        }
-    }
-
-    #[test]
-    fn test_move_iter() {
-        let s: TreeSet<int> = range(0i, 5).collect();
-
-        let mut n = 0;
-        for x in s.into_iter() {
-            assert_eq!(x, n);
-            n += 1;
-        }
-    }
-
-    #[test]
-    fn test_move_iter_size_hint() {
-        let s: TreeSet<int> = vec!(0i, 1).into_iter().collect();
-
-        let mut it = s.into_iter();
-
-        assert_eq!(it.size_hint(), (2, Some(2)));
-        assert!(it.next() != None);
-
-        assert_eq!(it.size_hint(), (1, Some(1)));
-        assert!(it.next() != None);
-
-        assert_eq!(it.size_hint(), (0, Some(0)));
-        assert_eq!(it.next(), None);
-    }
-
-    #[test]
-    fn test_clone_eq() {
-      let mut m = TreeSet::new();
-
-      m.insert(1i);
-      m.insert(2);
-
-      assert!(m.clone() == m);
-    }
-
-    #[test]
-    fn test_hash() {
-      let mut x = TreeSet::new();
-      let mut y = TreeSet::new();
-
-      x.insert(1i);
-      x.insert(2);
-      x.insert(3);
-
-      y.insert(3i);
-      y.insert(2);
-      y.insert(1);
-
-      assert!(hash::hash(&x) == hash::hash(&y));
-    }
-
-    fn check(a: &[int],
-             b: &[int],
-             expected: &[int],
-             f: |&TreeSet<int>, &TreeSet<int>, f: |&int| -> bool| -> bool) {
-        let mut set_a = TreeSet::new();
-        let mut set_b = TreeSet::new();
-
-        for x in a.iter() { assert!(set_a.insert(*x)) }
-        for y in b.iter() { assert!(set_b.insert(*y)) }
-
-        let mut i = 0;
-        f(&set_a, &set_b, |x| {
-            assert_eq!(*x, expected[i]);
-            i += 1;
-            true
-        });
-        assert_eq!(i, expected.len());
-    }
-
-    #[test]
-    fn test_intersection() {
-        fn check_intersection(a: &[int], b: &[int], expected: &[int]) {
-            check(a, b, expected, |x, y, f| x.intersection(y).all(f))
-        }
-
-        check_intersection([], [], []);
-        check_intersection([1, 2, 3], [], []);
-        check_intersection([], [1, 2, 3], []);
-        check_intersection([2], [1, 2, 3], [2]);
-        check_intersection([1, 2, 3], [2], [2]);
-        check_intersection([11, 1, 3, 77, 103, 5, -5],
-                           [2, 11, 77, -9, -42, 5, 3],
-                           [3, 5, 11, 77]);
-    }
-
-    #[test]
-    fn test_difference() {
-        fn check_difference(a: &[int], b: &[int], expected: &[int]) {
-            check(a, b, expected, |x, y, f| x.difference(y).all(f))
-        }
-
-        check_difference([], [], []);
-        check_difference([1, 12], [], [1, 12]);
-        check_difference([], [1, 2, 3, 9], []);
-        check_difference([1, 3, 5, 9, 11],
-                         [3, 9],
-                         [1, 5, 11]);
-        check_difference([-5, 11, 22, 33, 40, 42],
-                         [-12, -5, 14, 23, 34, 38, 39, 50],
-                         [11, 22, 33, 40, 42]);
-    }
-
-    #[test]
-    fn test_symmetric_difference() {
-        fn check_symmetric_difference(a: &[int], b: &[int],
-                                      expected: &[int]) {
-            check(a, b, expected, |x, y, f| x.symmetric_difference(y).all(f))
-        }
-
-        check_symmetric_difference([], [], []);
-        check_symmetric_difference([1, 2, 3], [2], [1, 3]);
-        check_symmetric_difference([2], [1, 2, 3], [1, 3]);
-        check_symmetric_difference([1, 3, 5, 9, 11],
-                                   [-2, 3, 9, 14, 22],
-                                   [-2, 1, 5, 11, 14, 22]);
-    }
-
-    #[test]
-    fn test_union() {
-        fn check_union(a: &[int], b: &[int],
-                                      expected: &[int]) {
-            check(a, b, expected, |x, y, f| x.union(y).all(f))
-        }
-
-        check_union([], [], []);
-        check_union([1, 2, 3], [2], [1, 2, 3]);
-        check_union([2], [1, 2, 3], [1, 2, 3]);
-        check_union([1, 3, 5, 9, 11, 16, 19, 24],
-                    [-2, 1, 5, 9, 13, 19],
-                    [-2, 1, 3, 5, 9, 11, 13, 16, 19, 24]);
-    }
-
-    #[test]
-    fn test_zip() {
-        let mut x = TreeSet::new();
-        x.insert(5u);
-        x.insert(12u);
-        x.insert(11u);
-
-        let mut y = TreeSet::new();
-        y.insert("foo");
-        y.insert("bar");
-
-        let x = x;
-        let y = y;
-        let mut z = x.iter().zip(y.iter());
-
-        // FIXME: #5801: this needs a type hint to compile...
-        let result: Option<(&uint, & &'static str)> = z.next();
-        assert_eq!(result.unwrap(), (&5u, &("bar")));
-
-        let result: Option<(&uint, & &'static str)> = z.next();
-        assert_eq!(result.unwrap(), (&11u, &("foo")));
-
-        let result: Option<(&uint, & &'static str)> = z.next();
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn test_swap() {
-        let mut m = TreeMap::new();
-        assert_eq!(m.swap(1u, 2i), None);
-        assert_eq!(m.swap(1u, 3i), Some(2));
-        assert_eq!(m.swap(1u, 4i), Some(3));
-    }
-
-    #[test]
-    fn test_pop() {
-        let mut m = TreeMap::new();
-        m.insert(1u, 2i);
-        assert_eq!(m.pop(&1), Some(2));
-        assert_eq!(m.pop(&1), None);
-    }
-
-    #[test]
-    fn test_from_iter() {
-        let xs = [1i, 2, 3, 4, 5, 6, 7, 8, 9];
-
-        let set: TreeSet<int> = xs.iter().map(|&x| x).collect();
-
-        for x in xs.iter() {
-            assert!(set.contains(x));
-        }
-    }
-
-    #[test]
-    fn test_show() {
-        let mut set: TreeSet<int> = TreeSet::new();
-        let empty: TreeSet<int> = TreeSet::new();
-
-        set.insert(1);
-        set.insert(2);
-
-        let set_str = format!("{}", set);
-
-        assert!(set_str == "{1, 2}".to_string());
-        assert_eq!(format!("{}", empty), "{}".to_string());
-    }
-}

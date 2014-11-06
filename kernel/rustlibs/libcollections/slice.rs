@@ -92,12 +92,11 @@ use core::cmp;
 use core::kinds::Sized;
 use core::mem::size_of;
 use core::mem;
-use core::prelude::{Clone, Collection, Greater, Iterator, Less, None, Option};
+use core::prelude::{Clone, Greater, Iterator, Less, None, Option};
 use core::prelude::{Ord, Ordering, RawPtr, Some, range};
 use core::ptr;
 use core::iter::{range_step, MultiplicativeIterator};
 
-use MutableSeq;
 use vec::Vec;
 
 pub use core::slice::{Chunks, AsSlice, ImmutableSlice, ImmutablePartialEqSlice};
@@ -762,7 +761,6 @@ mod tests {
     use std::rt;
     use slice::*;
 
-    use {Mutable, MutableSeq};
     use vec::Vec;
 
     fn square(n: uint) -> uint { n * n }
@@ -1600,15 +1598,15 @@ mod tests {
     #[test]
     fn test_total_ord() {
         let c: &[int] = &[1, 2, 3];
-        [1, 2, 3, 4].cmp(& c) == Greater;
+        [1, 2, 3, 4][].cmp(c) == Greater;
         let c: &[int] = &[1, 2, 3, 4];
-        [1, 2, 3].cmp(& c) == Less;
+        [1, 2, 3][].cmp(c) == Less;
         let c: &[int] = &[1, 2, 3, 6];
-        [1, 2, 3, 4].cmp(& c) == Equal;
+        [1, 2, 3, 4][].cmp(c) == Equal;
         let c: &[int] = &[1, 2, 3, 4, 5, 6];
-        [1, 2, 3, 4, 5, 5, 5, 5].cmp(& c) == Less;
+        [1, 2, 3, 4, 5, 5, 5, 5][].cmp(c) == Less;
         let c: &[int] = &[1, 2, 3, 4];
-        [2, 2].cmp(& c) == Greater;
+        [2, 2][].cmp(c) == Greater;
     }
 
     #[test]
@@ -1982,7 +1980,7 @@ mod tests {
             let (left, right) = values.split_at_mut(2);
             {
                 let left: &[_] = left;
-                assert!(left[0..left.len()] == [1, 2]);
+                assert!(left[0..left.len()] == [1, 2][]);
             }
             for p in left.iter_mut() {
                 *p += 1;
@@ -1990,7 +1988,7 @@ mod tests {
 
             {
                 let right: &[_] = right;
-                assert!(right[0..right.len()] == [3, 4, 5]);
+                assert!(right[0..right.len()] == [3, 4, 5][]);
             }
             for p in right.iter_mut() {
                 *p += 2;
@@ -2175,7 +2173,6 @@ mod bench {
     use test::Bencher;
 
     use vec::Vec;
-    use MutableSeq;
 
     #[bench]
     fn iterator(b: &mut Bencher) {

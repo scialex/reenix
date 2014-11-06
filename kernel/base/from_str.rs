@@ -7,7 +7,6 @@ use core::option::{Option,None,Some};
 use core::str::StrSlice;
 use core::slice::*;
 use core::char::Char;
-use core::collections::Collection;
 
 pub trait FromStr {
     fn from_str(s: &str) -> Option<Self>;

@@ -155,9 +155,7 @@ mod test {
     use std::prelude::*;
     use std::mem;
 
-    use enum_set::{EnumSet, CLike};
-
-    use MutableSeq;
+    use super::{EnumSet, CLike};
 
     #[deriving(PartialEq, Show)]
     #[repr(uint)]
