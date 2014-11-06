@@ -121,8 +121,8 @@ all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 
 $(KERNEL): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ echo "  Linking for \"kernel/$@\"..."
-	@ # entry.o included from link.ld. boot/boot.S must be the first file so that the multiboot header is close enough to the front.
-	$(HIDE_SIGIL) $(LD) $(LDFLAGS) $(KERNEL_LDFLAGS) -T link.ld boot/boot.o $(filter-out boot/boot.o entry/entry.o,$^) -o $@
+	@ # boot/boot.S must be the first file so that the multiboot header is close enough to the front.
+	$(HIDE_SIGIL) $(LD) $(LDFLAGS) $(KERNEL_LDFLAGS) -T link.ld boot/boot.o $(filter-out boot/boot.o,$^) -o $@
 
 $(BSYMBOLS): $(SYMBOLS)
 	@ echo "  Generating kernel symbols list..."
@@ -131,8 +131,8 @@ $(BSYMBOLS): $(SYMBOLS)
 $(SYMBOLS): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ echo "  Generating a image for debugging..."
 	@ # TODO This is bad and fragile. We really should be modifying $(KERNEL) to make it's paddr's match the vaddr's in its program headers.
-	@ # entry.o included from link.ld. boot/boot.S must be the first file so that the multiboot header is close enough to the front.
-	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T debug.ld boot/boot.o $(filter-out boot/boot.o entry/entry.o,$^) -o $@
+	@ # boot/boot.S must be the first file so that the multiboot header is close enough to the front.
+	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T debug.ld boot/boot.o $(filter-out boot/boot.o,$^) -o $@
 
 $(ISO_IMAGE): $(KERNEL)
 	@ echo "  Creating \"kernel/$@\" from floppy disk image..."

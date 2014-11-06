@@ -1,5 +1,4 @@
 ENTRY(_start)
-STARTUP(entry/entry.o)
 
 SECTIONS
 {
