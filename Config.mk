@@ -18,6 +18,10 @@ LD_OPT ?= "true"
 USE_STACK_CHECK=TRUE
 #USE_STACK_CHECK=FALSE
 
+# The opt levels for crates.
+DEFAULT_CRATE_OPT := 2
+DEFAULT_BUILTIN_CRATE_OPT := 3
+
 #
 # Setting any of these variables will control which parts of the source tree
 # are built. To enable something set it to 1, otherwise set it to 0.

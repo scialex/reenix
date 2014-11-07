@@ -27,3 +27,11 @@ CFLAGS    += $(foreach bool,$(COMPILE_CONFIG_BOOLS), \
              $(if $(findstring 1,$($(bool))),-D__$(bool)__=$(strip $($(bool)))))
 CFLAGS    += $(foreach def,$(COMPILE_CONFIG_DEFS), \
              $(if $($(def)),-D__$(def)__=$(strip $($(def))),))
+
+ifeq ("true",$(HIDE))
+HIDE_SIGIL := @
+SILENT_FLAG := --silent
+else
+HIDE_SIGIL :=
+SILENT_FLAG :=
+endif
