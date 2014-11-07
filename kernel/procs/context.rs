@@ -61,7 +61,7 @@ impl RunQueue {
     fn push(&mut self, ctx: &mut Context) {
         assert!(interrupt::get_ipl() == interrupt::HIGH);
         let &RunQueue(ref mut b) = self;
-        b.push(SleepingThread(unsafe { transmute(ctx) }));
+        b.push_back(SleepingThread(unsafe { transmute(ctx) }));
         dbg!(debug::SCHED, "there are now {} threads waiting to be executed", b.len());
     }
     fn pop(&mut self) -> &mut Context {

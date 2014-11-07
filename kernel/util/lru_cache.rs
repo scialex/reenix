@@ -74,7 +74,7 @@ impl<K: Ord, V> LruEntry<K, V> {
         res
     }
     /// Take this entry out of the list (if it is in one). This needs to take a non-mutable pointer
-    /// so we can do this even in cases where we are doing (i.e. find).
+    /// so we can do this even in cases where we are doing (i.e. get).
     pub fn remove_self(&self) {
         self.next().prev.set(self.prev.get());
         self.prev().next.set(self.next.get());
@@ -289,8 +289,8 @@ impl<K: Ord, V> LruCache<K, V> {
 
     /// Returns a reference to the value corresponding to the key.
     /// This also marks that key as being the most recently used.
-    pub fn find<'a>(&'a self, key: &K) -> Option<&'a V> {
-        if let Some(cur) = self.map.find(&KeyRef::new(key)) {
+    pub fn get<'a>(&'a self, key: &K) -> Option<&'a V> {
+        if let Some(cur) = self.map.get(&KeyRef::new(key)) {
             self.make_mru(&**cur);
             Some(cur.value())
         } else {
@@ -300,8 +300,8 @@ impl<K: Ord, V> LruCache<K, V> {
 
     /// Returns a mutable reference to the value corresponding to the key.
     /// This also marks that key as being the most recently used.
-    pub fn find_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
-        if let Some(cur) = self.map.find_mut(&KeyRef::new(key)) {
+    pub fn get_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
+        if let Some(cur) = self.map.get_mut(&KeyRef::new(key)) {
             (&**cur).remove_self();
             (&**cur).insert_after(&*self.ptr);
             Some(cur.value_mut())
@@ -311,11 +311,11 @@ impl<K: Ord, V> LruCache<K, V> {
     }
 
     /// Returns true if there is a value with that key and makes it the most recently used value.
-    pub fn touch_value(&self, key: &K) -> bool { self.find(key).is_some() }
+    pub fn touch_value(&self, key: &K) -> bool { self.get(key).is_some() }
 
     /// Returns true if there is a value with that key and makes it the least recently used value.
     pub fn curse_value(&self, key: &K) -> bool {
-        if let Some(prev) = self.map.find(&KeyRef::new(key)) {
+        if let Some(prev) = self.map.get(&KeyRef::new(key)) {
             prev.remove_self();
             prev.insert_after(self.ptr.prev());
             true
@@ -325,23 +325,23 @@ impl<K: Ord, V> LruCache<K, V> {
     /// Returns a reference to the value corresponding to the key.
     /// This does not count as a use of the value by the LRU cache and does not affect the values
     /// position in it.
-    pub fn find_unused<'a>(&'a self, key: &K) -> Option<&'a V> { self.map.find(&KeyRef::new(key)).map(|x| { x.value() }) }
+    pub fn get_unused<'a>(&'a self, key: &K) -> Option<&'a V> { self.map.get(&KeyRef::new(key)).map(|x| { x.value() }) }
 
     /// Returns a mutable reference to the value corresponding to the key.
     /// This does not count as a use of the value by the LRU cache and does not affect the values
     /// position in it.
-    pub fn find_unused_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
-        self.map.find_mut(&KeyRef::new(key)).map(|x| { x.value_mut() })
+    pub fn get_unused_mut<'a>(&'a mut self, key: &K) -> Option<&'a mut V> {
+        self.map.get_mut(&KeyRef::new(key)).map(|x| { x.value_mut() })
     }
 
     /// Inserts a key-value pair from the map. If the key already had a value present in the map,
     /// that value is returned. Otherwise, None is returned.
     /// The inserted value is considered to be the most recently used value in the cache.
-    pub fn swap(&mut self, key: K, val: V) -> Option<V> {
+    pub fn insert(&mut self, key: K, val: V) -> Option<V> {
         let ent = LruEntry::new(key, val);
         let kr = KeyRef::new(ent.key());
         self.make_mru(&*ent);
-        if let Some(prev) = self.map.swap(kr, ent) {
+        if let Some(prev) = self.map.insert(kr, ent) {
             prev.remove_self();
             Some(prev.take())
         } else {
@@ -351,14 +351,15 @@ impl<K: Ord, V> LruCache<K, V> {
 
     /// Inserts a key-value pair into the map. An existing value for a key is replaced by the new
     /// value. Returns true if the key did not already exist in the map.
-    pub fn insert(&mut self, key: K, val: V) -> bool { self.swap(key, val).is_none() }
+    #[inline]
+    pub fn swap(&mut self, key: K, val: V) -> Option<V> { self.insert(key, val) }
 
     /// Removes a key from the map, returning the value at the key if the key was previously in the
     /// map.
     pub fn pop(&mut self, key: &K) -> Option<V> { self.pop_entry(key).map(|(_, v)| v) }
 
     fn pop_entry(&mut self, key: &K) -> Option<(K, V)> {
-        if let Some(prev) = self.map.pop(&KeyRef::new(key)) {
+        if let Some(prev) = self.map.remove(&KeyRef::new(key)) {
             prev.remove_self();
             Some(prev.take_full())
         } else {
@@ -449,12 +450,12 @@ impl<K: Ord, V> LruCache<K, V> {
 
 impl<K: Ord, V> IndexMut<K, V> for LruCache<K, V> {
     #[inline]
-    fn index_mut<'a>(&'a mut self, i: &K) -> &'a mut V { self.find_mut(i).expect("no entry found in lru_cache") }
+    fn index_mut<'a>(&'a mut self, i: &K) -> &'a mut V { self.get_mut(i).expect("no entry found in lru_cache") }
 }
 
 impl<K: Ord, V> Index<K, V> for LruCache<K, V> {
     #[inline]
-    fn index<'a>(&'a self, i: &K) -> &'a V { self.find(i).expect("no entry found in lru_cache") }
+    fn index<'a>(&'a self, i: &K) -> &'a V { self.get(i).expect("no entry found in lru_cache") }
 }
 
 impl<K: Clone + Ord, V: Clone> Clone for LruCache<K, V> {

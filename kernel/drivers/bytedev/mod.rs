@@ -41,15 +41,15 @@ fn get_device_tree() -> &'static mut TreeMap<DeviceId, Box<ByteDevice>> {
 pub type ByteDevice = Device<u8>;
 
 pub fn lookup_mut(dev: DeviceId) -> Option<&'static mut Device<u8> + 'static> {
-    get_device_tree().find_mut(&dev).map(|bd| { &mut **bd })
+    get_device_tree().get_mut(&dev).map(|bd| { &mut **bd })
 }
 pub fn lookup(dev: DeviceId) -> Option<&'static Device<u8> + 'static> {
-    get_device_tree().find(&dev).map(|bd| { &**bd })
+    get_device_tree().get(&dev).map(|bd| { &**bd })
 }
 
 pub fn register(id: DeviceId, dev: Box<Device<u8> + 'static>) -> bool {
     let m = get_device_tree();
-    if m.contains_key(&id) { false } else { m.insert(id, dev) }
+    if m.contains_key(&id) { false } else { m.insert(id, dev).is_none() }
 }
 
 pub struct ByteWriter<'a>(pub &'a mut Device<u8>);

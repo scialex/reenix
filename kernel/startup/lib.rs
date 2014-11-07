@@ -101,13 +101,13 @@ pub mod tsd {
         }
 
         pub fn set_slot(&mut self, i: uint, v: Box<Any>) { self.data.insert(i, v); }
-        pub fn get_slot(&self, i: uint) -> Option<&Box<Any>> { self.data.find(&i) }
-        pub fn get_slot_mut(&mut self, i: uint) -> Option<&mut Box<Any>> { self.data.find_mut(&i) }
+        pub fn get_slot(&self, i: uint) -> Option<&Box<Any>> { self.data.get(&i) }
+        pub fn get_slot_mut(&mut self, i: uint) -> Option<&mut Box<Any>> { self.data.get_mut(&i) }
 
         pub fn set_open_slot(&mut self, v: Box<Any>) -> uint {
             for i in range(0, self.data.len() + 1) {
                 if self.data.contains_key(&i) {
-                    assert!(self.data.insert(i, v));
+                    assert!(self.data.insert(i, v).is_none());
                     return i;
                 }
             }
@@ -115,7 +115,7 @@ pub mod tsd {
         }
 
         pub fn is_slot_used(&mut self, i : uint) -> bool { self.data.contains_key(&i) }
-        pub fn pop_slot(&mut self, i : uint) -> Option<Box<Any>> { self.data.pop(&i) }
+        pub fn pop_slot(&mut self, i : uint) -> Option<Box<Any>> { self.data.remove(&i) }
         pub fn remove_slot(&mut self, i : uint) -> bool { self.pop_slot(i).is_some() }
     }
     impl fmt::Show for TSDInfo {

@@ -4,7 +4,7 @@
 
 use core::num::{Num, NumCast, zero, CheckedMul, CheckedAdd, Bounded, Signed};
 use core::option::{Option,None,Some};
-use core::str::StrSlice;
+use core::str::StrPrelude;
 use core::slice::*;
 use core::char::Char;
 

@@ -124,7 +124,7 @@ impl<'a> KShell<'a> {
 
     pub fn add_function(&mut self, f: KFunction<'a>) -> bool {
         let n : &'a str = f.name;
-        self.funcs.insert(n, f)
+        self.funcs.insert(n, f).is_none()
     }
 
     #[allow(unused_must_use)]

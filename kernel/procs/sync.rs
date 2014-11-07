@@ -164,7 +164,7 @@ impl<'a, T: 'a> CGuard<'a, T> {
 impl<'a, T:'a> Drop for CGuard<'a, T> {
     fn drop(&mut self) {
         let r = self._mtx.cond;
-        if r(self.deref()) { self._mtx.signal(); }
+        if r((*self).deref()) { self._mtx.signal(); }
     }
 }
 

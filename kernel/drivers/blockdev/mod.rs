@@ -31,13 +31,13 @@ fn get_device_tree() -> &'static mut TreeMap<DeviceId, Box<BlockDevice>> {
     unsafe { DEVICES.as_mut().expect("Device tree is null!") }
 }
 
-pub fn lookup_mut(dev: DeviceId) -> Option<&'static mut BlockDevice> { get_device_tree().find_mut(&dev).map(|bd| { &mut **bd }) }
-pub fn lookup(dev: DeviceId) -> Option<&'static BlockDevice> { get_device_tree().find(&dev).map(|bd| { &**bd }) }
+pub fn lookup_mut(dev: DeviceId) -> Option<&'static mut BlockDevice> { get_device_tree().get_mut(&dev).map(|bd| { &mut **bd }) }
+pub fn lookup(dev: DeviceId) -> Option<&'static BlockDevice> { get_device_tree().get_mut(&dev).map(|bd| { &**bd }) }
 
 pub fn register(id: DeviceId, dev: Box<BlockDevice>) -> bool {
     block_interrupts!({
         let m = get_device_tree();
-        if m.contains_key(&id) { false } else { m.insert(id, dev) }
+        if m.contains_key(&id) { false } else { m.insert(id, dev).is_none() }
     })
 }
 

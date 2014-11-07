@@ -230,7 +230,7 @@ impl KProc {
     /// Wait for a specific PID to exit.
     fn wait_specific_process(&mut self, pid: ProcId, options: WaitOps) -> Result<Rc<ProcRefCell<KProc>>, errno::Errno> {
         assert!(options == 0);
-        match self.children.find(&pid) {
+        match self.children.get(&pid) {
             Some(v) => {
                 let pr = v.clone();
                 loop {
@@ -283,7 +283,7 @@ impl KProc {
     }
 
     pub fn get_proc(pid: &ProcId) -> Option<Rc<ProcRefCell<KProc>>> {
-        let r = proc_list!().find(pid);
+        let r = proc_list!().get(pid);
         match r {
             Some(ref p) => p.clone().upgrade().or_else(|| { KProc::remove_proc(pid); None }),
             None => None,
@@ -372,7 +372,7 @@ impl KProc {
             let tmp = box rcp.clone();
             unsafe { INIT_PROC = transmute(tmp); }
         }
-        rcp.borrow_mut().threads.find_mut(&hash).expect("thread must still be present").make_runable();
+        rcp.borrow_mut().threads.get_mut(&hash).expect("thread must still be present").make_runable();
         return Ok(pid);
     }
 
