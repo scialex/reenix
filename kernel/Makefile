@@ -34,12 +34,16 @@ PREBUILT  :=
 EXTERNAL_LIBS  := openlibm
 EXTERNAL := $(foreach l, $(EXTERNAL_LIBS), libs/lib$(l).a)
 
-SYMBOLS   := weenix.dbg
-BSYMBOLS  := symbols.dbg
-KERNEL    := kernel.bin
-IMAGE     := weenix.img
-ISO_IMAGE := weenix.iso
-GDBCOMM   := gdb-commands
+SYMBOLS    := weenix.dbg
+BSYMBOLS   := symbols.dbg
+KERNEL     := kernel.bin
+IMAGE      := weenix.img
+ISO_IMAGE  := weenix.iso
+GDBCOMM    := gdb-commands
+ISO_DIR    := .iso
+
+ISO_CFG    := $(ISO_DIR)/boot/grub/grub.cfg
+ISO_KERNEL := $(ISO_DIR)/boot/$(KERNEL)
 
 RSFLAGS := $(strip $(RSFLAGS))
 
@@ -81,19 +85,19 @@ $(SYMBOLS): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ # boot/boot.S must be the first file so that the multiboot header is close enough to the front.
 	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T debug.ld boot/boot.o $(filter-out boot/boot.o,$^) -o $@
 
-$(ISO_IMAGE): $(KERNEL)
+$(ISO_CFG): boot/grub.cfg
+	@ echo "[CP  ] Copying \"kernel/$@\"..."
+	$(HIDE_SIGIL) mkdir -p $(dir $@)
+	$(HIDE_SIGIL) cp $< $@
+
+$(ISO_KERNEL) : $(KERNEL)
+	@ echo "[CP  ] Copying \"kernel/$@\"..."
+	$(HIDE_SIGIL) mkdir -p $(dir $@)
+	$(HIDE_SIGIL) cp $< $@
+
+$(ISO_IMAGE): $(ISO_KERNEL) $(ISO_CFG)
 	@ echo "[GRUB] Creating \"kernel/$@\"..."
-	$(HIDE_SIGIL) mkdir -p .iso/boot/grub
-	$(HIDE_SIGIL) ln -f $< .iso/boot/$<
-	$(HIDE_SIGIL) echo "default=0"                           >  .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo "timeout=0"                           >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo "menuentry \"$@\" {"                  >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo " echo \"Booting $@ from /boot/$<\" " >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo " echo \"Welcome To Weenix!\" "       >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo " multiboot /boot/$< "                >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo " boot "                              >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) echo "}"                                   >> .iso/boot/grub/grub.cfg
-	$(HIDE_SIGIL) grub-mkrescue -o $@ ./.iso
+	$(HIDE_SIGIL) $(MKRESCUE) -o $@ $(ISO_DIR)
 
 $(GDBCOMM): $(SCRIPTS)
 	@ echo "[GDB ] Creating gdb command list..."

@@ -2,7 +2,7 @@
 
 tidy:
 	$(HIDE_SIGIL) rm -f $(BUILT_CRATES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files 2>/dev/null
-	$(HIDE_SIGIL) rm -rf .iso 2>/dev/null
+	$(HIDE_SIGIL) rm -rf $(ISO_DIR) 2>/dev/null
 
 clean: tidy $(foreach d,$(EXTERNAL_LIBS),clean-$(d))
 

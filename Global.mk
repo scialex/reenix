@@ -3,7 +3,8 @@ LD        := ld
 AR        := ar
 PYTHON    := python
 CSCOPE    := cscope
-RUST      ?= rustc
+RUST      := rustc
+MKRESCUE  := grub-mkrescue
 
 RSFLAGS   += -g --target=i686-unknown-linux-gnu -Z no-landing-pads
 CFLAGS    += -fno-builtin -nostdinc -std=c99 -g3 -gdwarf-3 -fno-stack-protector -m32 -march=i686 -fsigned-char -Iinclude
