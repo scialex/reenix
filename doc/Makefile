@@ -13,8 +13,8 @@ all: $(DOCS)
 	$(HIDE_SIGIL) pdflatex -halt-on-error $< $(SILENT_SUFFIX)
 
 tidy:
-	@ rm *.log *.aux || true
+	@ rm -f *.log *.aux 2>/dev/null
 
 clean: tidy
-	@ rm $(DOCS) || true
+	@ rm -f $(DOCS) 2>/dev/null
 

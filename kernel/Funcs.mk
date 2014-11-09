@@ -22,7 +22,7 @@ define external-targets
 
 .PHONEY:
 clean-$(1):
-	$$(HIDE_SIGIL) rm libs/$(notdir $(3)) || true
+	$$(HIDE_SIGIL) rm -f libs/$(notdir $(3)) 2>/dev/null
 	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $(SILENT_FLAG) -C external/$(1) clean $(4)
 endef
 
