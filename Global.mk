@@ -31,7 +31,9 @@ CFLAGS    += $(foreach def,$(COMPILE_CONFIG_DEFS), \
 ifeq ("true",$(HIDE))
 HIDE_SIGIL := @
 SILENT_FLAG := --silent
+SILENT_SUFFIX := >/dev/null
 else
 HIDE_SIGIL :=
 SILENT_FLAG :=
+SILENT_SUFFIX :=
 endif

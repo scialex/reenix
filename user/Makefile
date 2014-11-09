@@ -11,6 +11,7 @@ STAGING_DIR := .staging
 .PHONY: all clean
 
 all: $(DISK_IMAGE)
+	@ echo "[MAKE] Finished building \"user\"..."
 
 ########
 # compile step
@@ -31,20 +32,20 @@ ASFLAGS := -D__ASSEMBLY__
 # - pass -fpic only to shared libraries
 
 lib/%.o: lib/%.c
-	@ echo "  Compiling \"user/$<\"..."
-	@ $(CC) -c $< -o $@ $(CFLAGS_LIB)
+	@ echo "[CC  ] Compiling \"user/$<\"..."
+	$(HIDE_SIGIL) $(CC) -c $< -o $@ $(CFLAGS_LIB)
 
 %.o: %.c
-	@ echo "  Compiling \"user/$<\"..."
-	@ $(CC) -c $< -o $@ $(CFLAGS)
+	@ echo "[CC  ] Compiling \"user/$<\"..."
+	$(HIDE_SIGIL) $(CC) -c $< -o $@ $(CFLAGS)
 
 lib/%.o: lib/%.S
-	@ echo "  Compiling \"user/$<\"..."
-	@ $(CC) -c $< -o $@ $(ASFLAGS) $(CFLAGS_LIB)
+	@ echo "[AS  ] Compiling \"user/$<\"..."
+	$(HIDE_SIGIL) $(CC) -c $< -o $@ $(ASFLAGS) $(CFLAGS_LIB)
 
 %.o: %.S
-	@ echo "  Compiling \"user/$<\"..."
-	@ $(CC) -c $< -o $@ $(ASFLAGS) $(CFLAGS)
+	@ echo "[AS  ] Compiling \"user/$<\"..."
+	$(HIDE_SIGIL) $(CC) -c $< -o $@ $(ASFLAGS) $(CFLAGS)
 
 ########
 # link step for static libraries and shared libraries
@@ -65,13 +66,12 @@ LIBC_SOURCES := $(wildcard lib/libc/*.[cS])
 LIBC_OBJECTS := $(addsuffix .o,$(basename $(LIBC_SOURCES)))
 
 lib/libc.so: $(LIBC_OBJECTS)
-	@ echo "  Linking for \"user/$@\"..."
-	@ $(LD) -o $@ $^ $(LDFLAGS) -shared -soname=/lib/libc.so \
---dynamic-linker /lib/ld-weenix.so
+	@ echo "[LD  ] Linking for \"user/$@\"..."
+	$(HIDE_SIGIL) $(LD) -o $@ $^ $(LDFLAGS) -shared -soname=/lib/libc.so --dynamic-linker /lib/ld-weenix.so
 
 lib/libc.a: $(LIBC_OBJECTS)
-	@ echo "  Creating \"user/$@\"..."
-	@ $(AR) crs $@ $^
+	@ echo "[AR  ] Creating \"user/$@\"..."
+	$(HIDE_SIGIL) $(AR) crs $@ $^
 
 # 2. libtest
 
@@ -79,12 +79,12 @@ LIBTEST_SOURCES := $(wildcard lib/libtest/*.[cS])
 LIBTEST_OBJECTS := $(addsuffix .o,$(basename $(LIBTEST_SOURCES)))
 
 lib/libtest.so: $(LIBTEST_OBJECTS) lib/libc.so
-	@ echo "  Linking for \"user/$@\"..."
-	@ $(LD) -o $@ $^ $(LDFLAGS) -shared -soname=/lib/libtest.so -lc
+	@ echo "[LD  ] Linking for \"user/$@\"..."
+	$(HIDE_SIGIL) $(LD) -o $@ $^ $(LDFLAGS) -shared -soname=/lib/libtest.so -lc
 
 lib/libtest.a: $(LIBTEST_OBJECTS)
-	@ echo "  Creating \"user/$@\"..."
-	@ $(AR) crs $@ $^
+	@ echo "[AR  ] Creating \"user/$@\"..."
+	$(HIDE_SIGIL) $(AR) crs $@ $^
 
 # 3. ld-weenix
 
@@ -92,9 +92,8 @@ LDWEENIX_SOURCES := $(wildcard lib/ld-weenix/*.[cS])
 LDWEENIX_OBJECTS := $(addsuffix .o,$(basename $(LDWEENIX_SOURCES)))
 
 lib/ld-weenix.so: $(LDWEENIX_OBJECTS) lib/libc.a
-	@ echo "  Linking for \"user/$@\"..."
-	@ $(LD) -o $@ $(LDWEENIX_OBJECTS) $(LDFLAGS) -shared \
--soname=/lib/ld-weenix.so -Bsymbolic -e _bootstrap -static -lc
+	@ echo "[LD  ] Linking for \"user/$@\"..."
+	$(HIDE_SIGIL) $(LD) -o $@ $(LDWEENIX_OBJECTS) $(LDFLAGS) -shared -soname=/lib/ld-weenix.so -Bsymbolic -e _bootstrap -static -lc
 
 LIB_OBJECTS := $(LIBC_OBJECTS) $(LIBTEST_OBJECTS) $(LDWEENIX_OBJECTS)
 
@@ -113,28 +112,24 @@ LIB_OBJECTS := $(LIBC_OBJECTS) $(LIBTEST_OBJECTS) $(LDWEENIX_OBJECTS)
 
 ifeq ($(DYNAMIC),0)
 usr/bin/%.exec: usr/bin/tests/%.o lib/libc.a lib/libc/entry.o lib/libtest.a
-	@ echo "  Linking for \"user/$@\" (static)..."
-	@ $(LD) -o $@ $< lib/libc/entry.o $(LDFLAGS) -static \
--e __libc_static_entry -lc -ltest
+	@ echo "[LD  ] Linking for \"user/$@\" (static)..."
+	$(HIDE_SIGIL) $(LD) -o $@ $< lib/libc/entry.o $(LDFLAGS) -static -e __libc_static_entry -lc -ltest
 else
 usr/bin/%.exec: usr/bin/tests/%.o lib/libc.so lib/libtest.so
-	@ echo "  Linking for \"user/$@\" (dynamic)..."
-	@ $(LD) -o $@ $< $(LDFLAGS) -e main --dynamic-linker /lib/ld-weenix.so \
--lc -ltest
+	@ echo "[LD  ] Linking for \"user/$@\" (dynamic)..."
+	$(HIDE_SIGIL) $(LD) -o $@ $< $(LDFLAGS) -e main --dynamic-linker /lib/ld-weenix.so -lc -ltest
 endif
 
 # 2. all other executables
 
 ifeq ($(DYNAMIC),0)
 %.exec: %.o lib/libc.a lib/libc/entry.o
-	@ echo "  Linking for \"user/$@\" (static)..."
-	@ $(LD) -o $@ $< lib/libc/entry.o $(LDFLAGS) -static \
--e __libc_static_entry -lc
+	@ echo "[LD  ] Linking for \"user/$@\" (static)..."
+	$(HIDE_SIGIL) $(LD) -o $@ $< lib/libc/entry.o $(LDFLAGS) -static -e __libc_static_entry -lc
 else
 %.exec: %.o lib/libc.so
-	@ echo "  Linking for \"user/$@\" (dynamic)..."
-	@ $(LD) -o $@ $< $(LDFLAGS) -e main --dynamic-linker /lib/ld-weenix.so \
--lc
+	@ echo "[LD  ] Linking for \"user/$@\" (dynamic)..."
+	$(HIDE_SIGIL) $(LD) -o $@ $< $(LDFLAGS) -e main --dynamic-linker /lib/ld-weenix.so -lc
 endif
 
 ########
@@ -153,10 +148,16 @@ EXEC_TARGETS := bin/ed bin/ls bin/sh bin/uname bin/hd bin/stat \
 sbin/halt sbin/init \
 usr/bin/args usr/bin/hello usr/bin/kshell usr/bin/segfault usr/bin/spin \
 usr/bin/eatmem usr/bin/forkbomb usr/bin/memtest usr/bin/stress usr/bin/vfstest \
-usr/bin/wc usr/bin/forktest usr/bin/eatinodes usr/bin/pipetest
+usr/bin/wc usr/bin/forktest usr/bin/eatinodes
+# TODO Make a pipetest
+# usr/bin/pipetest
 
 EXEC_SUFFIX := .exec
 EXEC_TARGETS_WITH_SUFFIX := $(addsuffix $(EXEC_SUFFIX),$(EXEC_TARGETS))
+
+# Make shouldn't delete files without us telling it to.
+EXEC_OBJECTS := $(addsuffix .o,$(EXEC_TARGETS)) $(patsubst %.c,%.o,$(wildcard usr/bin/tests/*.c))
+.SECONDARY: $(EXEC_OBJECTS) $(LIB_OBJECTS)
 
 # don't include any executables in the disk until VM
 ifeq ($(VM),1)
@@ -167,31 +168,31 @@ endif
 
 # TODO get rid of "mkdir -p", "cp --parents" (they are not portable)
 $(STAGING_DIR): $(TARGETS)
-	@ echo "  Staging initial disk contents..."
-	@ mkdir -p $(STAGING_DIR)
-	@ cp --parents $? $(STAGING_DIR)
+	@ echo "[DISK] Staging initial disk contents..."
+	$(HIDE_SIGIL) mkdir -p $(STAGING_DIR)
+	$(HIDE_SIGIL) cp --parents $? $(STAGING_DIR)
 # below: strip .exec suffix from binaries
 # (portable implementation of "rename 's/\.exec//' $?")
-	@ cd $(STAGING_DIR) \
+	$(HIDE_SIGIL) cd $(STAGING_DIR) \
 && for i in `ls $? | grep "\.exec"`; do \
 mv $$i `echo $$i | cut -f1 -d.`; \
 done
+
 
 ########
 # build the disk image
 ########
 
 $(DISK_IMAGE): $(STAGING_DIR)
-	@ echo "  Running fsmaker to create \"user/$@\"..."
-	@ echo "  Disk Blocks: $(DISK_BLOCKS)"
-	@ echo "  Disk Inodes: $(DISK_INODES)"
-	@ $(PYTHON) ../tools/fsmaker/sh.py $@ -e "format -b $(DISK_BLOCKS) -i $(DISK_INODES) -d $<"
+	@ echo "[PY  ] Running fsmaker to create \"user/$@\"..."
+	@ echo "       Disk Blocks: $(DISK_BLOCKS)"
+	@ echo "       Disk Inodes: $(DISK_INODES)"
+	$(HIDE_SIGIL) $(PYTHON) ../tools/fsmaker/sh.py $@ -e "format -b $(DISK_BLOCKS) -i $(DISK_INODES) -d $<"
 
 ########
 # clean
 ########
 
 clean:
-	rm -f $(DISK_IMAGE) $(LIB_TARGETS) $(EXEC_TARGETS_WITH_SUFFIX) \
-$(LIB_OBJECTS)
-	rm -rf $(STAGING_DIR)
+	@ rm -f $(DISK_IMAGE) $(LIB_TARGETS) $(EXEC_TARGETS_WITH_SUFFIX) $(LIB_OBJECTS) $(EXEC_OBJECTS)
+	@ rm -rf $(STAGING_DIR)

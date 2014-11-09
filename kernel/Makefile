@@ -47,6 +47,7 @@ RSFLAGS := $(strip $(RSFLAGS))
 
 .DEFAULT_GOAL := all
 all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
+	@ echo "[MAKE] Finished building \"kernel\"..."
 
 $(eval $(call builtin-crate-rule,libc,))
 $(eval $(call builtin-crate-rule,collections,alloc libc))
