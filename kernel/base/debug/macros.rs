@@ -12,6 +12,8 @@ macro_rules! dbg_write(
     })
 )
 
+/// Print a formatted debug string to the debug port, with the given debug type. Include the
+/// information that we have recieved the given errno.
 #[macro_export]
 macro_rules! dbger(
     ($d:expr, $err:expr, $fmt:expr, $($a:expr),*) => ({
@@ -26,6 +28,7 @@ macro_rules! dbger(
     })
 )
 
+/// Print a formatted debug string to the debug port, with the given debug type.
 #[macro_export]
 macro_rules! dbg(
     ($d:expr, $fmt:expr, $($a:expr),*) => ({
@@ -40,6 +43,7 @@ macro_rules! dbg(
     })
 )
 
+/// Send a full panic, this will fully stop the kernel.
 #[macro_export]
 macro_rules! kpanic(
     ($fmt:expr, $($a:expr),*) => ({

@@ -10,17 +10,23 @@ use core::fmt;
 
 mod tty;
 
+/// Do initialization that does not require allocating memory.
 pub fn init_stage1() {
     tty::init_stage1();
 }
+
+/// Do initialization that requires allocating memory.
 pub fn init_stage2() {
     init_device_tree();
     tty::init_stage2();
 }
+
+/// Do initialization that requires running in a process context.
 pub fn init_stage3() {
     tty::init_stage3();
 }
 
+/// Handle computer shutdown.
 pub fn shutdown() {
     tty::shutdown();
 }
@@ -34,10 +40,12 @@ fn init_device_tree() {
     }
 }
 
+/// Get the tree holding static references to all devices.
 fn get_device_tree() -> &'static mut TreeMap<DeviceId, Box<ByteDevice>> {
     unsafe { DEVICES.as_mut().expect("Device tree is null!") }
 }
 
+/// A device capable of reading and writing at byte granularity.
 pub type ByteDevice = Device<u8>;
 
 pub fn lookup_mut(dev: DeviceId) -> Option<&'static mut Device<u8> + 'static> {

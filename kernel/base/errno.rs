@@ -1,25 +1,29 @@
 // TODO Copyright Header
 
-//! # The Reenix base util stuff.
-//!
-//!
+//! The Reenix errno definitions.
 
 use core::default::Default;
 use core::result::Result;
 use describe::*;
 use core::fmt;
 
+/// A KResult is a common type of return value for a kernel operation, where it either succeeds or
+/// returns an errno appropriate to the failure.
 pub type KResult<T> = Result<T, Errno>;
 
 macro_rules! errnos (
     ($(($n:ident, $v:expr, $ex:expr)),+) => (
         #[deriving(PartialEq, Eq, Show, FromPrimitive)]
         #[repr(i32)]
+        #[doc = "The standard errno definition."]
         pub enum Errno {
-            $( $n = $v,)*
+            $(
+                $n = $v,
+            )*
         }
 
         impl Errno {
+            /// Get the explanation of what the given `errno` represents.
             pub fn to_explanation(e: Errno) -> &'static str {
                 match e {
                    $($n => $ex,)*
