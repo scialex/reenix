@@ -1,5 +1,6 @@
 CFLAGS    := -ffreestanding
 RSFLAGS   := -L libs -C no-redzone -Z gc
+RDFLAGS   := -L libs --no-defaults --passes unindent-comments --passes collapse-docs --passes strip-hidden
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 KERNEL_LDFLAGS := --strip-all
 
@@ -8,6 +9,7 @@ include Funcs.mk
 
 CFLAGS    += -D__KERNEL__
 RSFLAGS   += --cfg kernel
+RDFLAGS   += --cfg kernel
 
 ifeq ("true",$(LD_OPT))
 LDFLAGS += --gc-sections
@@ -24,8 +26,10 @@ SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
 CRATES := base mm alloc libc main startup collections procs drivers util
 BUILT_CRATES := $(foreach dr, $(CRATES), $(call rlib-name,$(dr)))
+CRATE_DOCS := $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 
 RSFLAGS += $(foreach dr, $(CRATES), --extern $(dr)=$(call rlib-name,$(dr)))
+RDFLAGS += $(foreach dr, $(CRATES), --extern $(dr)=$(call rlib-name,$(dr)))
 
 # List of prebuilt modules that do not include the source
 PREBUILT  :=
@@ -46,8 +50,9 @@ ISO_CFG    := $(ISO_DIR)/boot/grub/grub.cfg
 ISO_KERNEL := $(ISO_DIR)/boot/$(KERNEL)
 
 RSFLAGS := $(strip $(RSFLAGS))
+RDFLAGS := $(strip $(RDFLAGS))
 
-.PHONY: all cscope clean tidy
+.PHONY: all cscope clean tidy docs
 
 .DEFAULT_GOAL := all
 all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
@@ -69,6 +74,8 @@ $(eval $(call crate-rule,main,$(filter-out main,$(CRATES))))
 
 # Make the target for libm
 $(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-Wno-maybe-uninitialized -g3 -gdwarf-3 -m32 -march=i386 -ffreestanding" ARCH=i386))
+
+docs: $(CRATE_DOCS)
 
 $(KERNEL): $(OBJS) $(PREBUILT) $(EXTERNAL)
 	@ echo "[LD  ] Linking for \"kernel/$@\"..."

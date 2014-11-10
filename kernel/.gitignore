@@ -17,3 +17,4 @@ gdb-commands
 # Empty target stuff
 empty-target
 libs
+docs/*

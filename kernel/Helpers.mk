@@ -5,6 +5,7 @@ tidy:
 	$(HIDE_SIGIL) rm -rf $(ISO_DIR) 2>/dev/null
 
 clean: tidy $(foreach d,$(EXTERNAL_LIBS),clean-$(d))
+	$(HIDE_SIGIL) rm -rf docs
 
 cscope: $(HEAD) $(SRC)
 	@ echo "  Updating cscope symbol cross-reference..."

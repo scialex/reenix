@@ -1,5 +1,11 @@
 # A bunch of reenix make functions.
 
+# Get an doc name from the crate name
+# $(1) is the name of the crate
+define doc-name
+docs/$(1)/index.html
+endef
+
 # Get an rlib name from the crate name
 # $(1) is the name of the crate
 define rlib-name
@@ -35,6 +41,11 @@ define base-crate-rule
 $(call rlib-name,$(2)) : $$(shell find $(1) -type f) $$(foreach l,$(3), $(call rlib-name,$$(l)))
 	@ echo "[RS  ] Compiling \"kernel/$(1)/lib.rs\"..." # for \"kernel/$$@\""
 	$$(HIDE_SIGIL) $$(RUST) $$(RSFLAGS) $(4) --crate-type=rlib $(1)/lib.rs --out-dir libs
+
+$(call doc-name,$(2)) : $$(shell find $(1) -type f) $$(foreach l,$(3), $(call rlib-name,$$(l)))
+	@ echo "[RDOC] Documenting \"kernel/$(1)\"..."
+	$$(HIDE_SIGIL) $$(RUSTDOC) $$(RDFLAGS) --crate-name $(2) --output docs $(1)/lib.rs
+
 endef
 
 # A Crate with custom flags

@@ -4,9 +4,11 @@ AR        := ar
 PYTHON    := python
 CSCOPE    := cscope
 RUST      := rustc
+RUSTDOC   := rustdoc
 MKRESCUE  := grub-mkrescue
 
 RSFLAGS   += -g --target=i686-unknown-linux-gnu -Z no-landing-pads
+RDFLAGS   += --target=i686-unknown-linux-gnu
 CFLAGS    += -fno-builtin -nostdinc -std=c99 -g3 -gdwarf-3 -fno-stack-protector -m32 -march=i686 -fsigned-char -Iinclude
 CFLAGS    += -Wall -Wredundant-decls -Wundef -Wpointer-arith -Wfloat-equal -Wnested-externs -Wvla -Winline -Wextra -Wno-unused-parameter -Wno-unused-function -Wno-unused-variable -Wno-attributes
 ASFLAGS   := -D__ASSEMBLY__
@@ -17,8 +19,11 @@ include ../Config.mk
 include ../CheckTools.mk
 
 RSFLAGS   += $(foreach bool,$(COMPILE_CONFIG_BOOLS),$(if $(findstring 1,$($(bool))),--cfg $(bool),))
+RDFLAGS   += $(foreach bool,$(COMPILE_CONFIG_BOOLS),$(if $(findstring 1,$($(bool))),--cfg $(bool),))
 RSFLAGS   += $(foreach r,$(REMOVE_DBG), --cfg NDEBUG_$(r) )
+RDFLAGS   += $(foreach r,$(REMOVE_DBG), --cfg NDEBUG_$(r) )
 RSFLAGS   += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
+RDFLAGS   += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
 
 ifeq ($(USE_STACK_CHECK),"FALSE")
 RSFLAGS += -C no-stack-check --cfg NO_STACK_CHECK
