@@ -243,35 +243,76 @@ The entire reason this module is necessary is basically that \rust{}
 lacks any ability to express this sort of strange lifetime semantics.
 
 \subsection{Crate: \texttt{drivers}}
-The \texttt{drivers} crate will hold most of the code related to drivers
-in Reenix. It will hold implementations for taking in keyboard input,
-reading/writing from disks and displaying text on the screen. It may
-also hold the \texttt{acpi} and \texttt{pci} implementations instead of
-\texttt{startup} (although this is only likely if these are eventually
-rewritten into \rust{}).
+The \texttt{drivers} crate holds the code related to drivers in Reenix. It
+holds implementations for taking in keyboard input, reading/writing from disks
+and displaying text on the screen. It may in the future also hold the
+\texttt{acpi} and \texttt{pci} implementations instead of \texttt{startup}
+(although this is only likely if these are eventually rewritten into \rust{}).
 
-The overall design of the drivers will be similar to the Weenix
-version. There will be block and byte devices which will each define a
-trait for what they can do. These will have implementations for each
-of the various devices in Weenix. We will need to be careful in here
-as, since most of the implementation of these structures is invoked in
-interrupt handler's we cannot use allocation. Annoyingly verifying this
-is somewhat tricky due to the indirection of \rust{}'s libraries but
-should not be a huge obstacle.
+The overall design of the drivers is similar to the Weenix version. At the core
+of the crate we have a \texttt{WDevice<T>} and a \texttt{RDevice<T>} trait.
+These traits can, respectively, read and write data in chunks of \texttt{T}.
+There is also a \texttt{Device<T>} trait which is simply something that is both
+these traits.  There are block and byte devices which each define these traits
+for \texttt{[u8, .. PAGE\_SIZE]} and \texttt{u8} respectively. These have
+implementations for each of the various devices in Weenix. We need to be
+careful in here as, since most of the implementation of these structures is
+invoked in interrupt handlers we cannot use allocation.  Annoyingly verifying
+this is somewhat tricky due to the indirection of \rust{}'s libraries but
+realistically we can guarantee this just by checking the code in question and
+so is not a huge obstacle. Furthermore this challenge is also present in the
+\texttt{C} version of Weenix.
 
-A big improvement we will have writing this in \rust{} over \texttt{C} is
-that we get the indirection of \texttt{vtables}, which weenix implements
-manually, basically for free. This will make the implementation of the
-drivers somewhat easier as well as make their use much less cryptic. Also
-this language support means we do not need many of the somewhat magic
-macros such as \texttt{bd\_to\_ata}. Furthermore we have the nice
-advantage that the language itself will check to make sure that all
-implementors of these interfaces have all the right functions with
-the right types. This makes implementations of new types of drivers
-somewhat easier.
+This crate depends on the \texttt{procs} crate to be able to handle interrupts,
+as well as the \texttt{collections} and \texttt{alloc} crates.
 
-More details about the design and implementation of this crate will be
-added as I get closer to implementing it.
+\subsubsection{Advantages of Rust: \texttt{VTables} and Traits}
+A big improvement we will have writing this in \rust{} over \texttt{C} is that
+we get the indirection of \texttt{vtables}, which weenix implements manually,
+basically for free (at least implementation wise). This makes the
+implementation of the drivers somewhat easier as well as makes their use much
+less cryptic. Also this language support means we do not need many of the
+somewhat magic macros such as \texttt{bd\_to\_ata}. Furthermore we have the
+nice advantage that the language itself will check to make sure that all
+implementors of these interfaces have all the right functions with the right
+types. This makes implementations of new types of drivers somewhat easier.
+Furthermore this also makes it somewhat easier to see how we could go about
+adding hot-pluggable devices, although no such implementation is attempted in
+this project.
+
+\subsubsection{Challenge: Aligned data}
+Currently \rust{} has no way of specifying that data should be aligned to any
+particular degree. This is annoying because it means I need to basically copy a
+structure into memory at a particular alignment for DMA to work, which is very
+hacky.  Luckily there are few times where data is required to have a specific
+alignment in Reenix so this is not a very large issue. Besides which the fact
+that my allocator currently does not really make any guarantees about alignment
+would likely kill this feature for heap allocated structures.
+
+\subsubsection{Module: \texttt{bytedev::tty}}
+This module contains the implementation for \texttt{TTY}s in Reenix. It is
+structured very similarly to the one in weenix, with a line discipline handling
+translation from the input chars to the display chars, a virtual terminal
+keeping track of whats on the screen, a screen module for actually writing to
+the screen, and a keyboard module for taking keyboard input. These are
+implemented similarly to weenix but we make use of traits extensively to hide
+implementation details from each part. Theoretically it should be easily
+possible to replace, for example, the standard line discipline with one that
+handles input differently without any of the other parts of the tty noticing.
+At the moment, however, no support is included for doing this without
+recompiling.
+
+\subsubsection{Module: \texttt{blockdev::disk}}
+This module contains the implementation of disk read/write in Reenix. It is
+again structured similarly to weenix and uses DMA to control actual access.
+Outside of this module all disk access is done only through the \texttt{Device}
+trait and so is completely blind to what the actual implementation of disks
+are. Like weenix we make no attempt to support slave devices and require the
+data we are reading/writing to be placed in page aligned buffers. Unlike weenix
+however we have the nice advantage of having much of the bounds checking done
+for us. In rust the bounds of an array are always passed along with it to any
+functions and so we can be much more sure that we are not accessing or
+overwriting uninitialized or unowned memory.
 
 \subsection{Crate: \texttt{fs}}
 The \texttt{fs} crate holds an implementation of the VFS subsystem
