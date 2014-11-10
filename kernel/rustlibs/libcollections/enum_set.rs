@@ -16,9 +16,7 @@
 use core::prelude::*;
 use core::fmt;
 
-// FIXME(conventions): implement BitXor
 // FIXME(contentions): implement union family of methods? (general design may be wrong here)
-// FIXME(conventions): implement len
 
 #[deriving(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 /// A specialized `Set` implementation to use enum types.
@@ -90,6 +88,12 @@ impl<E:CLike> EnumSet<E> {
     #[unstable = "matches collection reform specification, waiting for dust to settle"]
     pub fn new() -> EnumSet<E> {
         EnumSet {bits: 0}
+    }
+
+    /// Returns the number of elements in the given `EnumSet`.
+    #[unstable = "matches collection reform specification, waiting for dust to settle"]
+    pub fn len(&self) -> uint {
+        self.bits.count_ones()
     }
 
     /// Returns true if the `EnumSet` is empty.
@@ -196,6 +200,12 @@ impl<E:CLike> BitAnd<EnumSet<E>, EnumSet<E>> for EnumSet<E> {
     }
 }
 
+impl<E:CLike> BitXor<EnumSet<E>, EnumSet<E>> for EnumSet<E> {
+    fn bitxor(&self, e: &EnumSet<E>) -> EnumSet<E> {
+        EnumSet {bits: self.bits ^ e.bits}
+    }
+}
+
 /// An iterator over an EnumSet
 pub struct Items<E> {
     index: uint,
@@ -227,6 +237,22 @@ impl<E:CLike> Iterator<E> for Items<E> {
     fn size_hint(&self) -> (uint, Option<uint>) {
         let exact = self.bits.count_ones();
         (exact, Some(exact))
+    }
+}
+
+impl<E:CLike> FromIterator<E> for EnumSet<E> {
+    fn from_iter<I:Iterator<E>>(iterator: I) -> EnumSet<E> {
+        let mut ret = EnumSet::new();
+        ret.extend(iterator);
+        ret
+    }
+}
+
+impl<E:CLike> Extend<E> for EnumSet<E> {
+    fn extend<I: Iterator<E>>(&mut self, mut iterator: I) {
+        for element in iterator {
+            self.insert(element);
+        }
     }
 }
 
@@ -267,6 +293,20 @@ mod test {
         assert_eq!("{A}", e.to_string().as_slice());
         e.insert(C);
         assert_eq!("{A, C}", e.to_string().as_slice());
+    }
+
+    #[test]
+    fn test_len() {
+        let mut e = EnumSet::new();
+        assert_eq!(e.len(), 0);
+        e.insert(A);
+        e.insert(B);
+        e.insert(C);
+        assert_eq!(e.len(), 3);
+        e.remove(&A);
+        assert_eq!(e.len(), 2);
+        e.clear();
+        assert_eq!(e.len(), 0);
     }
 
     ///////////////////////////////////////////////////////////////////////////
@@ -398,9 +438,29 @@ mod test {
         let elems = e_intersection.iter().collect();
         assert_eq!(vec![C], elems)
 
+        // Another way to express intersection
+        let e_intersection = e1 - (e1 - e2);
+        let elems = e_intersection.iter().collect();
+        assert_eq!(vec![C], elems)
+
         let e_subtract = e1 - e2;
         let elems = e_subtract.iter().collect();
         assert_eq!(vec![A], elems)
+
+        // Bitwise XOR of two sets, aka symmetric difference
+        let e_symmetric_diff = e1 ^ e2;
+        let elems = e_symmetric_diff.iter().collect();
+        assert_eq!(vec![A,B], elems)
+
+        // Another way to express symmetric difference
+        let e_symmetric_diff = (e1 - e2) | (e2 - e1);
+        let elems = e_symmetric_diff.iter().collect();
+        assert_eq!(vec![A,B], elems)
+
+        // Yet another way to express symmetric difference
+        let e_symmetric_diff = (e1 | e2) - (e1 & e2);
+        let elems = e_symmetric_diff.iter().collect();
+        assert_eq!(vec![A,B], elems)
     }
 
     #[test]

@@ -484,8 +484,8 @@ impl<T> FromIterator<T> for Vec<T> {
     }
 }
 
-#[experimental = "waiting on Extendable stability"]
-impl<T> Extendable<T> for Vec<T> {
+#[experimental = "waiting on Extend stability"]
+impl<T> Extend<T> for Vec<T> {
     #[inline]
     fn extend<I: Iterator<T>>(&mut self, mut iterator: I) {
         let (lower, _) = iterator.size_hint();
@@ -801,14 +801,13 @@ impl<T> Vec<T> {
     ///
     /// # Example
     /// ```
-    /// let mut v = vec!["foo".to_string(), "bar".to_string(),
-    ///                  "baz".to_string(), "qux".to_string()];
+    /// let mut v = vec!["foo", "bar", "baz", "qux"];
     ///
-    /// assert_eq!(v.swap_remove(1), Some("bar".to_string()));
-    /// assert_eq!(v, vec!["foo".to_string(), "qux".to_string(), "baz".to_string()]);
+    /// assert_eq!(v.swap_remove(1), Some("bar"));
+    /// assert_eq!(v, vec!["foo", "qux", "baz"]);
     ///
-    /// assert_eq!(v.swap_remove(0), Some("foo".to_string()));
-    /// assert_eq!(v, vec!["baz".to_string(), "qux".to_string()]);
+    /// assert_eq!(v.swap_remove(0), Some("foo"));
+    /// assert_eq!(v, vec!["baz", "qux"]);
     ///
     /// assert_eq!(v.swap_remove(2), None);
     /// ```

@@ -1,3 +1,5 @@
+//! A Least Recently Used cache.
+
 use alloc::boxed::*;
 use collections::*;
 use core::cell::Cell;
@@ -7,29 +9,12 @@ use core::default::Default;
 use mm::alloc::Allocation;
 use core::mem::{transmute_copy, transmute, size_of};
 use core::prelude::*;
-use core::ptr::*;
+use key_ref::*;
+use list_node::ListNode;
 
 pub fn init_stage1() {}
 pub fn init_stage2() {}
 pub fn init_stage3() {}
-
-/// A struct used as the key for our map so we can get the key back out without trouble.
-struct KeyRef<K> { k: *const K, }
-impl<K> KeyRef<K> {
-    pub fn new(v: &K) -> KeyRef<K> { unsafe { KeyRef { k: transmute(v), } } }
-    pub fn as_ref<'a>(&'a self) -> &'a K { unsafe { self.k.as_ref().expect("LRU-cache key ref should never be null") } }
-}
-
-impl<K: PartialEq>  PartialEq  for KeyRef<K> {
-    fn eq(&self, o: &KeyRef<K>)  -> bool { self.as_ref().eq( o.as_ref()) }
-}
-impl<K: PartialOrd> PartialOrd for KeyRef<K> {
-    fn partial_cmp(&self, o: &KeyRef<K>) -> Option<Ordering> { self.as_ref().partial_cmp(o.as_ref()) }
-}
-impl<K: Eq>  Eq  for KeyRef<K> { }
-impl<K: Ord> Ord for KeyRef<K> {
-    fn cmp(&self, o: &KeyRef<K>) -> Ordering { self.as_ref().cmp(o.as_ref()) }
-}
 
 /// This is a LRU cache implemented by a TreeMap referencing nodes in a linked list.
 ///
@@ -37,119 +22,19 @@ impl<K: Ord> Ord for KeyRef<K> {
 /// by iterating over it. We also provide methods that lets one get a node without using it and to
 /// assign nodes to particular places in the cache (see touch_value and curse_value).
 pub struct LruCache<K, V> {
-    map: TreeMap<KeyRef<K>, Box<LruEntry<K, V>>>,
-    ptr: Box<LruEntry<K, V>>,
-}
-
-struct LruEntry<K, V> {
-    val : Option<(K, V)>,
-    next: Cell<*mut LruEntry<K, V>>,
-    prev: Cell<*mut LruEntry<K, V>>,
+    map: TreeMap<KeyRef<K>, Box<ListNode<K, V>>>,
+    ptr: Box<ListNode<K, V>>,
 }
 
 /// This can be called to make sure there is an allocator able to efficiently hold be used by a lru
 /// cache on the given key-value types.
 pub fn request_lru_cache_allocator<K, V>(n: &'static str) {
     use mm::alloc::request_slab_allocator;
-    request_slab_allocator(n, size_of::<LruEntry<K, V>>() as u32);
-}
-
-impl<K: Ord, V> LruEntry<K, V> {
-    pub fn new(k: K, v: V) -> Box<LruEntry<K, V>> {
-        let mut res = LruEntry::initial();
-        res.val = Some((k, v));
-        res
-    }
-
-    pub fn initial() -> Box<LruEntry<K, V>> {
-        let res = box LruEntry {
-            val : None,
-            next: Cell::new(0 as *mut LruEntry<K, V>),
-            prev: Cell::new(0 as *mut LruEntry<K, V>),
-        };
-        unsafe {
-            res.next.set(transmute_copy(&res));
-            res.prev.set(transmute_copy(&res));
-        }
-        res
-    }
-    /// Take this entry out of the list (if it is in one). This needs to take a non-mutable pointer
-    /// so we can do this even in cases where we are doing (i.e. get).
-    pub fn remove_self(&self) {
-        self.next().prev.set(self.prev.get());
-        self.prev().next.set(self.next.get());
-        unsafe {
-            self.next.set(transmute(self));
-            self.prev.set(transmute(self));
-        }
-    }
-    /// Marks this one as being used less recently than o, but more recently than o.next()
-    pub fn insert_after(&self, o: &LruEntry<K, V>) {
-        self.next.set(o.next.get());
-        unsafe {
-            self.prev.set(transmute(&*o));
-            self.prev().next.set(transmute(&*self));
-            self.next().prev.set(transmute(&*self));
-        }
-    }
-    /// Get the one used less recently then this one.
-    pub fn next_mut<'a>(&'a mut self) -> &'a mut LruEntry<K, V> {
-        unsafe { self.next.get().as_mut().expect("Bad LRU cache state, no next pointer") }
-    }
-    /// Get the one that was used more recently than this one.
-    pub fn prev_mut<'a>(&'a mut self) -> &'a mut LruEntry<K, V> {
-        unsafe { self.prev.get().as_mut().expect("Bad LRU cache state, no prev pointer") }
-    }
-    pub fn next<'a>(&'a self) -> &'a LruEntry<K, V> {
-        unsafe { self.next.get().as_ref().expect("Bad LRU cache state, no next pointer") }
-    }
-    pub fn prev<'a>(&'a self) -> &'a LruEntry<K, V> {
-        unsafe { self.prev.get().as_ref().expect("Bad LRU cache state, no prev pointer") }
-    }
-
-    pub fn is_start(&self) -> bool { self.val.is_none() }
-
-    /// Return a ref to the value. Panic if we are not a list element.
-    pub fn value<'a>(&'a self) -> &'a V { self.entry().1 }
-
-    /// Return a ref mut to the value. Panic if we are not a list element.
-    pub fn value_mut<'a>(&'a mut self) -> &'a mut V { self.entry_mut().1 }
-
-    /// Return a ref to the key. Panic if we are not a list element.
-    pub fn key<'a>(&'a self) -> &'a K { self.entry().0 }
-
-    /// Take the value from the element. This destroys the element. The element cannot be in any
-    /// cache when this is called.
-    pub fn take(self) -> V {
-        // Ensure we are not in any list.
-        assert!(self.prev.get() == self.next.get() && self.prev().prev.get() == self.prev.get());
-        self.take_full().1
-    }
-
-    /// Take the value and key from the element. This destroys the element. The element cannot be
-    /// in any cache when this is called.
-    pub fn take_full(mut self) -> (K, V) {
-        assert!(self.prev.get() == self.next.get() && self.prev().prev.get() == self.prev.get());
-        self.val.take().expect("Take called on start element")
-    }
-
-    pub fn entry_mut<'a>(&'a mut self) -> (&'a K, &'a mut V) {
-        match self.val {
-            Some((ref k, ref mut v)) => (k, v),
-            None => kpanic!("entry_mut called on start element"),
-        }
-    }
-
-    pub fn entry<'a>(&'a self) -> (&'a K, &'a V) {
-        match self.val {
-            Some((ref k, ref v)) => (k, v),
-            None => kpanic!("entry called on start element"),
-        }
-    }
+    request_slab_allocator(n, size_of::<ListNode<K, V>>() as u32);
 }
 
 /// An iterator going from least to most recently used that yields mutable references.
-pub struct LTMMutEntries<'a, K: 'a, V: 'a> { cur: &'a mut LruEntry<K, V>, }
+pub struct LTMMutEntries<'a, K: 'a, V: 'a> { cur: &'a mut ListNode<K, V>, }
 impl<'a, K: Ord, V> Iterator<(&'a K, &'a mut V)> for LTMMutEntries<'a, K, V> {
     fn next(&mut self) -> Option<(&'a K, &'a mut V)> {
         if self.cur.is_start() { None } else {
@@ -162,7 +47,7 @@ impl<'a, K: Ord, V> Iterator<(&'a K, &'a mut V)> for LTMMutEntries<'a, K, V> {
 }
 
 /// An iterator going from most to least recently used that yields mutable references.
-pub struct MTLMutEntries<'a, K: 'a, V: 'a> { cur: &'a mut LruEntry<K, V>, }
+pub struct MTLMutEntries<'a, K: 'a, V: 'a> { cur: &'a mut ListNode<K, V>, }
 impl<'a, K: Ord, V> Iterator<(&'a K, &'a mut V)> for MTLMutEntries<'a, K, V> {
     fn next(&mut self) -> Option<(&'a K, &'a mut V)> {
         if self.cur.is_start() { None } else {
@@ -175,7 +60,7 @@ impl<'a, K: Ord, V> Iterator<(&'a K, &'a mut V)> for MTLMutEntries<'a, K, V> {
 }
 
 /// An iterator going from least to most recently used that yields immutable references.
-pub struct LTMEntries<'a, K: 'a, V: 'a> { cur: &'a LruEntry<K, V>, }
+pub struct LTMEntries<'a, K: 'a, V: 'a> { cur: &'a ListNode<K, V>, }
 impl<'a, K: Ord, V> Iterator<(&'a K, &'a V)> for LTMEntries<'a, K, V> {
     fn next(&mut self) -> Option<(&'a K, &'a V)> {
         if self.cur.is_start() { None } else {
@@ -187,7 +72,7 @@ impl<'a, K: Ord, V> Iterator<(&'a K, &'a V)> for LTMEntries<'a, K, V> {
 }
 
 /// An iterator going from most to least recently used that yields immutable references.
-pub struct MTLEntries<'a, K: 'a, V: 'a> { cur: &'a LruEntry<K, V>, }
+pub struct MTLEntries<'a, K: 'a, V: 'a> { cur: &'a ListNode<K, V>, }
 impl<'a, K: Ord, V> Iterator<(&'a K, &'a V)> for MTLEntries<'a, K, V> {
     fn next(&mut self) -> Option<(&'a K, &'a V)> {
         if self.cur.is_start() { None } else {
@@ -210,7 +95,7 @@ impl<'a, K: Ord, V> Deref<(&'a K, &'a V)> for ModifiableEntry<'a, K, V> {
 }
 
 /// An iterator going from most to least recently used that yields removable references.
-pub struct MTLModifyEntries<'a, K: 'a, V: 'a> { cur: &'a LruEntry<K, V>, cache: &'a mut LruCache<K, V>, }
+pub struct MTLModifyEntries<'a, K: 'a, V: 'a> { cur: &'a ListNode<K, V>, cache: &'a mut LruCache<K, V>, }
 impl<'a, K: Ord, V> Iterator<ModifiableEntry<'a, K, V>> for MTLModifyEntries<'a, K, V> {
     fn next(&mut self) -> Option<ModifiableEntry<'a, K, V>> {
         if self.cur.is_start() { None } else {
@@ -222,7 +107,7 @@ impl<'a, K: Ord, V> Iterator<ModifiableEntry<'a, K, V>> for MTLModifyEntries<'a,
 }
 
 /// An iterator going from least to most recently used that yields removable references.
-pub struct LTMModifyEntries<'a, K: 'a, V: 'a> { cur: &'a LruEntry<K, V>, cache: &'a mut LruCache<K, V>, }
+pub struct LTMModifyEntries<'a, K: 'a, V: 'a> { cur: &'a ListNode<K, V>, cache: &'a mut LruCache<K, V>, }
 impl<'a, K: Ord, V> Iterator<ModifiableEntry<'a, K, V>> for LTMModifyEntries<'a, K, V> {
     fn next(&mut self) -> Option<ModifiableEntry<'a, K, V>> {
         if self.cur.is_start() { None } else {
@@ -250,7 +135,7 @@ impl<K: Ord, V> LruCache<K, V> {
     pub fn new() -> Allocation<LruCache<K, V>> {
         Ok(LruCache {
             map: try!(alloc!(try TreeMap::new())),
-            ptr: try!(alloc!(try LruEntry::initial())),
+            ptr: try!(alloc!(try ListNode::initial())),
         })
     }
 
@@ -267,14 +152,14 @@ impl<K: Ord, V> LruCache<K, V> {
 
     /// Remove the most recently used item and return it, along with it's key.
     pub fn pop_mru<'a>(&'a mut self) -> Option<(K, V)> {
-        let mru : &'a LruEntry<K, V> = unsafe { transmute(self.ptr.next()) };
+        let mru : &'a ListNode<K, V> = unsafe { transmute(self.ptr.next()) };
         if mru.is_start() { return None; }
         self.pop_entry(mru.key())
     }
 
     /// Remove the least recently used item and return it, along with its key.
     pub fn pop_lru<'a>(&'a mut self) -> Option<(K, V)> {
-        let lru : &'a LruEntry<K, V> = unsafe { transmute(self.ptr.prev()) };
+        let lru : &'a ListNode<K, V> = unsafe { transmute(self.ptr.prev()) };
         if lru.is_start() { return None; }
         self.pop_entry(lru.key())
     }
@@ -338,7 +223,7 @@ impl<K: Ord, V> LruCache<K, V> {
     /// that value is returned. Otherwise, None is returned.
     /// The inserted value is considered to be the most recently used value in the cache.
     pub fn insert(&mut self, key: K, val: V) -> Option<V> {
-        let ent = LruEntry::new(key, val);
+        let ent = ListNode::new(key, val);
         let kr = KeyRef::new(ent.key());
         self.make_mru(&*ent);
         if let Some(prev) = self.map.insert(kr, ent) {
@@ -370,9 +255,9 @@ impl<K: Ord, V> LruCache<K, V> {
     /// Removes a key-value pair from the map. Returns true if the key was present in the map.
     pub fn remove(&mut self, key: &K) -> bool { self.pop(key).is_some() }
 
-    /// Sets the given LruEntry as the most recently used.
+    /// Sets the given ListNode as the most recently used.
     #[inline]
-    fn make_mru(&self, ent: &LruEntry<K, V>) {
+    fn make_mru(&self, ent: &ListNode<K, V>) {
         ent.remove_self();
         ent.insert_after(&*self.ptr);
     }
@@ -466,7 +351,7 @@ impl<K: Clone + Ord, V: Clone> Clone for LruCache<K, V> {
     }
 }
 
-impl<K: Ord, V> Extendable<(K, V)> for LruCache<K, V> {
+impl<K: Ord, V> Extend<(K, V)> for LruCache<K, V> {
     fn extend<T: Iterator<(K, V)>>(&mut self, mut iter: T) {
         for (k, v) in iter { self.insert(k, v); }
     }
