@@ -1,6 +1,6 @@
 CFLAGS    := -ffreestanding
-RSFLAGS   := -L libs -C no-redzone -Z gc
-RDFLAGS   := -L libs --no-defaults --passes unindent-comments --passes collapse-docs --passes strip-hidden
+RSFLAGS   :=
+RDFLAGS   := --no-defaults --passes unindent-comments --passes collapse-docs --passes strip-hidden
 LDFLAGS   := -m elf_i386 -z nodefaultlib
 KERNEL_LDFLAGS := --strip-all
 
@@ -8,8 +8,6 @@ include ../Global.mk
 include Funcs.mk
 
 CFLAGS    += -D__KERNEL__
-RSFLAGS   += --cfg kernel
-RDFLAGS   += --cfg kernel
 
 ifeq ("true",$(LD_OPT))
 LDFLAGS += --gc-sections
@@ -24,12 +22,21 @@ SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS])) drivers/pci.c dr
 OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
-CRATES := base mm alloc libc main startup collections procs drivers util
-BUILT_CRATES := $(foreach dr, $(CRATES), $(call rlib-name,$(dr)))
+KERNEL_CRATES := base mm alloc libc main startup collections procs drivers util
+PLUGINS := enabled
+CRATES := $(KERNEL_CRATES) $(PLUGINS)
+$(foreach dr,$(KERNEL_CRATES),$(call set-crate-name,$(dr),$(call rlib-name,$(dr))))
+$(foreach dr,$(PLUGINS),      $(call set-crate-name,$(dr),$(call dylib-name,$(dr))))
+
+BUILT_KERNEL_CRATES := $(foreach dr, $(KERNEL_CRATES), $(call crate-name,$(dr)))
+BUILT_CRATES := $(foreach dr, $(PLUGINS), $(call crate-name,$(dr))) $(BUILT_KERNEL_CRATES)
 CRATE_DOCS := $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 
-RSFLAGS += $(foreach dr, $(CRATES), --extern $(dr)=$(call rlib-name,$(dr)))
-RDFLAGS += $(foreach dr, $(CRATES), --extern $(dr)=$(call rlib-name,$(dr)))
+KERNEL_RSFLAGS := $(foreach dr, $(CRATES), --extern $(dr)=$(call crate-name,$(dr)))
+KERNEL_RSFLAGS += -L libs -C no-redzone -Z gc --cfg kernel --target=i686-unknown-linux-gnu
+
+KERNEL_RDFLAGS := $(foreach dr, $(CRATES), --extern $(dr)=$(call crate-name,$(dr)))
+KERNEL_RDFLAGS += -L libs --cfg kernel --target=i686-unknown-linux-gnu
 
 # List of prebuilt modules that do not include the source
 PREBUILT  :=
@@ -51,6 +58,8 @@ ISO_KERNEL := $(ISO_DIR)/boot/$(KERNEL)
 
 RSFLAGS := $(strip $(RSFLAGS))
 RDFLAGS := $(strip $(RDFLAGS))
+KERNEL_RSFLAGS := $(strip $(KERNEL_RSFLAGS))
+KERNEL_RDFLAGS := $(strip $(KERNEL_RDFLAGS))
 
 .PHONY: all cscope clean tidy docs
 
@@ -62,7 +71,8 @@ $(eval $(call builtin-crate-rule,libc,))
 $(eval $(call builtin-crate-rule,collections,alloc libc))
 $(eval $(call builtin-crate-rule,alloc,mm libc))
 
-$(eval $(call crate-rule,base,libc))
+$(eval $(call plugin-rule,enabled,))
+$(eval $(call crate-rule,base,libc enabled ))
 $(eval $(call crate-rule,mm,base libc))
 $(eval $(call crate-rule,startup,alloc mm base libc collections))
 $(eval $(call crate-rule,procs,startup alloc base libc mm collections))
@@ -111,9 +121,9 @@ $(GDBCOMM): $(SCRIPTS)
 	$(HIDE_SIGIL) $(foreach script, $(SCRIPTS), echo $(abspath $(script)) >> $(dir $(script))$(shell basename $(dir $(script))).gdbcomm; )
 	$(HIDE_SIGIL) cat */*.gdbcomm > $@
 
-libs/libreenix.a : reenix.rs $(BUILT_CRATES)
+libs/libreenix.a : reenix.rs $(BUILT_KERNEL_CRATES)
 	@ echo "[RS  ] Compiling \"kernel/$<\"..."
-	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib $(RSFLAGS) $< --out-dir=libs
+	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib $(RSFLAGS) $(KERNEL_RSFLAGS) $< --out-dir=libs
 
 %.o: %.c
 	@ echo "[CC  ] Compiling \"kernel/$<\"..."

@@ -9,6 +9,7 @@
 #![feature(asm, macro_rules, globs, concat_idents,lang_items, trace_macros, phase)]
 
 
+#[phase(plugin)] extern crate enabled;
 #[phase(plugin, link)] extern crate core;
 extern crate libc;
 

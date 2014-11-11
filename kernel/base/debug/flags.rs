@@ -44,7 +44,7 @@ macro_rules! dbg_modes (
 
             pub fn get_default() -> DbgMode {
                 let mut ret : DbgMode = ALL;
-                $(if cfg!($cfg) { ret = ret - $n })+
+                $(if is_enabled!(DEBUG -> $n) { ret = ret - $n })+
                 return ret;
             }
         }
