@@ -2,6 +2,8 @@
 
 #![crate_name="drivers"]
 #![crate_type="rlib"]
+#![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
+       html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![no_std]
 #![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics, if_let)]
 

@@ -7,7 +7,8 @@
 #![crate_name="mm"]
 #![crate_type="rlib"]
 #![allow(non_camel_case_types)]
-//#![allow(missing_doc)]
+#![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
+       html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![feature(phase, globs, struct_variant, macro_rules, asm, if_let, tuple_indexing)]
 #![no_std]
 

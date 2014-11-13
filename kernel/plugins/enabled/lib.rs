@@ -1,6 +1,8 @@
 #![crate_type="dylib"]
 #![crate_name="enabled"]
 #![feature(plugin_registrar)]
+#![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
+       html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
 #![doc = "A crate defining an is_enabled macro"]
 extern crate syntax;

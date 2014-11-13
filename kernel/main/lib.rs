@@ -3,6 +3,8 @@
 #![crate_name="main"]
 #![crate_type="rlib"]
 #![no_std]
+#![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
+       html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
 #![feature(globs, phase, macro_rules, asm, if_let, unsafe_destructor)]
 
@@ -16,7 +18,7 @@ extern crate startup;
 extern crate libc;
 extern crate collections;
 extern crate drivers;
-extern crate util;
+//extern crate util;
 
 use procs::cleanup_bootstrap_function;
 use base::kernel;
