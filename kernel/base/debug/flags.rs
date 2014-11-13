@@ -44,7 +44,7 @@ macro_rules! dbg_modes (
 
             pub fn get_default() -> DbgMode {
                 let mut ret : DbgMode = ALL;
-                $(if is_enabled!(DEBUG -> $n) { ret = ret - $n })+
+                $(if is_disabled!(DEBUG -> $n) { ret = ret - $n })+
                 return ret;
             }
         }
@@ -87,6 +87,9 @@ dbg_modes!(
     (VMMAP,       35, color::BGREEN,  "vm area mappings"),
     (ELF,         37, color::BGREEN,  "elf loader"),
     (USER,        38, color::BYELLOW, "user land"),
+    (PCACHE,      39, color::BMAGENTA,"pinnable cache system"),
+
+    (DANGER,      62, color::RED,     "A likely very dangerous operation"),
 
     // This one should always be last.
     (PANIC,       63, color::RED,     "PANIC!")
