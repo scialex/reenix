@@ -2,19 +2,14 @@
 
 use alloc::boxed::*;
 use collections::*;
-use core::cell::Cell;
-use core::fmt;
-use core::iter;
 use core::default::Default;
-use mm::alloc::Allocation;
-use core::mem::{transmute_copy, transmute, size_of};
+use core::{fmt, iter};
+use core::mem::{size_of, transmute};
 use core::prelude::*;
+use core::ptr::*;
 use key_ref::*;
 use list_node::ListNode;
-
-pub fn init_stage1() {}
-pub fn init_stage2() {}
-pub fn init_stage3() {}
+use mm::alloc::Allocation;
 
 /// This is a LRU cache implemented by a TreeMap referencing nodes in a linked list.
 ///
