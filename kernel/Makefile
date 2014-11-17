@@ -23,7 +23,7 @@ OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
 KERNEL_CRATES := base mm alloc libc main startup collections procs drivers util
-PLUGINS := enabled hoare
+PLUGINS := enabled hoare bassert
 CRATES := $(KERNEL_CRATES) $(PLUGINS)
 $(foreach dr,$(KERNEL_CRATES),$(call set-crate-name,$(dr),$(call rlib-name,$(dr))))
 $(foreach dr,$(PLUGINS),      $(call set-crate-name,$(dr),$(call dylib-name,$(dr))))
@@ -67,25 +67,36 @@ KERNEL_RDFLAGS := $(strip $(KERNEL_RDFLAGS))
 all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 	@ echo "[MAKE] Finished building \"kernel\"..."
 
-$(eval $(call builtin-crate-rule,libc,))
-$(eval $(call builtin-crate-rule,collections,alloc libc))
-$(eval $(call builtin-crate-rule,alloc,mm libc))
+BASIC_REQS := alloc base collections libc mm
 
-$(eval $(call plugin-rule,enabled,))
-$(eval $(call plugin-rule,hoare,))
+# Rust libs
+$(eval $(call builtin-crate-rule, libc,))
+$(eval $(call builtin-crate-rule, alloc,       libc mm))
+$(eval $(call builtin-crate-rule, collections, libc mm alloc))
 
-$(eval $(call crate-rule,base,libc))
-$(eval $(call crate-rule,mm,base libc))
-$(eval $(call crate-rule,startup,alloc mm base libc collections))
-$(eval $(call crate-rule,procs,startup alloc base libc mm collections))
-$(eval $(call crate-rule,util,alloc base libc mm collections))
-# TODO For some reason LLVM doesn't like --opt-level=2 in drivers.
-$(eval $(call long-crate-rule,drivers,procs alloc mm collections base,--opt-level=1))
+# Plugins
+$(eval $(call plugin-rule, enabled,))
+$(eval $(call plugin-rule, hoare,))
+$(eval $(call plugin-rule, bassert,))
 
-$(eval $(call crate-rule,main,$(filter-out main,$(CRATES))))
+# Reenix Crates.
+$(eval $(call crate-rule,      base,    libc))
+$(eval $(call crate-rule,      mm,      libc base))
+$(eval $(call crate-rule,      startup, $(BASIC_REQS)))
+$(eval $(call crate-rule,      procs,   $(BASIC_REQS) startup))
+$(eval $(call crate-rule,      util,    $(BASIC_REQS)))
+$(eval $(call crate-rule,      umem,    $(BASIC_REQS) util))
+$(eval $(call long-crate-rule, drivers, $(BASIC_REQS) procs, --opt-level=1)) # TODO For some reason LLVM doesn't like --opt-level=2 in drivers.
+
+# The `main` crate.
+$(eval $(call crate-rule, main,    $(filter-out main, $(CRATES))))
 
 # Make the target for libm
-$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,SFLAGS="-m32 -march=i386" LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static" CFLAGS="-Wno-maybe-uninitialized -g3 -gdwarf-3 -m32 -march=i386 -ffreestanding" ARCH=i386))
+$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,                \
+	SFLAGS="-m32 -march=i386"                                                       \
+   	LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static"                     \
+	CFLAGS="-Wno-maybe-uninitialized -g3 -gdwarf-3 -m32 -march=i386 -ffreestanding" \
+	ARCH=i386))
 
 docs: $(CRATE_DOCS)
 

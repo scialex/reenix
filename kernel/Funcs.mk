@@ -71,26 +71,26 @@ endef
 # $(2) is the list of dependencies
 # $(3) is a list of custom rust flags
 define long-crate-rule
-$(eval $(call base-crate-rule,$(1),$(1),$(2) $$(PLUGINS),$(3) $$(KERNEL_RSFLAGS),$$(KERNEL_RDFLAGS)))
+$(eval $(call base-crate-rule,$(strip $(1)),$(strip $(1)),$(2) $$(PLUGINS),$(3) $$(KERNEL_RSFLAGS),$$(KERNEL_RDFLAGS)))
 endef
 
 # A Crate from reenix
 # $(1) is the name of the crate
 # $(2) is the list of dependencies
 define crate-rule
-$(eval $(call long-crate-rule,$(1),$(2),--opt-level=$$(DEFAULT_CRATE_OPT)))
+$(eval $(call long-crate-rule,$(strip $(1)),$(2),--opt-level=$$(DEFAULT_CRATE_OPT)))
 endef
 
 # A module that is part of rusts stdlib.
 # $(1) is the name of the crate.
 # $(2) is the list of dependencies
 define builtin-crate-rule
-$(eval $(call base-crate-rule,rustlibs/lib$(1),$(1),$(2),$$(KERNEL_RSFLAGS) --allow=dead-code --opt-level=$$(DEFAULT_BUILTIN_CRATE_OPT),$$(KERNEL_RDFLAGS) ))
+$(eval $(call base-crate-rule,rustlibs/lib$(strip $(1)),$(strip $(1)),$(2),$$(KERNEL_RSFLAGS) --allow=dead-code --opt-level=$$(DEFAULT_BUILTIN_CRATE_OPT),$$(KERNEL_RDFLAGS) ))
 endef
 
 # A plugin
 # $(1) is the name of the plugin
 # $(2) is the list of dependencies.
 define plugin-rule
-$(eval $(call base-crate-rule,plugins/$(1),$(1),$(2),,,))
+$(eval $(call base-crate-rule,plugins/$(strip $(1)),$(strip $(1)),$(2),,,))
 endef
