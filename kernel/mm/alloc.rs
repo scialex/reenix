@@ -89,6 +89,7 @@ extern "C" {
 }
 
 /// Try to free up as much memory as possible.
+#[invariant="requests_closed()"]
 pub fn reclaim_memory() {
     let cnt = unsafe { slab_allocators_reclaim(0) };
     dbg!(debug::MM, "reclaimed {} pages from slab allocators", cnt);
@@ -160,6 +161,7 @@ extern "C" {
 
 /// Do one time startup initialization of the slab allocators and associated machinery.
 #[deny(dead_code)]
+#[invariant = "!requests_closed()"]
 pub fn init_stage1() {
     unsafe { slab_init(); }
     let ba = unsafe { &mut BASE_ALLOCATOR };
@@ -167,6 +169,7 @@ pub fn init_stage1() {
     request_slab_allocator("MAX SIZE SLAB", MAX_SLAB_SIZE as u32);
 }
 
+#[invariant = "requests_closed()"]
 pub fn init_stage2() {}
 
 /// are we done with the memory management setup?
@@ -177,12 +180,15 @@ pub fn requests_closed() -> bool { unsafe { REQUESTS_CLOSED } }
 
 /// Note that we have finished creating all needed allocators, we can start using liballoc once
 /// this is called.
+#[precond  = "!requests_closed()"]
+#[postcond = "requests_closed()"]
 pub fn close_requests() { dbg!(debug::MM, "Requests closed"); unsafe { REQUESTS_CLOSED = true; (&mut BASE_ALLOCATOR).finish() } }
 
 /// Request that a slab allocator be made to service requests of the given size.
 ///
 /// One should do this if it is known that there will be a lot of requests for a specific object.
 /// Other sizes will also be created using the same slab allocators, though these might get fragmented.
+#[debug_invariant = "!requests_closed()"]
 pub fn request_slab_allocator(name: &'static str, size: size_t) {
     if requests_closed() {
         dbg!(debug::MM, "New Allocator requested after requests closed. ignoring.");
@@ -398,6 +404,7 @@ impl Allocator {
 // it happens.
 #[allow(unused_unsafe)]
 #[inline]
+#[precond = "requests_closed()"]
 pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
     if !requests_closed() {
         // TODO Decide what I should do here. Panicing might not be best.
@@ -409,6 +416,7 @@ pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
 
 #[allow(unused_unsafe)]
 #[inline]
+#[precond = "requests_closed()"]
 pub unsafe fn reallocate(ptr: *mut u8, old_size: uint, size: uint,
                              align: uint) -> *mut u8 {
     let x = &BASE_ALLOCATOR;
@@ -417,6 +425,7 @@ pub unsafe fn reallocate(ptr: *mut u8, old_size: uint, size: uint,
 
 #[allow(unused_unsafe)]
 #[inline]
+#[precond = "requests_closed()"]
 pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: uint, size : uint,
                                     _align: uint) -> uint {
     let x = &BASE_ALLOCATOR;
@@ -429,21 +438,25 @@ pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: uint, size : uint,
 
 #[allow(unused_unsafe)]
 #[inline]
+#[precond = "requests_closed()"]
 pub unsafe fn deallocate(ptr: *mut u8, size: uint, _align: uint) {
     let x = &BASE_ALLOCATOR;
     x.deallocate(ptr, size, _align)
 }
 
 #[inline]
+#[precond = "requests_closed()"]
 pub fn usable_size(size: uint, _align: uint) -> uint {
     let x = unsafe { &BASE_ALLOCATOR };
     x.usable_size(size, _align)
 }
 
+#[precond = "requests_closed()"]
 pub fn stats_print() {
     dbg!(debug::MM|debug::CORE, "{}", get_stats());
 }
 
+#[precond = "requests_closed()"]
 pub fn get_stats() -> &'static fmt::Show + 'static {
     let x = unsafe { &BASE_ALLOCATOR };
     x as &'static fmt::Show
@@ -451,6 +464,7 @@ pub fn get_stats() -> &'static fmt::Show + 'static {
 
 /// Return's true if we have low memory and have a better then even chance of failing to allocate a
 /// value if asked. Even when true allocations might continue to succeed.
+#[precond = "requests_closed()"]
 pub fn is_memory_low() -> bool {
     (unsafe { &BASE_ALLOCATOR }).is_memory_low()
 }

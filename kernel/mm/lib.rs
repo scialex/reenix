@@ -12,6 +12,7 @@
 #![feature(phase, globs, struct_variant, macro_rules, asm, if_let, tuple_indexing)]
 #![no_std]
 
+#[phase(plugin)] extern crate hoare;
 #[phase(link, plugin)] extern crate core;
 #[phase(link, plugin)] extern crate base;
 extern crate libc;
@@ -41,6 +42,7 @@ extern "C" {
     pub fn realloc(addr: *mut c_void, size: size_t) -> *mut c_void;
 }
 
+#[doc(hidden)]
 mod mm {
     pub use super::alloc;
 }
@@ -210,6 +212,7 @@ pub mod page {
     // them directly.
 }
 
+#[doc(hidden)]
 mod std {
     pub use core::cmp;
     pub use core::fmt;
