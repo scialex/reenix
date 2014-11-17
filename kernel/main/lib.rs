@@ -58,12 +58,14 @@ fn shutdown() -> ! {
 pub static mut IS_PROCS_UP : bool = false;
 // TODO
 fn finish_init() {
+    use base::gdb;
     // TODO VFS Setup.
     procs::init_stage3();
     drivers::init_stage3();
     interrupt::enable();
     interrupt::set_ipl(interrupt::LOW);
     unsafe { IS_PROCS_UP = true; }
+    gdb::initialized_hook();
 }
 extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     cleanup_bootstrap_function();

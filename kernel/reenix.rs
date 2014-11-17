@@ -16,7 +16,7 @@ extern crate main;
 extern crate startup;
 extern crate libc;
 extern crate drivers;
-extern crate util;
+//extern crate util;
 
 use libc::c_void;
 
@@ -28,9 +28,10 @@ extern "C" { fn dbg_init(); }
 fn run_init() {
     use mm;
     use main;
-    use util;
+    //use util;
     use procs;
     use startup;
+    base::gdb::boot_hook();
     unsafe { dbg_init(); }
 
     // This sets up the gdt based stack checking.
@@ -42,8 +43,8 @@ fn run_init() {
     dbg!(debug::CORE, "mm initialized stage 1");
     startup::init_stage1();
     dbg!(debug::CORE, "startup initialized stage 1");
-    util::init_stage1();
-    dbg!(debug::CORE, "util initialized stage 1");
+    //util::init_stage1();
+    //dbg!(debug::CORE, "util initialized stage 1");
     procs::init_stage1();
     dbg!(debug::CORE, "procs initialized stage 1");
     drivers::init_stage1();
@@ -59,8 +60,8 @@ fn run_init() {
     dbg!(debug::CORE, "mm initialized stage 2");
     startup::init_stage2();
     dbg!(debug::CORE, "startup initialized stage 2");
-    util::init_stage2();
-    dbg!(debug::CORE, "util initialized stage 2");
+    //util::init_stage2();
+    //dbg!(debug::CORE, "util initialized stage 2");
     procs::init_stage2();
     dbg!(debug::CORE, "procs initialized stage 2");
     drivers::init_stage2();

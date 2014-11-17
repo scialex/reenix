@@ -40,7 +40,9 @@ extern "C" {
 /// This stops everything.
 #[no_stack_check]
 #[inline]
+#[export_name="hard_shutdown"]
 pub fn halt() -> ! {
+    ::gdb::shutdown_hook();
     unsafe {
         asm!("cli; hlt");
     }

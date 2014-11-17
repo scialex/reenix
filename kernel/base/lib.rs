@@ -19,7 +19,7 @@ extern crate libc;
 // NOTE Needs to go first so everything else can get the macro's defined in it.
 mod bitflags;
 mod macros;
-mod gdb;
+pub mod gdb;
 
 pub mod errno;
 
