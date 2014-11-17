@@ -13,6 +13,7 @@
 #![no_std]
 
 #[phase(plugin)] extern crate hoare;
+#[phase(plugin)] extern crate bassert;
 #[phase(link, plugin)] extern crate core;
 #[phase(link, plugin)] extern crate base;
 extern crate libc;

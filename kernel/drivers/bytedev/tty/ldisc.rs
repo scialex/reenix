@@ -126,10 +126,10 @@ impl RDevice<u8> for LineDiscipline {
 impl TTYLineDiscipline for LineDiscipline {
     /// Store that we recieved the given char and return a string to echo to the tty.
     fn recieve_char(&mut self, chr: u8) -> &'static str {
-        assert!(self.ckd_tail < LINE_BUF_SIZE);
-        assert!(self.raw_tail < LINE_BUF_SIZE);
-        assert!(self.rhead    < LINE_BUF_SIZE);
-        assert!(self.rhead == self.ckd_tail || {
+        bassert!(self.ckd_tail < LINE_BUF_SIZE);
+        bassert!(self.raw_tail < LINE_BUF_SIZE);
+        bassert!(self.rhead    < LINE_BUF_SIZE);
+        bassert!(self.rhead == self.ckd_tail || {
                     let prev = cmp::min(self.ckd_tail - 1, LINE_BUF_SIZE - 1);
                     (self.buf[prev] as char) == '\n' || (self.buf[prev] as char) == '\r' || (self.buf[prev] as char) == '\x04'
                 });

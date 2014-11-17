@@ -139,7 +139,7 @@ impl TTYDriver for VirtualTerminal {
             self.cur_char = 0;
             self.line_feed()
         } else { false };
-        assert!(self.cur_line < HISTORY_LINES);
+        bassert!(self.cur_line < HISTORY_LINES);
         self.buf[self.cur_line][self.cur_char] = chr;
 
         let x = self.cur_char;
@@ -177,10 +177,10 @@ impl TTYDriver for VirtualTerminal {
         let second_end = (self.view_line + screen::UINT_DISPLAY_HEIGHT) % HISTORY_LINES;
 
         if second_end < self.view_line && second_end != 0 {
-            assert!((HISTORY_LINES - self.view_line) + second_end == screen::UINT_DISPLAY_HEIGHT);
+            bassert!((HISTORY_LINES - self.view_line) + second_end == screen::UINT_DISPLAY_HEIGHT);
             unsafe { screen::get_screen().put_lines(self.buf.slice(0, second_end), (first_end - self.view_line) as u8); }
         } else {
-            assert!(first_end - self.view_line == screen::UINT_DISPLAY_HEIGHT);
+            bassert!(first_end - self.view_line == screen::UINT_DISPLAY_HEIGHT);
         }
         if let Some(y) = self.get_line_y() {
             if let Some(x) = self.cursor_x() {

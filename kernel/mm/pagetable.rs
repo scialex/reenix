@@ -61,8 +61,9 @@ impl PageDir {
 
     pub unsafe fn map(&mut self, vaddr: uint, paddr: uint, pdflags: uint, ptflags: uint) -> KResult<()> {
         assert!(page::aligned(vaddr as *const c_void));
-        assert!(user::MEM_LOW <= vaddr && vaddr <= user::MEM_HIGH);
-        assert!((pdflags & !page::MASK) == pdflags);
+        assert!(user::MEM_LOW <= vaddr && vaddr <= user::MEM_HIGH,
+                "{:#x} is not between {:#x} and {:#x}", vaddr, user::MEM_LOW, user::MEM_HIGH);
+        bassert!((pdflags & !page::MASK) == pdflags);
         let index = vaddr_to_pdindex(vaddr);
         let pt = match self.get_pagetable(index) {
             None => {
@@ -85,7 +86,7 @@ impl PageDir {
 
     pub unsafe fn unmap(&mut self, vaddr: uint) {
         assert!(page::aligned(vaddr as *const c_void), "request to unmap not page-aligned value");
-        assert!(user::MEM_LOW <= vaddr && vaddr <= user::MEM_HIGH, "Request to unmap memory outside of allowable range");
+        assert!(user::MEM_LOW <= vaddr && vaddr <= user::MEM_HIGH, "Request to unmap memory {:#x} outside of allowable range", vaddr);
         if let Some(x) = self.get_pagetable(vaddr_to_pdindex(vaddr)) {
             *x.offset(vaddr_to_ptindex(vaddr) as int) = 0;
         }
@@ -95,9 +96,10 @@ impl PageDir {
         use core::ptr::zero_memory;
         let mut vhigh = high;
         let mut vlow = low;
-        assert!(vlow < vhigh);
+        bassert!(vlow < vhigh);
         assert!(page::aligned(vlow as *const c_void) && page::aligned(vhigh as *const c_void));
-        assert!(user::MEM_LOW <= vlow && user::MEM_HIGH >= vhigh);
+        bassert!(user::MEM_LOW <= vlow);
+        bassert!(user::MEM_HIGH >= vhigh);
 
         if let Some(pt) = self.get_pagetable(vaddr_to_pdindex(vlow)) {
             let index = vaddr_to_ptindex(vlow);
@@ -116,8 +118,8 @@ impl PageDir {
             }
         }
 
-        assert!(0 == vaddr_to_ptindex(vlow));
-        assert!(0 == vaddr_to_ptindex(vhigh));
+        bassert!(vaddr_to_ptindex(vlow)  == 0);
+        bassert!(vaddr_to_ptindex(vhigh) == 0);
 
         for i in range(vaddr_to_pdindex(vlow), vaddr_to_pdindex(vhigh)) {
             if let Some(x) = self.get_pagetable(i) {

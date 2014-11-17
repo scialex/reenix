@@ -11,6 +11,7 @@
 ///
 /// This is all the drivers code in reenix.
 
+#[phase(plugin)] extern crate bassert;
 #[phase(plugin, link)] extern crate core;
 #[phase(plugin, link)] extern crate base;
 #[phase(plugin, link)] extern crate mm;

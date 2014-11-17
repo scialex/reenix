@@ -51,7 +51,7 @@ struct Tag(uint);
 
 impl Tag {
     pub fn new(size : uint) -> Tag {
-        assert!((size & 0x1) == 0);
+        assert!((size & 0x1) == 0, "size of {} is illegal", size);
         Tag(size)
     }
 
@@ -92,7 +92,7 @@ impl Tag {
             // in the front. Transitivity says this is okay.
             let end = unsafe { page::align_down(self.next()) };
             let start = unsafe { page::num_to_addr::<Tag>(page::addr_to_num(end as *const Tag) - requested_pages).offset(-1) };
-            assert!(start.to_uint() >= self.get_tag_ptr().to_uint());
+            bassert!(start.to_uint() >= self.get_tag_ptr().to_uint());
             assert!(page::aligned(unsafe {  (start as *const Tag).offset(1) }));
             Some((start, end))
         }
@@ -139,7 +139,7 @@ impl BackupAllocator {
         res
     }
     fn real_allocate(&self, size: uint, _align: uint) -> *mut u8 {
-        assert!((size % size_of::<Tag>()) == 0);
+        assert!((size % size_of::<Tag>()) == 0, "size of {} is not aligned to {}", size, size_of::<Tag>());
         if pg_size(size) > self.largest_space + 1 {
             dbg!(debug::MM|debug::CORE, "Unable to allocate {} bytes from backup memory allocator!", size);
             0 as *mut u8
@@ -200,13 +200,13 @@ impl BackupAllocator {
         if let Some((tag, (split_low, split_hi))) = best {
             let t = unsafe { tag.as_mut().expect("not null") };
             if t.get_tag_ptr() == split_low && t.next() == split_hi {
-                assert!(pg_size(t.size()) == pgs);
+                bassert!(pg_size(t.size()) == pgs);
                 assert!(page::aligned(t.size() as *const u8));
                 t.set_allocated();
                 t.get_start()
             } else {
                 let new_start_size = (split_low.to_uint()) - t.get_start().to_uint();
-                assert!(new_start_size % 4 == 0);
+                assert!(new_start_size % 4 == 0, "start size {} is not 4 byte aligned", new_start_size);
                 if split_hi.to_uint() != t.next().to_uint() {
                     let new_end_size = t.next().to_uint() - (split_hi.to_uint() + size_of::<Tag>());
                     if let Some(end) = self.read_tag(split_hi) {
@@ -236,7 +236,7 @@ impl BackupAllocator {
     }
 
     fn real_deallocate(&self, ptr: *mut u8, size: uint, _align: uint) {
-        assert!((size % size_of::<Tag>()) == 0);
+        assert!((size % size_of::<Tag>()) == 0, "size of {} is not aligned to {}", size, size_of::<Tag>());
         if size >= page::SIZE {
             self.deallocate_pages(ptr, pg_size(size))
         } else {

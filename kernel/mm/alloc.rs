@@ -296,7 +296,7 @@ impl Allocator {
             },
             Some(sa) => {
                 dbg!(debug::MM, "Allocating {} from {}", size, sa);
-                assert!(sa.get_size() as uint >= size, "allocator's size {} was less then required size {}", sa.get_size(), size);
+                bassert!(sa.get_size() as uint >= size, "allocator's size {} was less then required size {}", sa.get_size(), size);
                 let res = sa.allocate();
                 if res.is_null() {
                     dbg!(debug::MM, "Allocation from slab {} failed for request of {} bytes. Reclaiming memory and retrying.", sa, size);
