@@ -18,7 +18,7 @@ use alloc::rc::*;
 const GOOD : *mut c_void = 1 as *mut c_void;
 const BAD  : *mut c_void = 0 as *mut c_void;
 
-#[allow(dead_code)]
+#[allow(dead_code, unused_must_use)]
 pub fn start() {
     use base::debug;
     let (pass, total) = do_run(true);
@@ -122,6 +122,7 @@ extern "Rust" fn return_intr(r: &mut interrupt::Registers) {
     r.eax = GOOD as u32;
 }
 
+#[allow(unused_must_use)]
 extern "C" fn orphan_procs(n: i32, _:*mut c_void) -> *mut c_void {
     for i in range(0, n) {
         kproc::KProc::new(string::String::from_str("ignored"), orphan_procs, i, 0 as *mut c_void);
@@ -143,7 +144,7 @@ extern "C" fn kill_self(_: i32, _: *mut c_void) -> *mut c_void {
 
 extern "C" fn normal_fork(_: i32, _:*mut c_void) -> *mut c_void { GOOD }
 
-#[allow(dead_code)]
+#[allow(unused_must_use, dead_code)]
 extern "C" fn fork_some(n: i32, _: *mut c_void) -> *mut c_void {
     if n > 0 {
         for i in range::<i32>(1, n) {
@@ -232,6 +233,7 @@ fn get_c_mutex() -> &'static KMutex {
     unsafe { c_mutex.as_ref().expect("CMutex is not set") }
 }
 
+#[allow(unused_must_use)]
 extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
     let y = unsafe {
         let x = box KMutex::new("contested mutex test");
@@ -267,6 +269,7 @@ extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
     return ret;
 }
 
+#[allow(unused_must_use)]
 extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
     let x = Rc::new(Mutex::<i32>::new("contested mutex test", 0));
 

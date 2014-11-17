@@ -41,7 +41,7 @@ extern "C" fn tty_proc_run(_:i32, t:*mut c_void) -> *mut c_void {
 
 
 pub type ExternShellFunc = fn(io: &mut Device<u8>, argv: &[&str]) -> KResult<()>;
-type InternShellFunc = fn<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()>;
+type InternShellFunc = for<'a> fn(sh: &KShell<'a>, argv: &[&str]) -> KResult<()>;
 
 #[deriving(Clone)]
 enum ShellFunc {
