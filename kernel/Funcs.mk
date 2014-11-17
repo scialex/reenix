@@ -71,7 +71,7 @@ endef
 # $(2) is the list of dependencies
 # $(3) is a list of custom rust flags
 define long-crate-rule
-$(eval $(call base-crate-rule,$(1),$(1),$(2),$(3) $$(KERNEL_RSFLAGS),$$(KERNEL_RDFLAGS)))
+$(eval $(call base-crate-rule,$(1),$(1),$(2) $$(PLUGINS),$(3) $$(KERNEL_RSFLAGS),$$(KERNEL_RDFLAGS)))
 endef
 
 # A Crate from reenix

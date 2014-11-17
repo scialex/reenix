@@ -23,7 +23,7 @@ OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
 
 KERNEL_CRATES := base mm alloc libc main startup collections procs drivers util
-PLUGINS := enabled
+PLUGINS := enabled hoare
 CRATES := $(KERNEL_CRATES) $(PLUGINS)
 $(foreach dr,$(KERNEL_CRATES),$(call set-crate-name,$(dr),$(call rlib-name,$(dr))))
 $(foreach dr,$(PLUGINS),      $(call set-crate-name,$(dr),$(call dylib-name,$(dr))))
@@ -72,7 +72,9 @@ $(eval $(call builtin-crate-rule,collections,alloc libc))
 $(eval $(call builtin-crate-rule,alloc,mm libc))
 
 $(eval $(call plugin-rule,enabled,))
-$(eval $(call crate-rule,base,libc enabled ))
+$(eval $(call plugin-rule,hoare,))
+
+$(eval $(call crate-rule,base,libc))
 $(eval $(call crate-rule,mm,base libc))
 $(eval $(call crate-rule,startup,alloc mm base libc collections))
 $(eval $(call crate-rule,procs,startup alloc base libc mm collections))
