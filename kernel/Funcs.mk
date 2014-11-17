@@ -56,11 +56,11 @@ endef
 # $(4) is any additional rust flags you want.
 # $(5) is any additional rustdoc flags you want.
 define base-crate-rule
-$(call crate-name,$(2)) : $$(shell find $(1) -type f) $$(foreach l,$(3), $$(call crate-name,$$(l)))
+$(call crate-name,$(2)) : $$(shell find $(1) -type f -name "*.rs") $$(foreach l,$(3), $$(call crate-name,$$(l)))
 	@ echo "[RS  ] Compiling \"kernel/$(1)/lib.rs\"..." # for \"kernel/$$@\""
 	$$(HIDE_SIGIL) $$(RUST) $$(RSFLAGS) $(4) $(1)/lib.rs --out-dir libs
 
-$(call doc-name,$(2)) : $$(shell find $(1) -type f) $$(foreach l,$(3), $$(call crate-name,$$(l)))
+$(call doc-name,$(2)) : $$(shell find $(1) -type f -name "*.rs") $$(foreach l,$(3), $$(call crate-name,$$(l)))
 	@ echo "[RDOC] Documenting \"kernel/$(1)\"..."
 	$$(HIDE_SIGIL) $$(RUSTDOC) $$(RDFLAGS) $(5) --crate-name $(2) --output docs $(1)/lib.rs
 

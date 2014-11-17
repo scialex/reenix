@@ -28,6 +28,24 @@ pub mod debug;
 pub mod kernel;
 pub mod from_str;
 
+pub mod make {
+    /// A trait for a type that has a initializer that takes a single value of type K.
+    pub trait Make<A> {
+        /// Create a value using the type K as an initializer.
+        fn make(a: A) -> Self;
+    }
+
+    /// A trait for creating a value using a reference to another one.
+    ///
+    /// The generated value might outlive the reference used to create it and should not hold a
+    /// reference to it
+    pub trait RefMake<'a, A: 'a> {
+        /// Make this value from a reference to another type, which might not live as long as the
+        /// generated value.
+        fn make_from<'b, 'a: 'b>(v: &'b A) -> Self;
+    }
+}
+
 pub mod describe {
     use core::fmt;
     use core::prelude::*;
@@ -55,6 +73,7 @@ pub fn init_stage1() { debug::setup(); }
 pub fn init_stage2() {}
 
 // NOTE Needed for the #[deriving] stuff to work. Because that makes sense.
+#[doc(hidden)]
 mod std {
     pub use core::cmp;
     pub use core::fmt;
@@ -62,7 +81,9 @@ mod std {
     pub use core::num;
     pub use core::default;
 }
+
 // This lets us use the macro's exported from here locally.
+#[doc(hidden)]
 mod base {
     pub use super::*;
 }
