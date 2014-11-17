@@ -18,7 +18,6 @@ use core::fmt::*;
 use drivers::bytedev::ByteWriter;
 use collections::*;
 use core::iter::*;
-use base::from_str::*;
 use procs::args::ProcArgs;
 
 macro_rules! twriteln(

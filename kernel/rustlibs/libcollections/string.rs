@@ -25,7 +25,7 @@ use core::raw::Slice as RawSlice;
 use hash;
 use slice::CloneSliceAllocPrelude;
 use str;
-use str::{CharRange, StrAllocating, MaybeOwned, Owned};
+use str::{CharRange, FromStr, StrAllocating, MaybeOwned, Owned};
 use str::Slice as MaybeOwnedSlice; // So many `Slice`s...
 use vec::{DerefVec, Vec, as_vec};
 
@@ -244,8 +244,8 @@ impl String {
     ///
     /// ```rust
     /// // 𝄞music
-    /// let mut v = [0xD834, 0xDD1E, 0x006d, 0x0075,
-    ///              0x0073, 0x0069, 0x0063];
+    /// let mut v = &mut [0xD834, 0xDD1E, 0x006d, 0x0075,
+    ///                   0x0073, 0x0069, 0x0063];
     /// assert_eq!(String::from_utf16(v), Some("𝄞music".to_string()));
     ///
     /// // 𝄞mu<invalid>ic
@@ -270,9 +270,9 @@ impl String {
     /// # Example
     /// ```rust
     /// // 𝄞mus<invalid>ic<invalid>
-    /// let v = [0xD834, 0xDD1E, 0x006d, 0x0075,
-    ///          0x0073, 0xDD1E, 0x0069, 0x0063,
-    ///          0xD834];
+    /// let v = &[0xD834, 0xDD1E, 0x006d, 0x0075,
+    ///           0x0073, 0xDD1E, 0x0069, 0x0063,
+    ///           0xD834];
     ///
     /// assert_eq!(String::from_utf16_lossy(v),
     ///            "𝄞mus\uFFFDic\uFFFD".to_string());
@@ -287,7 +287,7 @@ impl String {
     /// # Example
     ///
     /// ```rust
-    /// let chars = ['h', 'e', 'l', 'l', 'o'];
+    /// let chars = &['h', 'e', 'l', 'l', 'o'];
     /// let s = String::from_chars(chars);
     /// assert_eq!(s.as_slice(), "hello");
     /// ```
@@ -498,9 +498,9 @@ impl String {
 
     /// Shortens a string to the specified length.
     ///
-    /// # Failure
+    /// # Panics
     ///
-    /// Fails if `new_len` > current length,
+    /// Panics if `new_len` > current length,
     /// or if `new_len` is not a character boundary.
     ///
     /// # Example
@@ -600,7 +600,7 @@ impl String {
         assert!(self.as_slice().is_char_boundary(idx));
         self.vec.reserve(4);
         let mut bits = [0, ..4];
-        let amt = ch.encode_utf8(bits).unwrap();
+        let amt = ch.encode_utf8(&mut bits).unwrap();
 
         unsafe {
             ptr::copy_memory(self.vec.as_mut_ptr().offset((idx + amt) as int),
@@ -795,6 +795,33 @@ pub fn as_string<'a>(x: &'a str) -> DerefString<'a> {
     DerefString { x: as_vec(x.as_bytes()) }
 }
 
+impl FromStr for String {
+    #[inline]
+    fn from_str(s: &str) -> Option<String> {
+        Some(String::from_str(s))
+    }
+}
+
+/// Trait for converting a type to a string, consuming it in the process.
+pub trait IntoString {
+    /// Consume and convert to a string.
+    fn into_string(self) -> String;
+}
+
+/// A generic trait for converting a value to a string
+pub trait ToString {
+    /// Converts the value of `self` to an owned string
+    fn to_string(&self) -> String;
+}
+
+impl<T: fmt::Show> ToString for T {
+    fn to_string(&self) -> String {
+        let mut buf = Vec::<u8>::new();
+        let _ = format_args!(|args| fmt::write(&mut buf, args), "{}", self);
+        String::from_utf8(buf).unwrap()
+    }
+}
+
 /// Unsafe operations
 #[unstable = "waiting on raw module conventions"]
 pub mod raw {
@@ -860,7 +887,7 @@ mod tests {
 
     use str;
     use str::{Str, StrPrelude, Owned};
-    use super::{as_string, String};
+    use super::{as_string, String, ToString};
     use vec::Vec;
     use slice::CloneSliceAllocPrelude;
 
@@ -989,30 +1016,30 @@ mod tests {
     fn test_utf16_invalid() {
         // completely positive cases tested above.
         // lead + eof
-        assert_eq!(String::from_utf16([0xD800]), None);
+        assert_eq!(String::from_utf16(&[0xD800]), None);
         // lead + lead
-        assert_eq!(String::from_utf16([0xD800, 0xD800]), None);
+        assert_eq!(String::from_utf16(&[0xD800, 0xD800]), None);
 
         // isolated trail
-        assert_eq!(String::from_utf16([0x0061, 0xDC00]), None);
+        assert_eq!(String::from_utf16(&[0x0061, 0xDC00]), None);
 
         // general
-        assert_eq!(String::from_utf16([0xD800, 0xd801, 0xdc8b, 0xD800]), None);
+        assert_eq!(String::from_utf16(&[0xD800, 0xd801, 0xdc8b, 0xD800]), None);
     }
 
     #[test]
     fn test_from_utf16_lossy() {
         // completely positive cases tested above.
         // lead + eof
-        assert_eq!(String::from_utf16_lossy([0xD800]), String::from_str("\uFFFD"));
+        assert_eq!(String::from_utf16_lossy(&[0xD800]), String::from_str("\uFFFD"));
         // lead + lead
-        assert_eq!(String::from_utf16_lossy([0xD800, 0xD800]), String::from_str("\uFFFD\uFFFD"));
+        assert_eq!(String::from_utf16_lossy(&[0xD800, 0xD800]), String::from_str("\uFFFD\uFFFD"));
 
         // isolated trail
-        assert_eq!(String::from_utf16_lossy([0x0061, 0xDC00]), String::from_str("a\uFFFD"));
+        assert_eq!(String::from_utf16_lossy(&[0x0061, 0xDC00]), String::from_str("a\uFFFD"));
 
         // general
-        assert_eq!(String::from_utf16_lossy([0xD800, 0xd801, 0xdc8b, 0xD800]),
+        assert_eq!(String::from_utf16_lossy(&[0xD800, 0xd801, 0xdc8b, 0xD800]),
                    String::from_str("\uFFFD𐒋\uFFFD"));
     }
 
@@ -1039,7 +1066,7 @@ mod tests {
         let mut s = String::from_str("ABC");
         unsafe {
             let mv = s.as_mut_vec();
-            mv.push_all([b'D']);
+            mv.push_all(&[b'D']);
         }
         assert_eq!(s.as_slice(), "ABCD");
     }
@@ -1162,6 +1189,28 @@ mod tests {
         assert_eq!("foo", s[..3]);
         assert_eq!("bar", s[3..]);
         assert_eq!("oob", s[1..4]);
+    }
+
+    #[test]
+    fn test_simple_types() {
+        assert_eq!(1i.to_string(), "1".to_string());
+        assert_eq!((-1i).to_string(), "-1".to_string());
+        assert_eq!(200u.to_string(), "200".to_string());
+        assert_eq!(2u8.to_string(), "2".to_string());
+        assert_eq!(true.to_string(), "true".to_string());
+        assert_eq!(false.to_string(), "false".to_string());
+        assert_eq!(().to_string(), "()".to_string());
+        assert_eq!(("hi".to_string()).to_string(), "hi".to_string());
+    }
+
+    #[test]
+    fn test_vectors() {
+        let x: Vec<int> = vec![];
+        assert_eq!(x.to_string(), "[]".to_string());
+        assert_eq!((vec![1i]).to_string(), "[1]".to_string());
+        assert_eq!((vec![1i, 2, 3]).to_string(), "[1, 2, 3]".to_string());
+        assert!((vec![vec![], vec![1i], vec![1i, 1]]).to_string() ==
+               "[[], [1], [1, 1]]".to_string());
     }
 
     #[bench]

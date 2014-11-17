@@ -26,7 +26,6 @@ pub mod errno;
 pub mod io;
 pub mod debug;
 pub mod kernel;
-pub mod from_str;
 
 pub mod make {
     /// A trait for a type that has a initializer that takes a single value of type K.

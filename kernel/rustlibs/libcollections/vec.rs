@@ -21,7 +21,7 @@ use core::default::Default;
 use core::fmt;
 use core::kinds::marker::{ContravariantLifetime, InvariantType};
 use core::mem;
-use core::num;
+use core::num::{Int, UnsignedInt};
 use core::ops;
 use core::ptr;
 use core::raw::Slice as RawSlice;
@@ -47,7 +47,7 @@ use slice::{CloneSliceAllocPrelude};
 /// vec[0] = 7i;
 /// assert_eq!(vec[0], 7);
 ///
-/// vec.push_all([1, 2, 3]);
+/// vec.push_all(&[1, 2, 3]);
 ///
 /// for x in vec.iter() {
 ///     println!("{}", x);
@@ -161,7 +161,7 @@ impl<T> Vec<T> {
         } else if capacity == 0 {
             Vec::new()
         } else {
-            let size = capacity.checked_mul(&mem::size_of::<T>())
+            let size = capacity.checked_mul(mem::size_of::<T>())
                                .expect("capacity overflow");
             let ptr = unsafe { allocate(size, mem::min_align_of::<T>()) };
             Vec { ptr: ptr as *mut T, len: 0, cap: capacity }
@@ -306,7 +306,7 @@ impl<T: Clone> Vec<T> {
     ///
     /// ```
     /// let mut vec = vec![1i];
-    /// vec.push_all([2i, 3, 4]);
+    /// vec.push_all(&[2i, 3, 4]);
     /// assert_eq!(vec, vec![1, 2, 3, 4]);
     /// ```
     #[inline]
@@ -506,13 +506,6 @@ impl<T: PartialEq> PartialEq for Vec<T> {
 
 #[unstable = "waiting on PartialOrd stability"]
 impl<T: PartialOrd> PartialOrd for Vec<T> {
-    // NOTE(stage0): remove method after a snapshot
-    #[cfg(stage0)]
-    #[inline]
-    fn partial_cmp(&self, other: &Vec<T>) -> Option<Ordering> {
-        self.as_slice().partial_cmp(&other.as_slice())
-    }
-    #[cfg(not(stage0))]  // NOTE(stage0): remove cfg after a snapshot
     #[inline]
     fn partial_cmp(&self, other: &Vec<T>) -> Option<Ordering> {
         self.as_slice().partial_cmp(other.as_slice())
@@ -530,13 +523,6 @@ impl<T: PartialEq, V: AsSlice<T>> Equiv<V> for Vec<T> {
 
 #[unstable = "waiting on Ord stability"]
 impl<T: Ord> Ord for Vec<T> {
-    // NOTE(stage0): remove method after a snapshot
-    #[cfg(stage0)]
-    #[inline]
-    fn cmp(&self, other: &Vec<T>) -> Ordering {
-        self.as_slice().cmp(&other.as_slice())
-    }
-    #[cfg(not(stage0))]  // NOTE(stage0): remove cfg after a snapshot
     #[inline]
     fn cmp(&self, other: &Vec<T>) -> Ordering {
         self.as_slice().cmp(other.as_slice())
@@ -601,11 +587,11 @@ impl<T> Vec<T> {
     #[unstable = "matches collection reform specification, waiting for dust to settle"]
     pub fn reserve(&mut self, additional: uint) {
         if self.cap - self.len < additional {
-            match self.len.checked_add(&additional) {
+            match self.len.checked_add(additional) {
                 None => panic!("Vec::reserve: `uint` overflow"),
                 // if the checked_add
                 Some(new_cap) => {
-                    let amort_cap = num::next_power_of_two(new_cap);
+                    let amort_cap = new_cap.next_power_of_two();
                     // next_power_of_two will overflow to exactly 0 for really big capacities
                     if amort_cap == 0 {
                         self.grow_capacity(new_cap);
@@ -638,7 +624,7 @@ impl<T> Vec<T> {
     #[unstable = "matches collection reform specification, waiting for dust to settle"]
     pub fn reserve_exact(&mut self, additional: uint) {
         if self.cap - self.len < additional {
-            match self.len.checked_add(&additional) {
+            match self.len.checked_add(additional) {
                 None => panic!("Vec::reserve: `uint` overflow"),
                 Some(new_cap) => self.grow_capacity(new_cap)
             }
@@ -653,13 +639,12 @@ impl<T> Vec<T> {
     ///
     /// ```
     /// let mut vec: Vec<int> = Vec::with_capacity(10);
-    /// vec.push_all([1, 2, 3]);
+    /// vec.push_all(&[1, 2, 3]);
     /// assert_eq!(vec.capacity(), 10);
     /// vec.shrink_to_fit();
     /// assert!(vec.capacity() >= 3);
     /// ```
     #[stable]
-    #[unstable = "matches collection reform specification, waiting for dust to settle"]
     pub fn shrink_to_fit(&mut self) {
         if mem::size_of::<T>() == 0 { return }
 
@@ -955,9 +940,9 @@ impl<T> Vec<T> {
 
     /// Appends an element to the back of a collection.
     ///
-    /// # Failure
+    /// # Panics
     ///
-    /// Fails if the number of elements in the vector overflows a `uint`.
+    /// Panics if the number of elements in the vector overflows a `uint`.
     ///
     /// # Example
     ///
@@ -971,7 +956,7 @@ impl<T> Vec<T> {
     pub fn push(&mut self, value: T) {
         if mem::size_of::<T>() == 0 {
             // zero-size types consume no memory, so we can't rely on the address space running out
-            self.len = self.len.checked_add(&1).expect("length overflow");
+            self.len = self.len.checked_add(1).expect("length overflow");
             unsafe { mem::forget(value); }
             return
         }
@@ -1064,7 +1049,7 @@ impl<T> Vec<T> {
         if mem::size_of::<T>() == 0 { return }
 
         if capacity > self.cap {
-            let size = capacity.checked_mul(&mem::size_of::<T>())
+            let size = capacity.checked_mul(mem::size_of::<T>())
                                .expect("capacity overflow");
             unsafe {
                 self.ptr = alloc_or_realloc(self.ptr, self.cap * mem::size_of::<T>(), size);
@@ -1476,9 +1461,9 @@ impl<T> Vec<T> {
     /// Converts a `Vec<T>` to a `Vec<U>` where `T` and `U` have the same
     /// size and in case they are not zero-sized the same minimal alignment.
     ///
-    /// # Failure
+    /// # Panics
     ///
-    /// Fails if `T` and `U` have differing sizes or are not zero-sized and
+    /// Panics if `T` and `U` have differing sizes or are not zero-sized and
     /// have differing minimal alignments.
     ///
     /// # Example
@@ -1667,6 +1652,13 @@ impl<T> Vec<T> {
     }
 }
 
+impl<'a> fmt::FormatWriter for Vec<u8> {
+    fn write(&mut self, buf: &[u8]) -> fmt::Result {
+        self.push_all(buf);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     extern crate test;
@@ -1690,7 +1682,7 @@ mod tests {
     #[test]
     fn test_as_vec() {
         let xs = [1u8, 2u8, 3u8];
-        assert_eq!(as_vec(xs).as_slice(), xs.as_slice());
+        assert_eq!(as_vec(&xs).as_slice(), xs.as_slice());
     }
 
     #[test]
@@ -1780,13 +1772,13 @@ mod tests {
         let mut values = vec![1u8,2,3,4,5];
         {
             let slice = values.slice_from_mut(2);
-            assert!(slice == [3, 4, 5]);
+            assert!(slice == &mut [3, 4, 5]);
             for p in slice.iter_mut() {
                 *p += 2;
             }
         }
 
-        assert!(values.as_slice() == [1, 2, 5, 6, 7]);
+        assert!(values.as_slice() == &[1, 2, 5, 6, 7]);
     }
 
     #[test]
@@ -1794,13 +1786,13 @@ mod tests {
         let mut values = vec![1u8,2,3,4,5];
         {
             let slice = values.slice_to_mut(2);
-            assert!(slice == [1, 2]);
+            assert!(slice == &mut [1, 2]);
             for p in slice.iter_mut() {
                 *p += 1;
             }
         }
 
-        assert!(values.as_slice() == [2, 3, 3, 4, 5]);
+        assert!(values.as_slice() == &[2, 3, 3, 4, 5]);
     }
 
     #[test]

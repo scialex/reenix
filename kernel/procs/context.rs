@@ -64,11 +64,20 @@ impl RunQueue {
         b.push_back(SleepingThread(unsafe { transmute(ctx) }));
         dbg!(debug::SCHED, "there are now {} threads waiting to be executed", b.len());
     }
+
+    /// Needed to make sure the whole check isnt optimized away.
+    ///
+    /// NOTE This is the closest way I can say that a value is volatile...
+    unsafe fn get_inner(&mut self) -> &mut RingBuf<SleepingThread> {
+        use core::intrinsics::volatile_load;
+        let &RunQueue(ref mut b) = self;
+        volatile_load::<&mut RingBuf<SleepingThread>>(&b as *const &mut RingBuf<SleepingThread>)
+    }
+
     fn pop(&mut self) -> &mut Context {
         assert!(interrupt::get_ipl() == interrupt::HIGH);
-        let &RunQueue(ref mut b) = self;
         loop {
-            if let Some(next) = b.pop_front() {
+            if let Some(next) = unsafe { self.get_inner().pop_front() } {
                 // TODO Put this dbg back in.
                 //dbg!(debug::SCHED, "found context for thead {} in {}", next.get_current_thread(), next.get_current_proc());
                 dbg!(debug::SCHED, "found a thread and executing it");
