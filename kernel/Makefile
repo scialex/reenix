@@ -5,7 +5,7 @@ LDFLAGS   := -m elf_i386 -z nodefaultlib
 KERNEL_LDFLAGS := --strip-all
 
 include ../Global.mk
-include Funcs.mk
+include build/Funcs.mk
 
 CFLAGS    += -D__KERNEL__
 
@@ -15,22 +15,32 @@ endif
 
 ###
 
+# Plugins
+PLUGINS        := enabled hoare bassert
+# Crates for the kernel
+REENIX_CRATES  := entry main base mm startup procs drivers util
+# Crates from the Rust standard library
+BUILTIN_CRATES := alloc libc collections
+# C code helpers for Rust
+REENIX_CSRC    := drivers/pci.c drivers/blockdev/disk/ata.c base/timer.c procs/rcontext.c entry/entry.c
+
+BOOT_ENTRY     := boot/boot.o
+
+CRATES         := $(REENIX_CRATES) $(BUILTIN_CRATES) $(PLUGINS)
+
+$(foreach dr,$(REENIX_CRATES), $(call set-crate-name,$(dr)))
+$(foreach dr,$(BUILTIN_CRATES),$(call set-builtin-crate-name,$(dr)))
+$(foreach dr,$(PLUGINS),       $(call set-plugin-crate-name,$(dr)))
+
+BUILT_CRATES := $(foreach dr, $(CRATES), $(call crate-name,$(dr)))
+CRATE_DOCS   := $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
+
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
-# TODO I need to remove these at some point.
-SRCDIR    := main boot util mm entry procs
-SRC       := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS])) drivers/pci.c drivers/blockdev/disk/ata.c base/timer.c
-OBJS      := $(addsuffix .o,$(basename $(SRC))) libs/libreenix.a
+SRCDIR    := main util mm procs
+SRC       := $(filter-out $(REENIX_CSRC), $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]))) $(REENIX_CSRC)
+COBJS     := $(addsuffix .o,$(basename $(SRC)))
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
-
-KERNEL_CRATES := base mm alloc libc main startup collections procs drivers util
-PLUGINS := enabled hoare bassert
-CRATES := $(KERNEL_CRATES) $(PLUGINS)
-$(foreach dr,$(KERNEL_CRATES),$(call set-crate-name,$(dr),$(call rlib-name,$(dr))))
-$(foreach dr,$(PLUGINS),      $(call set-crate-name,$(dr),$(call dylib-name,$(dr))))
-
-BUILT_KERNEL_CRATES := $(foreach dr, $(KERNEL_CRATES), $(call crate-name,$(dr)))
-BUILT_CRATES := $(foreach dr, $(PLUGINS), $(call crate-name,$(dr))) $(BUILT_KERNEL_CRATES)
-CRATE_DOCS := $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
+GRUB_CFG  := boot/grub.cfg
 
 KERNEL_RSFLAGS := $(foreach dr, $(CRATES), --extern $(dr)=$(call crate-name,$(dr)))
 KERNEL_RSFLAGS += -L libs -C no-redzone -Z gc --cfg kernel --target=i686-unknown-linux-gnu
@@ -43,18 +53,21 @@ PREBUILT  :=
 
 # List of external modules for various things (Such as a small libm).
 EXTERNAL_LIBS  := openlibm
-EXTERNAL := $(foreach l, $(EXTERNAL_LIBS), libs/lib$(l).a)
+EXTERNAL       := $(foreach l, $(EXTERNAL_LIBS), libs/lib$(l).a)
 
-SYMBOLS    := weenix.dbg
-BSYMBOLS   := symbols.dbg
-KERNEL     := kernel.bin
-IMAGE      := weenix.img
-ISO_IMAGE  := weenix.iso
-GDBCOMM    := gdb-commands
-ISO_DIR    := .iso
+# boot/boot.S must be the first file so that the multiboot header is close enough to the front.
+OBJS := $(BOOT_ENTRY) $(COBJS) $(PREBUILT) $(EXTERNAL) $(call crate-name,entry)
+
+SYMBOLS    := build/weenix.dbg
+BSYMBOLS   := build/symbols.dbg
+KERNEL     := build/kernel.bin
+IMAGE      := build/weenix.img
+ISO_IMAGE  := build/weenix.iso
+GDBCOMM    := build/gdb-commands
+ISO_DIR    := build/.iso
 
 ISO_CFG    := $(ISO_DIR)/boot/grub/grub.cfg
-ISO_KERNEL := $(ISO_DIR)/boot/$(KERNEL)
+ISO_KERNEL := $(ISO_DIR)/boot/kernel.bin
 
 RSFLAGS := $(strip $(RSFLAGS))
 RDFLAGS := $(strip $(RDFLAGS))
@@ -64,8 +77,8 @@ KERNEL_RDFLAGS := $(strip $(KERNEL_RDFLAGS))
 .PHONY: all cscope clean tidy docs
 
 .DEFAULT_GOAL := all
-all: $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
-	@ echo "[MAKE] Finished building \"kernel\"..."
+all:  $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
+docs: $(CRATE_DOCS)
 
 BASIC_REQS := alloc base collections libc mm
 
@@ -75,21 +88,23 @@ $(eval $(call builtin-crate-rule, alloc,       libc mm))
 $(eval $(call builtin-crate-rule, collections, libc mm alloc))
 
 # Plugins
-$(eval $(call plugin-rule, enabled,))
-$(eval $(call plugin-rule, hoare,))
 $(eval $(call plugin-rule, bassert,))
+$(eval $(call plugin-rule, enabled,))
+$(eval $(call plugin-rule, hoare  ,))
 
 # Reenix Crates.
 $(eval $(call crate-rule,      base,    libc))
 $(eval $(call crate-rule,      mm,      libc base))
 $(eval $(call crate-rule,      startup, $(BASIC_REQS)))
-$(eval $(call crate-rule,      procs,   $(BASIC_REQS) startup))
 $(eval $(call crate-rule,      util,    $(BASIC_REQS)))
 $(eval $(call crate-rule,      umem,    $(BASIC_REQS) util))
+$(eval $(call crate-rule,      procs,   $(BASIC_REQS) startup))
 $(eval $(call long-crate-rule, drivers, $(BASIC_REQS) procs, --opt-level=1)) # TODO For some reason LLVM doesn't like --opt-level=2 in drivers.
 
 # The `main` crate.
-$(eval $(call crate-rule, main,    $(filter-out main, $(CRATES))))
+$(eval $(call crate-rule, main,  $(filter-out entry main, $(CRATES))))
+# The `entry` crate.
+$(eval $(call crate-rule, entry, main))
 
 # Make the target for libm
 $(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,                \
@@ -98,32 +113,17 @@ $(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,            
 	CFLAGS="-Wno-maybe-uninitialized -g3 -gdwarf-3 -m32 -march=i386 -ffreestanding" \
 	ARCH=i386))
 
-docs: $(CRATE_DOCS)
+# TODO linking twice is bad and fragile.
+# TODO We really should be modifying $(KERNEL) to make it's paddr's match the vaddr's in its program headers.
+$(eval $(call ld-rule,   $(SYMBOLS),  $(OBJS), build/debug.ld, ))
+$(eval $(call ld-rule,   $(KERNEL),   $(OBJS), build/link.ld,  $(KERNEL_LDFLAGS)))
 
-$(KERNEL): $(OBJS) $(PREBUILT) $(EXTERNAL)
-	@ echo "[LD  ] Linking for \"kernel/$@\"..."
-	@ # boot/boot.S must be the first file so that the multiboot header is close enough to the front.
-	$(HIDE_SIGIL) $(LD) $(LDFLAGS) $(KERNEL_LDFLAGS) -T link.ld boot/boot.o $(filter-out boot/boot.o,$^) -o $@
+$(eval $(call copy-rule, $(KERNEL),   $(ISO_KERNEL)))
+$(eval $(call copy-rule, $(GRUB_CFG), $(ISO_CFG)))
 
 $(BSYMBOLS): $(SYMBOLS)
 	@ echo "[ELF ] Generating kernel symbols list..."
 	$(HIDE_SIGIL) readelf -Ws $(SYMBOLS) | grep -Ev 'SECTION|UND|FILE|Num:|Symbol|^$$' | awk '{printf "0x%s %s\n", $$2, $$8}' > $@
-
-$(SYMBOLS): $(OBJS) $(PREBUILT) $(EXTERNAL)
-	@ echo "[LD  ] Linking for \"kernel/$@\"..."
-	@ # TODO This is bad and fragile. We really should be modifying $(KERNEL) to make it's paddr's match the vaddr's in its program headers.
-	@ # boot/boot.S must be the first file so that the multiboot header is close enough to the front.
-	$(HIDE_SIGIL) $(LD) $(LDFLAGS) -T debug.ld boot/boot.o $(filter-out boot/boot.o,$^) -o $@
-
-$(ISO_CFG): boot/grub.cfg
-	@ echo "[CP  ] Copying \"kernel/$@\"..."
-	$(HIDE_SIGIL) mkdir -p $(dir $@)
-	$(HIDE_SIGIL) cp $< $@
-
-$(ISO_KERNEL) : $(KERNEL)
-	@ echo "[CP  ] Copying \"kernel/$@\"..."
-	$(HIDE_SIGIL) mkdir -p $(dir $@)
-	$(HIDE_SIGIL) cp $< $@
 
 $(ISO_IMAGE): $(ISO_KERNEL) $(ISO_CFG)
 	@ echo "[GRUB] Creating \"kernel/$@\"..."
@@ -134,16 +134,29 @@ $(GDBCOMM): $(SCRIPTS)
 	$(HIDE_SIGIL) $(foreach script, $(SCRIPTS), echo $(abspath $(script)) >> $(dir $(script))$(shell basename $(dir $(script))).gdbcomm; )
 	$(HIDE_SIGIL) cat */*.gdbcomm > $@
 
-libs/libreenix.a : reenix.rs $(BUILT_KERNEL_CRATES)
-	@ echo "[RS  ] Compiling \"kernel/$<\"..."
-	$(HIDE_SIGIL) $(RUST) --crate-type=staticlib $(RSFLAGS) $(KERNEL_RSFLAGS) $< --out-dir=libs
-
 %.o: %.c
 	@ echo "[CC  ] Compiling \"kernel/$<\"..."
 	$(HIDE_SIGIL) $(CC) -c $(CFLAGS) $< -o $@
 
 %.o: %.S
 	@ echo "[AS  ] Compiling \"kernel/$<\"..."
-	$(HIDE_SIGIL) $(CC) -g -c $(ASFLAGS) $(CFLAGS) $< -o $@
+	$(HIDE_SIGIL) $(CC) -g3 -c $(ASFLAGS) $(CFLAGS) $< -o $@
 
-include Helpers.mk
+tidy:
+	$(HIDE_SIGIL) rm -f $(BUILT_CRATES)          \
+	                 	$(OBJS)                  \
+						$(SYMBOLS)               \
+					   	$(BSYMBOLS)              \
+					   	$(KERNEL)                \
+					   	$(IMAGE)                 \
+					   	$(ISO_IMAGE)             \
+					   	$(GDBCOMM)               \
+					   	*/*.gdbcomm              \
+					   	cscope*.out              \
+					   	cscope.files 2>/dev/null
+	$(HIDE_SIGIL) rm -rf $(ISO_DIR)  2>/dev/null
+
+clean: tidy $(foreach d,$(EXTERNAL_LIBS),clean-$(d))
+	$(HIDE_SIGIL) rm -rf docs
+
+include build/Helpers.mk

@@ -1,4 +1,4 @@
-#![crate_name = "reenix"]
+#![crate_name = "entry"]
 #![crate_type = "staticlib"]
 
 #![no_std]
@@ -70,6 +70,7 @@ fn run_init() {
     dbg!(debug::CORE, "main initialized stage 2");
 }
 
+#[export_name="kmain"]
 #[no_mangle]
 #[no_stack_check]
 pub extern "C" fn kmain() {

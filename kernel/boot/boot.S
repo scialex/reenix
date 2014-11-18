@@ -1,5 +1,4 @@
-        .file "boot.S"
-        .global _start
+.file "boot.S"
 
 #define ASM_FILE 1
 #include "multiboot.h"
@@ -22,6 +21,7 @@
 #include "paging.h"
 #include "gdt.h"
 
+.global _start
 _start:
     /* clear the interrupt flag so we are
      * not interrupted until we are ready */

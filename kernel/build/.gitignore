@@ -1,0 +1,9 @@
+# kernel binaries
+kernel.bin
+symbols.dbg
+weenix.dbg
+weenix.img
+weenix.iso
+.iso/*
+
+gdb-commands

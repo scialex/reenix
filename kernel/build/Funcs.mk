@@ -6,21 +6,22 @@ define doc-name
 docs/$(1)/index.html
 endef
 
-# Get an dylib name from the crate name
 # $(1) is the name of the crate
-# TODO This should be less fragile.
-define dylib-name
-libs/lib$(1).so
+# $(2) is the directory it is in.
+define set-base-crate-name
+$(eval $(1)_CRATE := libs/$(shell $(RUST) --print-file-name $(2)/lib.rs))
 endef
 
-# Get an rlib name from the crate name
-# $(1) is the name of the crate
-define rlib-name
-libs/lib$(1).rlib
+define set-builtin-crate-name
+$(call set-base-crate-name,$(1),rustlibs/lib$(1))
+endef
+
+define set-plugin-crate-name
+$(call set-base-crate-name,$(1),plugins/$(1))
 endef
 
 define set-crate-name
-$(eval $(1)_CRATE := $(2))
+$(call set-base-crate-name,$(1),$(1))
 endef
 
 # Get the file name of a crate name
@@ -41,12 +42,12 @@ define external-targets
 
 ./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f -not -path ./external/$(1)/$(3))
 	@ echo "[MAKE] Recursive make of \"kernel/$$@\"..."
-	$$(HIDE_SIGIL) $$(MAKE) $(SILENT_FLAG) $$(MFLAGS) -C external/$(1) $(2) $(4)
+	$$(HIDE_SIGIL) $$(MAKE) $$(SILENT_FLAG) $$(MFLAGS) -C external/$(1) $(2) $(4)
 
 .PHONEY:
 clean-$(1):
 	$$(HIDE_SIGIL) rm -f libs/$(notdir $(3)) 2>/dev/null
-	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $(SILENT_FLAG) -C external/$(1) clean $(4)
+	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C external/$(1) clean $(4)
 endef
 
 # Make rules to build a crate
@@ -62,7 +63,7 @@ $(call crate-name,$(2)) : $$(shell find $(1) -type f -name "*.rs") $$(foreach l,
 
 $(call doc-name,$(2)) : $$(shell find $(1) -type f -name "*.rs") $$(foreach l,$(3), $$(call crate-name,$$(l)))
 	@ echo "[RDOC] Documenting \"kernel/$(1)\"..."
-	$$(HIDE_SIGIL) $$(RUSTDOC) $$(RDFLAGS) $(5) --crate-name $(2) --output docs $(1)/lib.rs
+	$$(HIDE_SIGIL) $$(RUSTDOC) $$(RDFLAGS) $(5) --output docs $(1)/lib.rs
 
 endef
 
@@ -94,3 +95,29 @@ endef
 define plugin-rule
 $(eval $(call base-crate-rule,plugins/$(strip $(1)),$(strip $(1)),$(2),,,))
 endef
+
+# a rule that copies a file.
+# $(1) is the source
+# $(2) is the destination
+define copy-rule
+$(2) : $(1)
+	@ echo "[CP  ] Copying \"kernel/$$@\"..."
+	$$(HIDE_SIGIL) mkdir -p $$(dir $$@)
+	$$(HIDE_SIGIL) cp $$< $$@
+endef
+
+# invoke the linker
+# $(1) is the file to link
+# $(2) is the list of all files to give the linker
+# $(3) is the ld to give the linker
+# $(4) is the extra ldflags to pass
+define ld-rule
+$(1) : $(2) $(3)
+	@ echo "[LD  ] Linking for \"kernel/$$@\"..."
+ifeq ("",$(3))
+	$$(HIDE_SIGIL) $$(LD) $$(LDFLAGS) $(4) $(2) -o $$@
+else
+	$$(HIDE_SIGIL) $$(LD) -T $(3) $$(LDFLAGS) $(4) $(2) -o $$@
+endif
+endef
+

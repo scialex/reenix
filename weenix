@@ -14,11 +14,11 @@ USAGE="Usage: $0 [OPTION]...
 # XXX hardcoding these temporarily -- should be read from the makefiles
 GDB_TMP_INIT=inittmp.gdb
 KERN_DIR=kernel
-ISO_IMAGE=weenix.iso
-SYMBOLS=weenix.dbg
+ISO_IMAGE=build/weenix.iso
+SYMBOLS=build/weenix.dbg
 GDB_COMM_INIT=commands.gdb
 GDB_INIT=init.gdb
-GDBCOMM=gdb-commands
+GDBCOMM=build/gdb-commands
 QEMU=qemu-system-i386
 QEMU_FLAGS="-k en-us -boot order=dca"
 if ! which $QEMU; then

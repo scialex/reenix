@@ -1,12 +1,5 @@
 # A bunch of extra targets for stuff.
 
-tidy:
-	$(HIDE_SIGIL) rm -f $(BUILT_CRATES) $(OBJS) $(SYMBOLS) $(BSYMBOLS) $(KERNEL) $(IMAGE) $(ISO_IMAGE) $(GDBCOMM) */*.gdbcomm cscope*.out cscope.files 2>/dev/null
-	$(HIDE_SIGIL) rm -rf $(ISO_DIR) 2>/dev/null
-
-clean: tidy $(foreach d,$(EXTERNAL_LIBS),clean-$(d))
-	$(HIDE_SIGIL) rm -rf docs
-
 cscope: $(HEAD) $(SRC)
 	@ echo "  Updating cscope symbol cross-reference..."
 	@ echo $(HEAD) $(SRC) > cscope.files
