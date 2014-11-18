@@ -7,6 +7,7 @@ use core::result::Result;
 use describe::*;
 use core::fmt;
 
+pub use errno::Errno::*;
 /// A KResult is a common type of return value for a kernel operation, where it either succeeds or
 /// returns an errno appropriate to the failure.
 pub type KResult<T> = Result<T, Errno>;
