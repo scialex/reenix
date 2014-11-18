@@ -42,7 +42,7 @@ define external-targets
 
 ./external/$(1)/$(3) : $$(shell find ./external/$(1) -type f -not -path ./external/$(1)/$(3))
 	@ echo "[MAKE] Recursive make of \"kernel/$$@\"..."
-	$$(HIDE_SIGIL) $$(MAKE) $$(SILENT_FLAG) $$(MFLAGS) -C external/$(1) $(2) $(4)
+	$$(HIDE_SIGIL) $$(MAKE) HIDE_SIGIL=$$(HIDE_SIGIL) $$(MFLAGS) --no-print-directory -C external/$(1) $(2) $(4)
 
 .PHONEY:
 clean-$(1):

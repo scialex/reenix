@@ -27,12 +27,15 @@ OBJS =  $(patsubst %.f,%.f.o,\
 all: libopenlibm.a libopenlibm.$(SHLIB_EXT) 
 
 libopenlibm.a: $(OBJS)  
-	$(AR) -rcs libopenlibm.a $(OBJS)
+	@ echo "[AR  ] Archiving for \"kernel/external/openlibm/$@\"..."
+	$(HIDE_SIGIL) $(AR) -rcs libopenlibm.a $(OBJS)
+
 libopenlibm.$(SHLIB_EXT): $(OBJS)
+	@ echo "[LD  ] Linking for \"kernel/external/openlibm/$@\"..."
 ifeq ($(OS),WINNT)
-	$(CC) -shared $(OBJS) $(LDFLAGS) -Wl,$(SONAME_FLAG),libopenlibm.$(SHLIB_EXT) -o libopenlibm.$(SHLIB_EXT)
+	$(HIDE_SIGIL) $(CC) -shared $(OBJS) $(LDFLAGS) -Wl,$(SONAME_FLAG),libopenlibm.$(SHLIB_EXT) -o libopenlibm.$(SHLIB_EXT)
 else
-	$(CC) -shared $(OBJS) $(LDFLAGS) -Wl,$(SONAME_FLAG),libopenlibm.$(SHLIB_EXT).$(SOMAJOR) -o libopenlibm.$(SHLIB_EXT).$(SOMAJOR).$(SOMINOR)
+	$(HIDE_SIGIL) $(CC) -shared $(OBJS) $(LDFLAGS) -Wl,$(SONAME_FLAG),libopenlibm.$(SHLIB_EXT).$(SOMAJOR) -o libopenlibm.$(SHLIB_EXT).$(SOMAJOR).$(SOMINOR)
 	@-ln -sf libopenlibm.$(SHLIB_EXT).$(SOMAJOR).$(SOMINOR) libopenlibm.$(SHLIB_EXT).$(SOMAJOR)
 	@-ln -sf libopenlibm.$(SHLIB_EXT).$(SOMAJOR).$(SOMINOR) libopenlibm.$(SHLIB_EXT)
 endif

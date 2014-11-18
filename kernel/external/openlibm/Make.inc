@@ -43,10 +43,12 @@ CFLAGS_add += -std=c99 -Wall -O3 -I$(OPENLIBM_HOME) -I$(OPENLIBM_HOME)/include -
 default: all
 
 %.c.o: %.c
-	$(CC) $(CPPFLAGS) $(CFLAGS_add) $(CFLAGS) -c $< -o $@
+	@ echo "[CC  ] Compiling \"kernel/external/openlibm/$<\"..."
+	$(HIDE_SIGIL) $(CC) $(CPPFLAGS) $(CFLAGS_add) $(CFLAGS) -c $< -o $@
 
 %.S.o: %.S
-	$(CC) $(SFLAGS) $(filter -m% -B% -I% -D%,$(CFLAGS_add)) -c $< -o $@
+	@ echo "[AS  ] Compiling \"kernel/external/openlibm/$<\"..."
+	$(HIDE_SIGIL) $(CC) $(SFLAGS) $(filter -m% -B% -I% -D%,$(CFLAGS_add)) -c $< -o $@
 
 # OS-specific stuff
 ifeq ($(ARCH),i386)
