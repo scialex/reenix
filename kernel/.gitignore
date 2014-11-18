@@ -6,5 +6,5 @@ cscope.po.out
 
 # Empty target stuff
 empty-target
-libs
-docs/*
+doc
+build
