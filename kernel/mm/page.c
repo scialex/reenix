@@ -13,8 +13,6 @@
 
 #include "vm/shadowd.h"
 
-#include "proc/sched.h"
-
 GDB_DEFINE_HOOK(page_alloc, void *addr, int npages)
 GDB_DEFINE_HOOK(page_free, void *addr, int npages)
 

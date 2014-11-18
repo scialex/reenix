@@ -36,7 +36,7 @@ BUILT_CRATES := $(foreach dr, $(CRATES), $(call crate-name,$(dr)))
 CRATE_DOCS   := $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 
 HEAD      := $(wildcard include/*/*.h include/*/*/*.h)
-SRCDIR    := main util mm procs
+SRCDIR    := main util mm
 SRC       := $(filter-out $(REENIX_CSRC), $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.[cS]))) $(REENIX_CSRC)
 COBJS     := $(addsuffix .o,$(basename $(SRC)))
 SCRIPTS   := $(foreach dr, $(SRCDIR), $(wildcard $(dr)/*.gdb $(dr)/*.py))
