@@ -143,13 +143,13 @@ impl WDevice<u8> for TTY {
 
 impl Device<u8> for TTY {}
 
-extern "Rust" fn handle_keyboard_input(event: keyboard::KeyboardEvent) {
+extern "Rust" fn handle_keyboard_input(event: keyboard::Event) {
     let ct = get_current_tty();
     match event {
-        keyboard::Normal(chr) => ct.handle_char(chr),
-        keyboard::Switch(n) => switch_tty(n),
-        keyboard::ScrollUp => ct.scroll(UP),
-        keyboard::ScrollDown => ct.scroll(DOWN),
+        keyboard::Event::Normal(chr) => ct.handle_char(chr),
+        keyboard::Event::Switch(n) => switch_tty(n),
+        keyboard::Event::ScrollUp => ct.scroll(ScrollDirection::UP),
+        keyboard::Event::ScrollDown => ct.scroll(ScrollDirection::DOWN),
     }
 }
 

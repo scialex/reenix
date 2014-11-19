@@ -23,6 +23,7 @@ use sync::Wait;
 use mm::pagetable::PageDir;
 use mm::AllocError;
 
+pub use self::WaitProcId::*;
 pub const CUR_PROC_SLOT : uint = 1;
 pub const CUR_PID_SLOT  : uint = 2;
 
@@ -217,7 +218,7 @@ impl KProc {
             }
             if let Some(ref kproc) =
                     self.children.values().find(|a: &&Rc<ProcRefCell<KProc>>| -> bool {
-                                                    (**a).borrow().state == DEAD
+                                                    (**a).borrow().state == ProcState::DEAD
                                                 }) {
                 return Ok((*kproc).clone());
             }
@@ -235,7 +236,7 @@ impl KProc {
                 let pr = v.clone();
                 loop {
                     let b = (*pr).borrow();
-                    if b.state == DEAD {
+                    if b.state == ProcState::DEAD {
                         break;
                     } else {
                         // We need to make sure the borrow isn't held during the sleep. Something
@@ -259,7 +260,7 @@ impl KProc {
     /// Returns true if all threads (other then the current one) are EXITED.
     fn all_threads_dead(&self) -> bool {
         for a in self.threads.values() {
-            if !a.is_current_thread() && a.state != kthread::EXITED {
+            if !a.is_current_thread() && a.state != kthread::State::EXITED {
                 return false;
             }
         }
@@ -313,7 +314,7 @@ impl KProc {
             threads : try!(alloc!(try TreeMap::new())),
             children : try!(alloc!(try TreeMap::new())),
             status : 0,
-            state : RUNNING,
+            state : ProcState::RUNNING,
             parent : None,
             pagedir : try!(alloc!(try_box PageDir::new())),
             wait : try!(alloc!(try WQueue::new())),
@@ -415,7 +416,7 @@ impl KProc {
         let parent = self.parent.clone().expect("PARENT PROCESS UNSET").upgrade().expect("Parent process should not have been destroyed!");
         dbg!(debug::PROC, "{} cleaning up. Sending wakeup to parent {}, exit status was 0x{:x}", self, parent.borrow(), status);
         self.status = status;
-        self.state = DEAD;
+        self.state = ProcState::DEAD;
         let init = init_proc!();
         for (pid, child) in self.children.iter() {
             dbg!(debug::PROC, "moving {} to init proc", pid);

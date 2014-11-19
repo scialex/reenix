@@ -73,7 +73,7 @@ impl KQueue {
             unsafe {
                 t.queue = transmute_copy(&self);
             }
-            t.state = if cancelable { kthread::SLEEPCANCELLABLE } else { kthread::SLEEP };
+            t.state = if cancelable { kthread::State::SLEEPCANCELLABLE } else { kthread::State::SLEEP };
             self.add(t);
             t.ctx.switch();
         });

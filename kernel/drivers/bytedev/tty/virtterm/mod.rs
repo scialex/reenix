@@ -1,7 +1,8 @@
 
 //! The Reenix virtual terminal support.
 
-use super::{ScrollDirection, UP, DOWN};
+use super::ScrollDirection;
+use super::ScrollDirection::{UP, DOWN};
 use bytedev::tty::Finalizer;
 use core::prelude::*;
 use bytedev::tty::TTYDriver;

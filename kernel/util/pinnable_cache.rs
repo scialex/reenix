@@ -86,7 +86,7 @@ impl<K: Ord, V:Cacheable> Cacheable for CacheItem<K, V> {
 
 /// The states a value in the cache can have.
 #[deriving(Eq, PartialEq)]
-pub enum PinState { Pinned, Unpinned, NotFound }
+pub enum State { Pinned, Unpinned, NotFound }
 
 /// The errors that can happen when we try to insert a value into the cache.
 pub enum InsertError {
@@ -157,8 +157,8 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
     /// otherwise returns an error with failure reason.
     pub fn insert<'a>(&'a self, key: K, val: V) -> Result<PinnedValue<'a, K, V>,InsertError> {
         // VERY MUCH RELIES ON MUTUAL EXCLUSION
-        if self.contains_key(&key) { return Err(KeyPresent); }
-        let item = try!(CacheItem::new(key, val).map_err(|x| MemoryError(x)));
+        if self.contains_key(&key) { return Err(InsertError::KeyPresent); }
+        let item = try!(CacheItem::new(key, val).map_err(|x| InsertError::MemoryError(x)));
         let kr  = KeyRef::new(item.key());
         let kr2 = KeyRef::new(item.key());
         assert!(self.pinned_mut().insert(kr, item).is_none());
@@ -174,20 +174,20 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
 
     /// Returns true if the key is contained within this cache.
     #[inline]
-    pub fn contains_key(&self, key: &K) -> bool { self.get_state(key) != NotFound }
+    pub fn contains_key(&self, key: &K) -> bool { self.get_state(key) != State::NotFound }
 
     /// Gets the state of the key in this cache
     ///
     /// Returns Pinned if the value is currently pinned, Unpinned if the value is not currently
     /// pinned but is present, and NotFound if we do not have the value in our cache.
-    pub fn get_state(&self, key: &K) -> PinState {
+    pub fn get_state(&self, key: &K) -> State {
         let kr = &KeyRef::new(key);
         if self.pinned().contains_key(kr) {
-            Pinned
+            State::Pinned
         } else if self.unpinned().contains_key(kr) {
-            Unpinned
+            State::Unpinned
         } else {
-            NotFound
+            State::NotFound
         }
     }
 

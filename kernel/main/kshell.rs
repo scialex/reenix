@@ -56,12 +56,12 @@ pub struct KFunction<'a> {
     func : ShellFunc,
 }
 macro_rules! KFunc_i(
-    ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: Internal($f) } );
+    ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: ShellFunc::Internal($f) } );
     ($n:expr, $f:ident) => (KFunc!($n, $n, $f));
     ($f:ident) => (KFunc!(stringify!($f),$f));
 )
 macro_rules! KFunc(
-    ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: External($f) } );
+    ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: ShellFunc::External($f) } );
     ($n:expr, $f:ident) => (KFunc!($n, $n, $f));
     ($f:ident) => (KFunc!(stringify!($f),$f));
 )
@@ -69,16 +69,16 @@ macro_rules! KFunc(
 impl<'a> KFunction<'a> {
     #[allow(dead_code)]
     pub fn create<'a>(name: &'a str, func: ExternShellFunc) -> KFunction<'a> {
-        KFunction { name : name, description: name, func : External(func) }
+        KFunction { name : name, description: name, func : ShellFunc::External(func) }
     }
     #[allow(dead_code)]
     pub fn new<'a>(name: &'a str, description: &'a str, func: ExternShellFunc) -> KFunction<'a> {
-        KFunction { name: name, description: description, func: External(func) }
+        KFunction { name: name, description: description, func: ShellFunc::External(func) }
     }
     pub fn call<'b>(&'a self, ksh: &'a KShell<'b>, args: &[&str]) -> KResult<()> {
         match self.func {
-            External(f) => f(ksh.get_tty(), args),
-            Internal(f) => f(ksh, args),
+            ShellFunc::External(f) => f(ksh.get_tty(), args),
+            ShellFunc::Internal(f) => f(ksh, args),
         }
     }
 }
@@ -342,7 +342,7 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     for _ in range(0, blks) {
         use core::slice::bytes::copy_memory;
         let mut out : [u8, ..page::SIZE] = [0, ..page::SIZE];
-        copy_memory(out, example);
+        copy_memory(&mut out, &example);
         buf.push(out);
     }
     let disk = blockdev::lookup_mut(DeviceId::create(1,0)).expect("should have disk 0");

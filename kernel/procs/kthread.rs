@@ -72,10 +72,10 @@ impl Drop for KStack {
 }
 
 #[deriving(Show)]
-pub enum KThreadMode { USER, KERNEL }
+pub enum Mode { USER, KERNEL }
 
 #[deriving(Show, Eq, PartialEq)]
-pub enum KThreadState { NOSTATE, RUN, SLEEP, SLEEPCANCELLABLE, EXITED }
+pub enum State { NOSTATE, RUN, SLEEP, SLEEPCANCELLABLE, EXITED }
 
 pub struct KThread {
     pub ctx : Context, // The threads context
@@ -83,8 +83,8 @@ pub struct KThread {
     pub retval : *mut c_void, // The threads return value, if we have one.
     pub errno : Option<errno::Errno>, // The current errno, if applicable.
     pub cancelled : bool, // True if we are canceled, false otherwise.
-    pub state : KThreadState, // Our state.
-    pub mode  : KThreadMode, // Whether we are in user or kernel mode
+    pub state : State, // Our state.
+    pub mode  : Mode, // Whether we are in user or kernel mode
     pub queue : *mut KQueue, // The queue we are currently blocking on.
 }
 
@@ -113,8 +113,8 @@ impl KThread {
             retval    : ptr::null_mut(),
             errno     : None,
             cancelled : false,
-            state     : NOSTATE,
-            mode      : KERNEL,
+            state     : State::NOSTATE,
+            mode      : Mode::KERNEL,
             queue     : 0 as *mut KQueue
         })
     }
@@ -124,11 +124,11 @@ impl KThread {
 
     pub fn make_runable(&mut self) {
         assert!(self.queue == ptr::null_mut());
-        if self.state == RUN {
+        if self.state == State::RUN {
             return;
         }
-        assert!(self.state == SLEEP || self.state == SLEEPCANCELLABLE || self.state == NOSTATE);
-        self.state = RUN;
+        assert!(self.state == State::SLEEP || self.state == State::SLEEPCANCELLABLE || self.state == State::NOSTATE);
+        self.state = State::RUN;
         self.ctx.make_runable();
     }
 
@@ -144,13 +144,13 @@ impl KThread {
     /// this status is checked later.
     pub fn cancel(&mut self, v: *mut c_void) {
         self.cancelled = true;
-        if self.state == EXITED {
+        if self.state == State::EXITED {
             dbg!(debug::THR, "cancel called on an already exited thread");
             return;
         }
-        assert!(self.state != NOSTATE, "Illegal state for a process");
+        assert!(self.state != State::NOSTATE, "Illegal state for a process");
         self.retval = v;
-        if self.state == SLEEPCANCELLABLE {
+        if self.state == State::SLEEPCANCELLABLE {
             if let Some(queue) = unsafe { self.queue.as_mut() } {
                 queue.remove(self);
             }
@@ -161,11 +161,11 @@ impl KThread {
         self.retval = v;
         // TODO Add this check back in.
         //assert!(transmute(self) == gdt::get_tsd().cur_thr);
-        assert!(self.state == RUN);
+        assert!(self.state == State::RUN);
         dbg!(debug::THR, "Thread {} of process {} ended with a status of 0x{:x} ({})",
              self, current_proc!(), v as uint, num::from_uint::<errno::Errno>(v as uint));
         (current_proc_mut!()).thread_exited(v);
-        self.state = EXITED;
+        self.state = State::EXITED;
         context::die();
     }
 }

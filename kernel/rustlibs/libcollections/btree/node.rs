@@ -11,10 +11,15 @@
 // This module represents all the internal representation and logic for a B-Tree's node
 // with a safe interface, so that BTreeMap itself does not depend on any of these details.
 
+pub use self::InsertionResult::*;
+pub use self::SearchResult::*;
+pub use self::TraversalItem::*;
+
 use core::prelude::*;
 
 use core::{slice, mem, ptr};
 use core::iter::Zip;
+use core::borrow::BorrowFrom;
 
 use vec;
 use vec::Vec;
@@ -43,7 +48,7 @@ pub struct Node<K, V> {
     // theory, if we take full control of allocation like HashMap's RawTable does,
     // and restrict leaves to max size 256 (not unreasonable for a btree node) we can cut
     // this down to just (ptr, cap: u8, size: u8, is_leaf: bool). With generic
-    // integer arguments, cap can even move into the the type, reducing this just to
+    // integer arguments, cap can even move into the type, reducing this just to
     // (ptr, size, is_leaf). This could also have cache benefits for very small nodes, as keys
     // could bleed into edges and vals.
     //
@@ -69,19 +74,19 @@ impl<K: Ord, V> Node<K, V> {
     /// Searches for the given key in the node. If it finds an exact match,
     /// `Found` will be yielded with the matching index. If it doesn't find an exact match,
     /// `GoDown` will be yielded with the index of the subtree the key must lie in.
-    pub fn search(&self, key: &K) -> SearchResult {
+    pub fn search<Sized? Q>(&self, key: &Q) -> SearchResult where Q: BorrowFrom<K> + Ord {
         // FIXME(Gankro): Tune when to search linear or binary based on B (and maybe K/V).
         // For the B configured as of this writing (B = 6), binary search was *significantly*
         // worse for uints.
         self.search_linear(key)
     }
 
-    fn search_linear(&self, key: &K) -> SearchResult {
+    fn search_linear<Sized? Q>(&self, key: &Q) -> SearchResult where Q: BorrowFrom<K> + Ord {
         for (i, k) in self.keys.iter().enumerate() {
-            match k.cmp(key) {
-                Less => {},
+            match key.cmp(BorrowFrom::borrow_from(k)) {
+                Greater => {},
                 Equal => return Found(i),
-                Greater => return GoDown(i),
+                Less => return GoDown(i),
             }
         }
         GoDown(self.len())

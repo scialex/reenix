@@ -52,7 +52,7 @@ fn sort(l: &mut [Option<SlabAllocator>], lo: uint, hi: uint) {
 
 impl SlabMap {
     pub fn finish(&mut self) {
-        sort(self.vals, 0, self.cnt);
+        sort(&mut self.vals, 0, self.cnt);
         let mut prev = 0;
         for i in range(0, self.len()) {
             let size = self.vals[i].expect("shouldn't be null").get_size();

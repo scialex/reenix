@@ -75,7 +75,7 @@ const SHIFT_SCANCODES  : &'static str = "\x00\x1b!@#$%^&*()_+\x08\tQWERTYUIOP{}\
                                                 "\x00\x00\x00",
                                                 " ");*/
 
-pub enum KeyboardEvent {
+pub enum Event {
     Normal(u8), Switch(u8), ScrollUp, ScrollDown,
 }
 
@@ -88,11 +88,11 @@ pub fn init_stage2() {
     interrupt::register(interrupt::KEYBOARD, keyboard_handler);
 }
 
-pub type KeyboardHandler = extern "Rust" fn(KeyboardEvent);
+pub type KeyboardHandler = extern "Rust" fn(Event);
 
 pub struct Keyboard { curmask: u8, handler: KeyboardHandler }
 
-fn default_handler(_: KeyboardEvent) { }
+fn default_handler(_: Event) { }
 static mut KEYBOARD : Keyboard = Keyboard { curmask : 0, handler: default_handler };
 
 #[inline]
@@ -129,11 +129,11 @@ impl Keyboard {
             self.curmask |= ESC_MASK;
             return;
         } else if sc >= VT_KEY_LOW && sc <= VT_KEY_HIGH {
-            Switch(sc - VT_KEY_LOW)
+            Event::Switch(sc - VT_KEY_LOW)
         } else if (self.curmask & CTRL_MASK) != 0 && sc == SCROLL_DOWN {
-            ScrollDown
+            Event::ScrollDown
         } else if (self.curmask & CTRL_MASK) != 0 && sc == SCROLL_UP {
-            ScrollUp
+            Event::ScrollUp
         } else if sc > NORMAL_KEY_HIGH {
             return;
         } else if self.curmask & CTRL_MASK != 0 {
@@ -142,14 +142,14 @@ impl Keyboard {
             let c = SHIFT_SCANCODES.as_bytes()[sc as uint];
             /* Range of chars that have corresponding control chars */
             if c >= 0x40 && c < 0x60 {
-                Normal(c - 0x40)
+                Event::Normal(c - 0x40)
             } else {
                 return;
             }
         } else if self.curmask & SHIFT_MASK != 0 {
-            Normal(SHIFT_SCANCODES.as_bytes()[sc as uint])
+            Event::Normal(SHIFT_SCANCODES.as_bytes()[sc as uint])
         } else {
-            Normal(NORMAL_SCANCODES.as_bytes()[sc as uint])
+            Event::Normal(NORMAL_SCANCODES.as_bytes()[sc as uint])
         };
         /* Give the key to the vt system, which passes it to the tty */
         let h = self.handler;
