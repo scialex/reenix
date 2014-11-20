@@ -20,12 +20,14 @@ use backup::{BackupAllocator, DEFAULT_BACKUP_ALLOCATOR};
 use core::fmt::Show;
 use page;
 
+/// An allocator is a type that can allocate memory. It is currently a wrapper around C functions.
 struct Allocator {
     slabs : SlabMap,
     pages : PageAllocator,
     backup : BackupAllocator,
 }
 
+/// A type that can allocate pages. Currently is just a shim to the C page allocator.
 struct PageAllocator;
 impl PageAllocator {
     pub unsafe fn alloc_n(&self, n: u32) -> *mut u8 {
@@ -47,7 +49,9 @@ static mut BASE_ALLOCATOR : Allocator = Allocator {
     backup : DEFAULT_BACKUP_ALLOCATOR,
 };
 
+/// A type representing that we had an error allocating. We might put more in this eventually.
 pub type AllocError = ();
+/// The result of an allocation.
 pub type Allocation<T> = Result<T, AllocError>;
 
 pub static SLAB_REDZONE : u32 = 0xdeadbeef;
