@@ -30,6 +30,7 @@ pub mod io;
 pub mod debug;
 pub mod kernel;
 
+/// Stuff for creating values of certain types.
 pub mod make {
     /// A trait for a type that has a initializer that takes a single value of type K.
     pub trait Make<A> {
@@ -48,13 +49,14 @@ pub mod make {
     }
 }
 
+/// Another, more in-depth information to print.
 pub mod describe {
     use core::fmt;
     use core::prelude::*;
     pub trait Describeable {
         fn describe(&self, &mut fmt::Formatter) -> fmt::Result;
     }
-    pub struct Describer<T: Describeable>(T);
+    pub struct Describer<T: Describeable>(pub T);
     impl<T: Describeable> Describeable for Describer<T> {
         fn describe(&self, f: &mut fmt::Formatter) -> fmt::Result {
             let &Describer(ref x) = self;

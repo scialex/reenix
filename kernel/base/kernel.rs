@@ -50,6 +50,7 @@ pub fn halt() -> ! {
 }
 
 extern "C" {
+    /// This does cpu-spin based delay.
     #[link_name="do_c_ndelay"]
     pub fn ndelay(n: u32);
 }

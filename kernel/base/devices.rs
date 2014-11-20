@@ -31,6 +31,7 @@ impl Show for DeviceId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "DeviceId({}.{})", self.get_major(), self.get_minor()) }
 }
 
+/// Create a device ID in a static manner.
 #[macro_export]
 macro_rules! DeviceId_static(
     ($h:expr, $l:expr) => ( DeviceId((($h as u16) << 8) | ($l as u16)) )

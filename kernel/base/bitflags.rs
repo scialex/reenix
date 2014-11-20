@@ -2,6 +2,12 @@
 //
 #![macro_escape]
 
+/// A bitmask creation macro.
+///
+/// It is used by specifying the name you wish to give the particular bit and the number of bits to
+/// shift for that bit, starting at zero. One can optionally put a `default` name which is the name
+/// of the value if it has no bits set. It is pretty printed to be a `|` of all the names whose
+/// bits are set.
 #[macro_export]
 macro_rules! bitmask_create {
     (flags $name:ident : $t:ty

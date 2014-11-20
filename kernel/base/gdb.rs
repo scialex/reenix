@@ -1,5 +1,8 @@
 // TODO Copyright Header
 
+//! A bunch of hook definitions used by gdb to tell when we have reached certain stages. These
+//! should never contain any code.
+
 /// A function to tell GDB we have booted
 #[allow(dead_code)] #[inline(never)] #[no_stack_check]
 #[export_name="__py_hook_boot"]
