@@ -1,12 +1,12 @@
 // TODO Copyright Header
 
 #![crate_name="main"]
-#![crate_type="rlib"]
+#![crate_type="staticlib"]
 #![no_std]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
-#![feature(globs, phase, macro_rules, asm, if_let, unsafe_destructor)]
+#![feature(globs, phase, macro_rules, asm, if_let, unsafe_destructor,lang_items)]
 
 
 #[phase(plugin, link)] extern crate core;
@@ -34,9 +34,60 @@ use core::fmt;
 
 mod proctest;
 mod kshell;
+mod langs;
 
-pub fn init_stage1() { }
-pub fn init_stage2() { }
+extern "C" { fn dbg_init(); }
+
+#[no_stack_check]
+fn run_init() {
+    use mm;
+    //use util;
+    use procs;
+    use startup;
+    base::gdb::boot_hook();
+    unsafe { dbg_init(); }
+
+    // This sets up the gdt based stack checking.
+    startup::gdt::init_stage1();
+    dbg!(debug::CORE, "gdt initialized stage 1");
+    base::init_stage1();
+    dbg!(debug::CORE, "base initialized stage 1");
+    mm::init_stage1();
+    dbg!(debug::CORE, "mm initialized stage 1");
+    startup::init_stage1();
+    dbg!(debug::CORE, "startup initialized stage 1");
+    //util::init_stage1();
+    //dbg!(debug::CORE, "util initialized stage 1");
+    procs::init_stage1();
+    dbg!(debug::CORE, "procs initialized stage 1");
+    drivers::init_stage1();
+    dbg!(debug::CORE, "drivers initialized stage 1");
+
+    mm::alloc::close_requests();
+
+    base::init_stage2();
+    dbg!(debug::CORE, "Base initialized stage 2");
+    mm::init_stage2();
+    dbg!(debug::CORE, "mm initialized stage 2");
+    startup::init_stage2();
+    dbg!(debug::CORE, "startup initialized stage 2");
+    //util::init_stage2();
+    //dbg!(debug::CORE, "util initialized stage 2");
+    procs::init_stage2();
+    dbg!(debug::CORE, "procs initialized stage 2");
+    drivers::init_stage2();
+    dbg!(debug::CORE, "drivers initialized stage 2");
+}
+
+#[export_name="kmain"]
+#[no_mangle]
+#[no_stack_check]
+pub extern "C" fn kmain() {
+    run_init();
+    // TODO I should call the gdb hook things.
+    // TODO I should do the context switch in here.
+    procs::enter_bootstrap_func(bootstrap, 0, 0 as *mut c_void);
+}
 
 #[no_mangle]
 #[no_stack_check]
@@ -67,6 +118,7 @@ fn finish_init() {
     unsafe { IS_PROCS_UP = true; }
     gdb::initialized_hook();
 }
+
 extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     cleanup_bootstrap_function();
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
@@ -101,8 +153,10 @@ extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     return 0 as *mut c_void;
 }
 
+#[doc(hidden)]
 struct Estr;
 impl fmt::Show for Estr { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "\x08") } }
+#[doc(hidden)]
 static EMPTY_STR : Estr = Estr;
 
 #[no_mangle]
@@ -112,6 +166,7 @@ pub extern "C" fn get_dbg_pid() -> &'static fmt::Show + 'static {
 }
 
 
+#[doc(hidden)]
 mod std {
     pub use core::fmt;
     pub use core::clone;

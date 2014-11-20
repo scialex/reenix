@@ -20,7 +20,7 @@ endif
 # Plugins
 PLUGINS        := enabled hoare bassert
 # Crates for the kernel
-REENIX_CRATES  := entry main base mm startup procs drivers util
+REENIX_CRATES  := main base mm startup procs drivers util #umem
 # Crates from the Rust standard library
 BUILTIN_CRATES := alloc libc collections
 # C code helpers for Rust
@@ -62,7 +62,7 @@ EXTERNAL_LIBS  := openlibm
 EXTERNAL       := $(foreach l, $(EXTERNAL_LIBS), $(BUILD_DIR)/external/lib$(l).a)
 
 # boot/boot.S must be the first file so that the multiboot header is close enough to the front.
-OBJS := $(BOOT_ENTRY) $(COBJS) $(PREBUILT) $(EXTERNAL) $(call crate-name,entry)
+OBJS := $(BOOT_ENTRY) $(COBJS) $(PREBUILT) $(EXTERNAL) $(call crate-name,main)
 
 SYMBOLS    := $(BUILD_DIR)/weenix.dbg
 BSYMBOLS   := $(BUILD_DIR)/symbols.dbg
@@ -86,8 +86,6 @@ KERNEL_RDFLAGS := $(strip $(KERNEL_RDFLAGS))
 all:  $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 docs: $(CRATE_DOCS)
 
-BASIC_REQS := alloc base collections libc mm
-
 # Rust libs
 $(eval $(call builtin-crate-rule, libc,))
 $(eval $(call builtin-crate-rule, alloc,       libc mm))
@@ -99,18 +97,17 @@ $(eval $(call plugin-rule, enabled,))
 $(eval $(call plugin-rule, hoare  ,))
 
 # Reenix Crates.
+BASIC_REQS := alloc base collections libc mm
 $(eval $(call crate-rule,      base,    libc))
 $(eval $(call crate-rule,      mm,      libc base))
 $(eval $(call crate-rule,      startup, $(BASIC_REQS)))
 $(eval $(call crate-rule,      util,    $(BASIC_REQS)))
-$(eval $(call crate-rule,      umem,    $(BASIC_REQS) util))
 $(eval $(call crate-rule,      procs,   $(BASIC_REQS) startup))
-$(eval $(call long-crate-rule, drivers, $(BASIC_REQS) procs, --opt-level=1)) # TODO For some reason LLVM doesn't like --opt-level=2 in drivers.
+$(eval $(call crate-rule,      umem,    $(BASIC_REQS) util procs))
+$(eval $(call long-crate-rule, drivers, $(BASIC_REQS) procs, --opt-level=1)) # TODO For some reason LLVM doesn't like -O2 in drivers.
 
 # The `main` crate.
-$(eval $(call crate-rule, main,  $(filter-out entry main, $(CRATES))))
-# The `entry` crate.
-$(eval $(call crate-rule, entry, main))
+$(eval $(call crate-rule, main,  $(filter-out main, $(CRATES))))
 
 # Make the target for libm
 $(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,                \
