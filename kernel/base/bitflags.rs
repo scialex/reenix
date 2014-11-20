@@ -5,7 +5,7 @@
 #[macro_export]
 macro_rules! bitmask_create {
     (flags $name:ident : $t:ty
-     { $($f:ident = $v:expr),+ default $d:ident, }) => {
+     {  default $d:ident, $($f:ident = $v:expr),+ }) => {
         #[deriving(Default, PartialEq, Eq)]
         pub struct $name($t);
         $(pub const $f : $name = $name(0x1 << $v);)*
