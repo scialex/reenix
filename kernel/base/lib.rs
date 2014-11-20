@@ -19,6 +19,9 @@ extern crate libc;
 // NOTE Needs to go first so everything else can get the macro's defined in it.
 mod bitflags;
 mod macros;
+
+pub mod devices;
+
 pub mod gdb;
 
 pub mod errno;
@@ -79,6 +82,7 @@ mod std {
     pub use core::option;
     pub use core::num;
     pub use core::default;
+    pub use core::clone;
 }
 
 // This lets us use the macro's exported from here locally.
