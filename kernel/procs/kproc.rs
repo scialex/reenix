@@ -160,7 +160,7 @@ impl KProc {
     /// This operation cannot be canceled.
     fn do_waitpid(&mut self, pid: WaitProcId, options : WaitOps) -> Result<(ProcId, ProcStatus), errno::Errno> {
         if options != 0 {
-            dbg!(debug::PROC, "waitpid with options 0b{:t} is not supported.", options);
+            dbg!(debug::PROC, "waitpid with options 0b{:b} is not supported.", options);
             return Err(errno::ECHILD);
         }
 

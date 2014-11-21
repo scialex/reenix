@@ -67,7 +67,7 @@ impl<'a> fmt::FormatWriter for ByteWriter<'a> {
         let &ByteWriter(ref mut this) = self;
         match this.write_to(0, bytes) {
             Ok(_) => Ok(()),
-            Err(_) => Err(fmt::WriteError),
+            Err(_) => Err(fmt::Error),
         }
     }
 }

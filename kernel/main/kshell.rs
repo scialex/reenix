@@ -21,10 +21,10 @@ use core::iter::*;
 use procs::args::ProcArgs;
 
 macro_rules! twriteln(
-    ($t:expr, $($e:expr),*) => (assert!(writeln!(ByteWriter($t), $($e),*).is_ok()))
+    ($t:expr, $($e:expr),*) => (assert!(writeln!(&mut ByteWriter($t), $($e),*).is_ok()))
 )
 macro_rules! twrite(
-    ($t:expr, $($e:expr),*) => (assert!(write!(ByteWriter($t), $($e),*).is_ok()))
+    ($t:expr, $($e:expr),*) => (assert!(write!(&mut ByteWriter($t), $($e),*).is_ok()))
 )
 pub fn start(i: i32) {
     let tty = ProcArgs::new(bytedev::lookup_mut(DeviceId::create(2,i as u8)).unwrap()).unwrap();

@@ -199,7 +199,7 @@ pub fn init_stage2() {
 
             // If status register is 0x00 drive does not exist.
             if 0 == c.inb(register::STATUS) {
-                dbg!(debug::DISK | debug::CORE, "Drive {} does not exist! status is 0b{:08t}", c, c.inb(register::STATUS));
+                dbg!(debug::DISK | debug::CORE, "Drive {} does not exist! status is 0b{:08b}", c, c.inb(register::STATUS));
                 continue;
             }
             // Poll until the bsy bit clears.
@@ -212,7 +212,7 @@ pub fn init_stage2() {
             loop {
                 let cur_status = c.inb(register::STATUS);
                 if cur_status & status::ERR != 0 {
-                    kpanic!("Error setting up ATA drive {}, status is 0b{:08t}", c, cur_status);
+                    kpanic!("Error setting up ATA drive {}, status is 0b{:08b}", c, cur_status);
                 }
                 if cur_status & status::DRQ != 0 { break; } else { c.pause(); }
             }

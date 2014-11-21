@@ -23,7 +23,7 @@ pub extern fn rust_begin_unwind(msg: &core::fmt::Arguments,
                                 file: &'static str,
                                 line: uint) -> ! {
     use base::kernel;
-    dbg!(debug::PANIC, "Failed at {:s}:{:u} -> {}",file, line, msg);
+    dbg!(debug::PANIC, "Failed at {:}:{:} -> {}",file, line, msg);
     //unsafe { core::fmt::write(&mut DBG_WRITER, msg); }
     kernel::halt();
 }
@@ -43,5 +43,5 @@ pub extern fn stack_exhausted(fmt: &core::fmt::Arguments,
                               file: &'static str,
                               line: uint) -> ! {
     unsafe { core::fmt::write(&mut DBG_WRITER, fmt); }
-    kpanic!("Stack Exhausted at {:s}:{:u}",file, line);
+    kpanic!("Stack Exhausted at {:}:{:}",file, line);
 }

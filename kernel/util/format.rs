@@ -28,6 +28,6 @@ pub fn mk_string_formatter() -> StringFormatter { StringFormatter(String::with_c
 
 impl fmt::FormatWriter for StringFormatter {
     fn write(&mut self, bytes: &[u8]) -> fmt::Result {
-        from_utf8(bytes).map_or(Err(fmt::WriteError), |st| { self.0.push_str(st); Ok(()) })
+        from_utf8(bytes).map_or(Err(fmt::Error), |st| { self.0.push_str(st); Ok(()) })
     }
 }
