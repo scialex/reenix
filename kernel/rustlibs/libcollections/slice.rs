@@ -89,7 +89,7 @@
 
 use self::Direction::*;
 use alloc::boxed::Box;
-use core::borrow::{BorrowFrom, BorrowFromMut};
+use core::borrow::{BorrowFrom, BorrowFromMut, ToOwned};
 use core::cmp;
 use core::kinds::Sized;
 use core::mem::size_of;
@@ -106,7 +106,7 @@ pub use core::slice::{OrdSlicePrelude, SlicePrelude, Items, MutItems};
 pub use core::slice::{ImmutableIntSlice, MutableIntSlice};
 pub use core::slice::{MutSplits, MutChunks, Splits};
 pub use core::slice::{bytes, mut_ref_slice, ref_slice, CloneSlicePrelude};
-pub use core::slice::{Found, NotFound};
+pub use core::slice::{Found, NotFound, from_raw_buf, from_raw_mut_buf};
 
 // Functional utilities
 
@@ -121,7 +121,7 @@ pub trait VectorVector<T> for Sized? {
     fn connect_vec(&self, sep: &T) -> Vec<T>;
 }
 
-impl<T: Clone, V: AsSlice<T>> VectorVector<T> for [V] {
+impl<'a, T: Clone, V: AsSlice<T>> VectorVector<T> for [V] {
     fn concat_vec(&self) -> Vec<T> {
         let size = self.iter().fold(0u, |acc, v| acc + v.as_slice().len());
         let mut result = Vec::with_capacity(size);
@@ -424,7 +424,7 @@ fn merge_sort<T>(v: &mut [T], compare: |&T, &T| -> Ordering) {
     // allocate some memory to use as scratch memory, we keep the
     // length 0 so we can keep shallow copies of the contents of `v`
     // without risking the dtors running on an object twice if
-    // `compare` fails.
+    // `compare` panics.
     let mut working_space = Vec::with_capacity(2 * len);
     // these both are buffers of length `len`.
     let mut buf_dat = working_space.as_mut_ptr();
@@ -658,6 +658,11 @@ impl<T> BorrowFromMut<Vec<T>> for [T] {
     fn borrow_from_mut(owned: &mut Vec<T>) -> &mut [T] { owned[mut] }
 }
 
+#[unstable = "trait is unstable"]
+impl<T: Clone> ToOwned<Vec<T>> for [T] {
+    fn to_owned(&self) -> Vec<T> { self.to_vec() }
+}
+
 /// Unsafe operations
 pub mod raw {
     pub use core::slice::raw::{buf_as_slice, mut_buf_as_slice};
@@ -666,6 +671,8 @@ pub mod raw {
 
 #[cfg(test)]
 mod tests {
+    extern crate rustrt;
+
     use std::cell::Cell;
     use std::default::Default;
     use std::mem;
@@ -949,9 +956,9 @@ mod tests {
     #[test]
     fn test_swap_remove_noncopyable() {
         // Tests that we don't accidentally run destructors twice.
-        let mut v = vec![rt::exclusive::Exclusive::new(()),
-                         rt::exclusive::Exclusive::new(()),
-                         rt::exclusive::Exclusive::new(())];
+        let mut v = vec![rustrt::exclusive::Exclusive::new(()),
+                         rustrt::exclusive::Exclusive::new(()),
+                         rustrt::exclusive::Exclusive::new(())];
         let mut _e = v.swap_remove(0);
         assert_eq!(v.len(), 2);
         _e = v.swap_remove(1);
@@ -2084,7 +2091,7 @@ mod bench {
     use std::rand::{weak_rng, Rng};
     use std::mem;
     use std::ptr;
-    use test::Bencher;
+    use test::{Bencher, black_box};
 
     use vec::Vec;
 
@@ -2140,8 +2147,8 @@ mod bench {
         let mut vec: Vec<uint> = vec![];
         b.iter(|| {
             vec.push(0);
-            &vec
-        })
+            black_box(&vec);
+        });
     }
 
     #[bench]

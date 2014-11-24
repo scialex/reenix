@@ -42,9 +42,9 @@
 //! # Representation
 //!
 //! Rust's string type, `str`, is a sequence of Unicode scalar values encoded as a
-//! stream of UTF-8 bytes. All strings are guaranteed to be validly encoded UTF-8
-//! sequences. Additionally, strings are not null-terminated and can thus contain
-//! null bytes.
+//! stream of UTF-8 bytes. All [strings](../../reference.html#literals) are
+//! guaranteed to be validly encoded UTF-8 sequences. Additionally, strings are
+//! not null-terminated and can thus contain null bytes.
 //!
 //! The actual representation of strings have direct mappings to slices: `&str`
 //! is the same as `&[u8]`.
@@ -54,7 +54,7 @@
 pub use self::MaybeOwned::*;
 use self::RecompositionState::*;
 use self::DecompositionType::*;
-use core::borrow::BorrowFrom;
+use core::borrow::{BorrowFrom, ToOwned};
 use core::default::Default;
 use core::fmt;
 use core::cmp;
@@ -67,18 +67,20 @@ use core::prelude::{range};
 
 use hash;
 use ring_buf::RingBuf;
-use string::String;
+use string::{String, ToString};
 use unicode;
 use vec::Vec;
 
 pub use core::str::{from_utf8, CharEq, Chars, CharOffsets};
 pub use core::str::{Bytes, CharSplits};
 pub use core::str::{CharSplitsN, AnyLines, MatchIndices, StrSplits};
-pub use core::str::{Utf16CodeUnits, eq_slice, is_utf8, is_utf16, Utf16Items};
+pub use core::str::{Utf16Encoder, Utf16CodeUnits};
+pub use core::str::{eq_slice, is_utf8, is_utf16, Utf16Items};
 pub use core::str::{Utf16Item, ScalarValue, LoneSurrogate, utf16_items};
 pub use core::str::{truncate_utf16_at_nul, utf8_char_width, CharRange};
 pub use core::str::{FromStr, from_str};
 pub use core::str::{Str, StrPrelude};
+pub use core::str::{from_utf8_unchecked, from_c_str};
 pub use unicode::str::{UnicodeStrPrelude, Words, Graphemes, GraphemeIndices};
 
 // FIXME(conventions): ensure bit/char conventions are followed by str's API
@@ -161,7 +163,7 @@ impl<S: Str> StrVector for [S] {
     }
 }
 
-impl<S: Str> StrVector for Vec<S> {
+impl<S: Str, T: AsSlice<S>> StrVector for T {
     #[inline]
     fn concat(&self) -> String {
         self.as_slice().concat()
@@ -392,11 +394,11 @@ pub fn replace(s: &str, from: &str, to: &str) -> String {
     let mut result = String::new();
     let mut last_end = 0;
     for (start, end) in s.match_indices(from) {
-        result.push_str(unsafe{raw::slice_bytes(s, last_end, start)});
+        result.push_str(unsafe { s.slice_unchecked(last_end, start) });
         result.push_str(to);
         last_end = end;
     }
-    result.push_str(unsafe{raw::slice_bytes(s, last_end, s.len())});
+    result.push_str(unsafe { s.slice_unchecked(last_end, s.len()) });
     result
 }
 
@@ -609,6 +611,11 @@ impl BorrowFrom<String> for str {
     fn borrow_from(owned: &String) -> &str { owned[] }
 }
 
+#[unstable = "trait is unstable"]
+impl ToOwned<String> for str {
+    fn to_owned(&self) -> String { self.to_string() }
+}
+
 /// Unsafe string operations.
 pub mod raw {
     pub use core::str::raw::{from_utf8, c_str_to_static_slice, slice_bytes};
@@ -629,7 +636,9 @@ pub trait StrAllocating: Str {
         let me = self.as_slice();
         let mut out = String::with_capacity(me.len());
         for c in me.chars() {
-            c.escape_default(|c| out.push(c));
+            for c in c.escape_default() {
+                out.push(c);
+            }
         }
         out
     }
@@ -639,7 +648,9 @@ pub trait StrAllocating: Str {
         let me = self.as_slice();
         let mut out = String::with_capacity(me.len());
         for c in me.chars() {
-            c.escape_unicode(|c| out.push(c));
+            for c in c.escape_unicode() {
+                out.push(c);
+            }
         }
         out
     }
@@ -669,16 +680,7 @@ pub trait StrAllocating: Str {
     /// assert_eq!(s.replace("cookie monster", "little lamb"), s);
     /// ```
     fn replace(&self, from: &str, to: &str) -> String {
-        let me = self.as_slice();
-        let mut result = String::new();
-        let mut last_end = 0;
-        for (start, end) in me.match_indices(from) {
-            result.push_str(unsafe{raw::slice_bytes(me, last_end, start)});
-            result.push_str(to);
-            last_end = end;
-        }
-        result.push_str(unsafe{raw::slice_bytes(me, last_end, me.len())});
-        result
+        replace(self.as_slice(), from, to)
     }
 
     /// Given a string, makes a new string with repeated copies of it.
@@ -927,54 +929,93 @@ mod tests {
         assert_eq!("ะเทศไท", "ประเทศไทย中华Việt Nam".slice_chars(2, 8));
     }
 
-    #[test]
-    fn test_concat() {
-        fn t(v: &[String], s: &str) {
-            assert_eq!(v.concat().as_slice(), s);
+    struct S {
+        x: [String, .. 2]
+    }
+
+    impl AsSlice<String> for S {
+        fn as_slice<'a> (&'a self) -> &'a [String] {
+            &self.x
         }
-        t(&[String::from_str("you"), String::from_str("know"),
-            String::from_str("I'm"),
-            String::from_str("no"), String::from_str("good")],
-          "youknowI'mnogood");
-        let v: &[String] = &[];
-        t(v, "");
-        t(&[String::from_str("hi")], "hi");
+    }
+
+    fn s(x: &str) -> String { x.into_string() }
+
+    macro_rules! test_concat {
+        ($expected: expr, $string: expr) => {
+            {
+                let s = $string.concat();
+                assert_eq!($expected, s.as_slice());
+            }
+        }
     }
 
     #[test]
-    fn test_connect() {
-        fn t(v: &[String], sep: &str, s: &str) {
-            assert_eq!(v.connect(sep).as_slice(), s);
+    fn test_concat_for_different_types() {
+        test_concat!("ab", ["a", "b"]);
+        test_concat!("ab", [s("a"), s("b")]);
+        test_concat!("ab", vec!["a", "b"]);
+        test_concat!("ab", vec!["a", "b"].as_slice());
+        test_concat!("ab", vec![s("a"), s("b")]);
+
+        let mut v0 = ["a", "b"];
+        let mut v1 = [s("a"), s("b")];
+        unsafe {
+            use std::c_vec::CVec;
+
+            test_concat!("ab", CVec::new(v0.as_mut_ptr(), v0.len()));
+            test_concat!("ab", CVec::new(v1.as_mut_ptr(), v1.len()));
         }
-        t(&[String::from_str("you"), String::from_str("know"),
-            String::from_str("I'm"),
-            String::from_str("no"), String::from_str("good")],
-          " ", "you know I'm no good");
-        let v: &[String] = &[];
-        t(v, " ", "");
-        t(&[String::from_str("hi")], " ", "hi");
+
+        test_concat!("ab", S { x: [s("a"), s("b")] });
     }
 
     #[test]
-    fn test_concat_slices() {
-        fn t(v: &[&str], s: &str) {
-            assert_eq!(v.concat().as_slice(), s);
+    fn test_concat_for_different_lengths() {
+        let empty: &[&str] = &[];
+        test_concat!("", empty);
+        test_concat!("a", ["a"]);
+        test_concat!("ab", ["a", "b"]);
+        test_concat!("abc", ["", "a", "bc"]);
+    }
+
+    macro_rules! test_connect {
+        ($expected: expr, $string: expr, $delim: expr) => {
+            {
+                let s = $string.connect($delim);
+                assert_eq!($expected, s.as_slice());
+            }
         }
-        t(&["you", "know", "I'm", "no", "good"], "youknowI'mnogood");
-        let v: &[&str] = &[];
-        t(v, "");
-        t(&["hi"], "hi");
     }
 
     #[test]
-    fn test_connect_slices() {
-        fn t(v: &[&str], sep: &str, s: &str) {
-            assert_eq!(v.connect(sep).as_slice(), s);
+    fn test_connect_for_different_types() {
+        test_connect!("a-b", ["a", "b"], "-");
+        let hyphen = "-".into_string();
+        test_connect!("a-b", [s("a"), s("b")], hyphen.as_slice());
+        test_connect!("a-b", vec!["a", "b"], hyphen.as_slice());
+        test_connect!("a-b", vec!["a", "b"].as_slice(), "-");
+        test_connect!("a-b", vec![s("a"), s("b")], "-");
+
+        let mut v0 = ["a", "b"];
+        let mut v1 = [s("a"), s("b")];
+        unsafe {
+            use std::c_vec::CVec;
+
+            test_connect!("a-b", CVec::new(v0.as_mut_ptr(), v0.len()), "-");
+            test_connect!("a-b", CVec::new(v1.as_mut_ptr(), v1.len()), hyphen.as_slice());
         }
-        t(&["you", "know", "I'm", "no", "good"],
-          " ", "you know I'm no good");
-        t(&[], " ", "");
-        t(&["hi"], " ", "hi");
+
+        test_connect!("a-b", S { x: [s("a"), s("b")] }, "-");
+    }
+
+    #[test]
+    fn test_connect_for_different_lengths() {
+        let empty: &[&str] = &[];
+        test_connect!("", empty, "-");
+        test_connect!("a", ["a"], "-");
+        test_connect!("a-b", ["a", "b"], "-");
+        test_connect!("-a-bc", ["", "a", "bc"], "-");
     }
 
     #[test]
@@ -1188,7 +1229,7 @@ mod tests {
         assert_eq!("11foo1bar11".trim_left_chars('1'), "foo1bar11");
         let chars: &[char] = &['1', '2'];
         assert_eq!("12foo1bar12".trim_left_chars(chars), "foo1bar12");
-        assert_eq!("123foo1bar123".trim_left_chars(|c: char| c.is_digit()), "foo1bar123");
+        assert_eq!("123foo1bar123".trim_left_chars(|c: char| c.is_numeric()), "foo1bar123");
     }
 
     #[test]
@@ -1203,7 +1244,7 @@ mod tests {
         assert_eq!("11foo1bar11".trim_right_chars('1'), "11foo1bar");
         let chars: &[char] = &['1', '2'];
         assert_eq!("12foo1bar12".trim_right_chars(chars), "12foo1bar");
-        assert_eq!("123foo1bar123".trim_right_chars(|c: char| c.is_digit()), "123foo1bar");
+        assert_eq!("123foo1bar123".trim_right_chars(|c: char| c.is_numeric()), "123foo1bar");
     }
 
     #[test]
@@ -1218,7 +1259,7 @@ mod tests {
         assert_eq!("11foo1bar11".trim_chars('1'), "foo1bar");
         let chars: &[char] = &['1', '2'];
         assert_eq!("12foo1bar12".trim_chars(chars), "foo1bar");
-        assert_eq!("123foo1bar123".trim_chars(|c: char| c.is_digit()), "foo1bar");
+        assert_eq!("123foo1bar123".trim_chars(|c: char| c.is_numeric()), "foo1bar");
     }
 
     #[test]
