@@ -1,6 +1,7 @@
 
 //! An LRU cache where we can 'pin' items.
 
+use core::mem::size_of;
 use core::cell::*;
 use collections::*;
 use base::make::*;
@@ -86,9 +87,14 @@ impl<K: Ord, V:Cacheable> Cacheable for CacheItem<K, V> {
 
 /// The states a value in the cache can have.
 #[deriving(Eq, PartialEq)]
-pub enum State { Pinned, Unpinned, NotFound }
+pub enum State {
+    Pinned(uint),
+    Unpinned,
+    NotFound
+}
 
 /// The errors that can happen when we try to insert a value into the cache.
+#[deriving(Show)]
 pub enum InsertError {
     /// There is already a key with that value in the cache.
     KeyPresent,
@@ -96,6 +102,15 @@ pub enum InsertError {
     MemoryError(AllocError),
     /// Some other error occured, which might be described by the errno.
     SysError(Option<Errno>),
+}
+
+/// This can be called to make sure there is an allocator able to efficiently hold be used by a
+/// pinnable cache on the given key-value types.
+pub fn request_pinnable_cache_allocator<K, V>(n: &'static str) {
+    use mm::alloc::request_slab_allocator;
+    use lru_cache::request_lru_cache_allocator;
+    request_slab_allocator(n, size_of::<CacheItem<K, V>>() as u32);
+    request_lru_cache_allocator::<KeyRef<K>,Box<CacheItem<K, V>>>(n);
 }
 
 /// A pinnable cache is a cache where data can be in one of 2 states, either `pinned` where we are
@@ -182,8 +197,8 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
     /// pinned but is present, and NotFound if we do not have the value in our cache.
     pub fn get_state(&self, key: &K) -> State {
         let kr = &KeyRef::new(key);
-        if self.pinned().contains_key(kr) {
-            State::Pinned
+        if let Some(v) = self.pinned().get(kr) {
+            State::Pinned(v.pin_count())
         } else if self.unpinned().contains_key(kr) {
             State::Unpinned
         } else {
@@ -230,20 +245,19 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
         }
     }
 }
-/*
 impl<'a, K, V:'a> PinnableCache<K, V> where K: Ord, V: RefMake<'a, K> + Cacheable {
     pub fn add<'b: 'a>(&'b mut self, k: K) -> Result<PinnedValue<'b, K, V>,InsertError> {
         let val = RefMake::make_from(&k);
         self.insert(k, val)
     }
     pub fn add_or_get<'b: 'a>(&'b mut self, k: K) -> Allocation<PinnedValue<'b, K, V>> {
-        if let Some(v) = self.get(&k) {
-            Ok(v)
+        if self.contains_key(&k) {
+            Ok(self.get(&k).unwrap())
         } else {
             match self.add(k) {
                 Ok(v) => Ok(v),
-                Err(MemoryError(_)) => Err(()),
-                _ => { panic!("Unable to insert value for unknown reason") },
+                Err(InsertError::MemoryError(_)) => Err(()),
+                Err(e) => { panic!("Unable to insert value because, likely race: {}", e) },
             }
         }
     }
@@ -254,7 +268,6 @@ impl<'a, K, V:'a> PinnableCache<K, V> where K: Ord + Clone, V: RefMake<'a, K> + 
         self.add_or_get(k.clone())
     }
 }
-*/
 
 pub struct PinnedValue<'a, K: Ord + 'a, V: 'a> {
     cache : &'a PinnableCache<K, V>,
