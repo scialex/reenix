@@ -29,25 +29,7 @@ pub mod errno;
 pub mod io;
 pub mod debug;
 pub mod kernel;
-
-/// Stuff for creating values of certain types.
-pub mod make {
-    /// A trait for a type that has a initializer that takes a single value of type K.
-    pub trait Make<A> {
-        /// Create a value using the type K as an initializer.
-        fn make(a: A) -> Self;
-    }
-
-    /// A trait for creating a value using a reference to another one.
-    ///
-    /// The generated value might outlive the reference used to create it and should not hold a
-    /// reference to it
-    pub trait RefMake<'a, A: 'a> {
-        /// Make this value from a reference to another type, which might not live as long as the
-        /// generated value.
-        fn make_from<'b, 'a: 'b>(v: &'b A) -> Self;
-    }
-}
+pub mod make;
 
 /// Another, more in-depth information to print.
 pub mod describe {
