@@ -42,6 +42,7 @@ impl Ord for MMObjId {
 }
 
 pub trait MMObj {
+    /// Return an MMObjId for this object.
     fn get_id<'a>(&'a self) -> &'a MMObjId;
 
     /**

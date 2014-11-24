@@ -11,17 +11,35 @@ use core::mem::size_of;
 use mmobj;
 
 pub use pframe::pfstate::PFState;
-use util::pinnable_cache;
+use util::pinnable_cache::{mod, PinnableCache};
+
+pub type PageNum = uint;
+
+#[deriving(PartialEq, Eq, PartialOrd, Ord, Show, Clone)]
+pub struct PFrameId { mmobj: Rc<Box<MMObj>>, page: PageNum, }
+impl PFrameId {
+    /// Create a pframe id.
+    pub fn new(mmo: Rc<Box<MMObj>>, page: PageNum) -> PFrameId { PFrameId { mmobj: mmo, page: page } }
+}
+
+impl Make<(Rc<Box<MMObj>>, PageNum)> for PFrameId {
+    fn make(v: (Rc<Box<MMObj>>, PageNum)) -> PFrameId { let (mmo, page) = v; PFrameId::new(mmo, page) }
+}
+
+static mut PFRAME_CACHE : *mut PinnableCache<PFrameId, PFrame> = 0 as *mut PinnableCache<PFrameId, PFrame>;
 
 pub fn init_stage1() {
     // TODO
     // The allocator for the alloc_list
-    pinnable_cache::request_pinnable_cache_allocator::<(Rc<Box<MMObj>>, uint), PFrame>("pframe pinnable cache");
+    pinnable_cache::request_pinnable_cache_allocator::<PFrameId, PFrame>("pframe pinnable cache");
 }
 
 pub fn init_stage2() {
+    let pfcache : PinnableCache<PFrameId, PFrame> = PinnableCache::new().unwrap();
+    unsafe { PFRAME_CACHE = transmute(pfcache); }
     // TODO
 }
+
 pub fn init_stage3() {
     // TODO
 }
@@ -38,7 +56,7 @@ pub mod pfstate {
 pub struct PFrame {
     /// A weak reference to the creating mmobj.
     obj     : Weak<Box<MMObj>>,
-    pagenum : uint,
+    pagenum : PageNum,
 
     page : *mut c_void,
 
@@ -53,7 +71,7 @@ pub enum PFError { Alloc(AllocError), Sys(errno::Errno), }
 impl PFrame {
     // TODO pframe_migrate?
     /// Makes a new pframe, also makes sure to allocate memory space for it.
-    pub fn create<'a>(mmo : Rc<MMObj>, page_num: uint) -> Result<PFrame<'a>,PFError> {
+    pub fn create(mmo : Rc<Box<MMObj>>, page_num: uint) -> Result<PFrame,PFError> {
         use PFError::*;
         Ok({
             let mut res = PFrame {
