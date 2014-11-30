@@ -2,6 +2,8 @@
 //! than any real organizational reason. Some crates need this but don't really need to know much
 //! more about drivers.
 
+use core::cell::*;
+use core::ptr::*;
 use core::fmt::{mod, Show, Formatter};
 use core::prelude::*;
 use errno::KResult;
@@ -41,17 +43,48 @@ macro_rules! DeviceId_static(
 pub trait RDevice<T> {
     /// Read buf.len() objects from the device starting at offset. Returns the number of objects
     /// read from the stream, or errno if it fails.
-    fn read_from(&mut self, offset: uint, buf: &mut [T]) -> KResult<uint>;
+    fn read_from(&self, offset: uint, buf: &mut [T]) -> KResult<uint>;
 }
 
 /// A device capable of writing in units of `T`.
 pub trait WDevice<T> {
     /// Write the buffer to the device, starting at the given offset from the start of the device.
     /// Returns the number of bytes written or errno if an error happens.
+    fn write_to(&self, offset: uint, buf: &[T]) -> KResult<uint>;
+}
+
+// NOTE Doing this feels really icky. It's basically due to a disconnect between the userland view
+// of a device as immutable and the kernel land knowledge that some use mutation.
+
+/// A device capable of reading in units of `T` when mutably held.
+pub trait RDeviceMut<T> {
+    /// Read buf.len() objects from the device starting at offset. Returns the number of objects
+    /// read from the stream, or errno if it fails.
+    fn read_from(&mut self, offset: uint, buf: &mut [T]) -> KResult<uint>;
+}
+
+/// A device capable of writing in units of `T` when mutably held.
+pub trait WDeviceMut<T> {
+    /// Write the buffer to the device, starting at the given offset from the start of the device.
+    /// Returns the number of bytes written or errno if an error happens.
     fn write_to(&mut self, offset: uint, buf: &[T]) -> KResult<uint>;
+}
+
+impl<T, D> RDevice<T> for UnsafeCell<D> where D: RDeviceMut<T> {
+    fn read_from(&self, offset: uint, buf: &mut [T]) -> KResult<uint> {
+        // TODO I might want to replace this with a trait that just lets us do the deref, that
+        // TODO would let us keep more safety.
+        unsafe { self.get().as_mut() }.expect("illegal cell state").read_from(offset, buf)
+    }
+}
+
+impl<T, D> WDevice<T> for UnsafeCell<D> where D: WDeviceMut<T> {
+    fn write_to(&self, offset: uint, buf: &[T]) -> KResult<uint> {
+        unsafe { self.get().as_mut() }.expect("illegal cell state").write_to(offset, buf)
+    }
 }
 
 /// A Device that can both read and write.
 pub trait Device<T> : WDevice<T> + RDevice<T> + 'static + Sized {}
 
-
+impl<T,D> Device<T> for UnsafeCell<D> where D: RDeviceMut<T> + WDeviceMut<T> + 'static + Sized {}

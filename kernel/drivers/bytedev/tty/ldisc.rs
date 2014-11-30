@@ -6,7 +6,7 @@ use core::prelude::*;
 use base::errno;
 use base::errno::KResult;
 use core::cmp;
-use RDevice;
+use RDeviceMut;
 use bytedev::tty::TTYLineDiscipline;
 
 pub const LINE_BUF_SIZE : uint = 256;
@@ -99,7 +99,7 @@ impl LineDiscipline {
     }
 }
 
-impl RDevice<u8> for LineDiscipline {
+impl RDeviceMut<u8> for LineDiscipline {
     fn read_from(&mut self, _: uint, b: &mut [u8]) -> KResult<uint> {
         let t = try!(self.rlock.lock().or_else(|_| Err(errno::EINTR)));
         while self.rhead == self.ckd_tail {

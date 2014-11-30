@@ -86,7 +86,7 @@ pub struct PFrame {
     pagenum : PageNum,
 
     /// The actual memory this pageframe holds.
-    page : *mut c_void,
+    page : *mut [u8, ..page::SIZE],
 
     /// The current state of the pframe, holding whether we are dirty and other data.
     flags : Cell<PFState>,
@@ -117,6 +117,9 @@ impl PFrame {
         })
     }
 
+    pub fn get_page_mut(&mut self) -> &mut [u8, ..page::SIZE] { unsafe { self.page.as_mut().expect("cannot be null") } }
+    pub fn get_page(&self) -> &[u8, ..page::SIZE] { unsafe { self.page.as_ref().expect("cannot be null") } }
+
     // TODO pframe_migrate?
     /// Makes a new pframe, also makes sure to allocate memory space for it.
     fn create(mmo : Rc<Box<MMObj + 'static>>, page_num: uint) -> Result<PFrame,PFError> {
@@ -126,7 +129,7 @@ impl PFrame {
                 obj : mmo.downgrade(),
                 pagenum : page_num,
 
-                page : try!(unsafe { page::alloc::<c_void>().map_err(|v| Alloc(v)) }),
+                page : try!(unsafe { page::alloc::<[u8, ..page::SIZE]>().map_err(|v| Alloc(v)) }),
 
                 flags : Cell::new(pfstate::NORMAL | pfstate::INITING),
                 queue : WQueue::new(),
@@ -193,6 +196,10 @@ impl PFrame {
         ret
     }
 
+
+    #[inline]
+    pub fn get_pagenum(&self) -> PageNum { self.pagenum }
+
     /**
      * Clean a dirty page by writing it back to disk. Removes the dirty
      * bit of the page and updates the MMU entry.
@@ -207,7 +214,7 @@ impl PFrame {
 
         self.flags.set(self.flags.get() & !pfstate::DIRTY);
         /* Make sure a future write to the page will fault (and hence dirty it) */
-        unsafe { tlb::flush(self.page) };
+        unsafe { tlb::flush(self.page as *mut c_void) };
         self.remove_from_pts();
 
         self.set_busy();
@@ -257,7 +264,6 @@ impl Wait<PFState,()> for PFrame {
     }
 }
 
-
 #[unsafe_destructor]
 impl Drop for PFrame {
     fn drop(&mut self) {
@@ -265,8 +271,8 @@ impl Drop for PFrame {
         // TODO Not sure if this is good enough.
         dbg!(debug::PFRAME, "uncaching {}", self);
         // We have already been removed from pagetables.
-        unsafe { tlb::flush(self.page) };
-        unsafe { page::free(self.page) };
+        unsafe { tlb::flush(self.page as *mut c_void) };
+        unsafe { page::free(self.page as *mut c_void) };
     }
 }
 

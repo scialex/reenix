@@ -23,8 +23,8 @@ extern crate alloc;
 extern crate libc;
 
 // TODO We should have a MaybePinnedList that uses a LRUCache under the hood...
-mod mmobj;
-mod pframe;
+pub mod mmobj;
+pub mod pframe;
 
 pub fn init_stage1() {
     pframe::init_stage1();

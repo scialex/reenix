@@ -1,6 +1,8 @@
 //! The cacheable trait.
 
 use alloc::rc::*;
+use core::cell::*;
+use core::ptr::*;
 
 /// A trait that indicates the type could be dropped but we will not nessecarially want to do so.
 /// For example think of a data-point in an LRU cache, even if we have no reffernces if the data
@@ -33,3 +35,7 @@ base_deriving!(u64)
 base_deriving!(i64)
 base_deriving!(uint)
 base_deriving!(int)
+
+impl<T> Cacheable for UnsafeCell<T> where T: Cacheable {
+    fn is_still_useful(&self) -> bool { unsafe { self.get().as_ref().expect("cannot be null").is_still_useful() } }
+}

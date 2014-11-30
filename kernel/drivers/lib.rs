@@ -16,6 +16,8 @@
 #[phase(plugin, link)] extern crate base;
 #[phase(plugin, link)] extern crate mm;
 #[phase(plugin, link)] extern crate procs;
+extern crate umem;
+extern crate util;
 extern crate startup;
 extern crate collections;
 extern crate alloc;

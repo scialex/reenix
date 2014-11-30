@@ -1,11 +1,12 @@
 
 //! The Reenix ATA support.
-
 #![allow(dead_code)]
-use core::ptr::*;
 use mm::page;
 use core::prelude::*;
+use util::Cacheable;
 use DeviceId;
+use core::cell::*;
+use core::ptr::*;
 use base::{io, kernel};
 use blockdev::disk::dma;
 use procs::interrupt;
@@ -13,9 +14,10 @@ use procs::sync::*;
 use base::errno::{KResult, mod};
 use libc::c_void;
 use core::fmt::{mod, Formatter, Show};
-use RDevice;
-use WDevice;
-use Device;
+use umem::mmobj::{MMObjId, MMObjMut};
+use umem::pframe::PFrame;
+use RDeviceMut;
+use WDeviceMut;
 
 mod irqs {
     pub const DISK_PRIMARY   : u16 = 14;
@@ -168,7 +170,6 @@ pub fn init_stage1() {
 
 #[allow(unused_variables)]
 pub fn init_stage2() {
-    use core::mem::transmute_copy;
     interrupt::map(irqs::DISK_PRIMARY, interrupt::DISK_PRIMARY);
     interrupt::map(irqs::DISK_SECONDARY, interrupt::DISK_SECONDARY);
 
@@ -234,15 +235,16 @@ pub fn init_stage2() {
             c.busmaster = ata_setup_busmaster_simple(c.get_channel_num());
 
             // Allocate the new disk.
-            let disk = box ATADisk::create(c, true,
-                                           (id_buf[IDENT_MAX_LBA] as uint), BLOCK_SIZE / SECTOR_SIZE);
+            let disk = box UnsafeCell::new(ATADisk::create(c, true, (id_buf[IDENT_MAX_LBA] as uint),
+                                                           BLOCK_SIZE / SECTOR_SIZE));
+            let rd = disk.get().as_ref().expect("should not be null");
             // TODO Doing this is somewhat bad but there is no way (At the moment) to remove disks
             // TODO so it is at least safe. Idealy we would not need this and just do dynamic_cast
             // TODO to TTY in interrupt handler.
-            DISKS[disk.channel.get_channel_num() as uint] = transmute_copy(&disk);
-            interrupt::register(disk.channel.intr, ata_intr_handler);
-            dbg!(debug::DISK, "Registering disk {}", disk);
-            ::blockdev::register(disk.channel.dev, disk);
+            DISKS[rd.channel.get_channel_num() as uint] = disk.get();
+            interrupt::register(rd.channel.intr, ata_intr_handler);
+            dbg!(debug::DISK, "Registering disk {}", rd);
+            ::blockdev::register(rd.channel.dev, disk);
         }
     }
 }
@@ -275,6 +277,8 @@ impl Show for ATADisk {
                if self.is_master { "master" } else {"slave"}, self.channel, ((self.size/self.sectors_per_block)*BLOCK_SIZE)/1024)
     }
 }
+
+impl ::blockdev::BlockDevice for UnsafeCell<ATADisk> {}
 
 impl ATADisk {
     fn create(channel: Channel, is_master: bool, size: uint, sectors_per_block: uint) -> ATADisk {
@@ -366,7 +370,7 @@ impl ATADisk {
     }
 }
 
-impl RDevice<[u8, ..page::SIZE]> for ATADisk {
+impl RDeviceMut<[u8, ..page::SIZE]> for ATADisk {
     /// Read buf.len() objects from the device starting at offset. Returns the number of objects
     /// read from the stream, or errno if it fails.
     fn read_from(&mut self, offset: uint, buf: &mut [[u8, ..page::SIZE]]) -> KResult<uint> {
@@ -377,7 +381,7 @@ impl RDevice<[u8, ..page::SIZE]> for ATADisk {
     }
 }
 
-impl WDevice<[u8, ..page::SIZE]> for ATADisk {
+impl WDeviceMut<[u8, ..page::SIZE]> for ATADisk {
     /// Write the buffer to the device, starting at the given offset from the start of the device.
     /// Returns the number of bytes written or errno if an error happens.
     fn write_to(&mut self, offset: uint, buf: &[[u8, ..page::SIZE]]) -> KResult<uint> {
@@ -389,7 +393,40 @@ impl WDevice<[u8, ..page::SIZE]> for ATADisk {
     }
 }
 
-impl Device<[u8, ..page::SIZE]> for ATADisk {}
+impl MMObjMut for ATADisk {
+    // TODO TEST ALL OF THIS
+
+    // TODO I might want to get rid of the MMObjId thing and just use memory location like in
+    // TODO weenix, gaurenteed uniqueness
+    fn get_id(&self) -> MMObjId { MMObjId::new(self.channel.dev, 0) }
+
+    /**
+     * Fill the given page frame with the data that should be in it.
+     */
+    fn fill_page(&mut self, pf: &mut PFrame) -> KResult<()> {
+        use core::slice::mut_ref_slice;
+        let pgnum = pf.get_pagenum();
+        self.read_from(pgnum, mut_ref_slice(pf.get_page_mut())).map(|_| ())
+    }
+
+    /**
+     * Since this is just a drive we do nothing.
+     */
+    fn dirty_page(&mut self, _: &PFrame) -> KResult<()> { Ok(()) }
+
+    /**
+     * Write the contents of the page frame
+     */
+    fn clean_page(&mut self, pf: &PFrame) -> KResult<()> {
+        use core::slice::ref_slice;
+        let pgnum = pf.get_pagenum();
+        self.write_to(pgnum, ref_slice(pf.get_page())).map(|_| ())
+    }
+
+    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self) }
+}
+
+impl Cacheable for ATADisk { fn is_still_useful(&self) -> bool { true } }
 
 extern "Rust" fn ata_intr_handler(r: &mut interrupt::Registers) {
     dbg!(debug::DISK, "ATA Interrupt for {}", r.intr);

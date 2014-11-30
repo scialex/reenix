@@ -3,12 +3,12 @@
 //! The Reenix tty support module.
 
 use core::ptr::*;
+use core::cell::*;
 use core::prelude::*;
 use alloc::boxed::Box;
 use base::errno::KResult;
-use RDevice;
-use WDevice;
-use Device;
+use RDeviceMut;
+use WDeviceMut;
 
 pub fn init_stage1() {
     keyboard::init_stage1();
@@ -39,7 +39,7 @@ pub fn shutdown() {
 
 enum ScrollDirection { UP, DOWN, }
 
-pub trait TTYLineDiscipline: RDevice<u8> {
+pub trait TTYLineDiscipline: RDeviceMut<u8> {
     /// Store that we recieved the given char and return a string to echo to the tty.
     fn recieve_char(&mut self, chr: u8) -> &'static str;
     /// Process a char that was written to the tty so it is suitable to be outputted to the tty.
@@ -74,10 +74,9 @@ const NUM_TTYS : u8 = 3;
 static mut CUR_TTY_ID : u8 = 0;
 static mut TTYS : [*mut TTY, ..(NUM_TTYS as uint)] = [0 as *mut TTY, ..(NUM_TTYS as uint)];
 fn create_ttys() {
-    use core::mem::transmute_copy;
     for i in range(0, NUM_TTYS) {
-        let t = box TTY::create(box virtterm::VirtualTerminal::create(), box ldisc::LineDiscipline::create());
-        unsafe { TTYS[i as uint] = transmute_copy(&t); }
+        let t = box UnsafeCell::new(TTY::create(box virtterm::VirtualTerminal::create(), box ldisc::LineDiscipline::create()));
+        unsafe { TTYS[i as uint] = t.get(); }
         super::register(::DeviceId::create(TTY_MAJOR, i), t);
     }
 }
@@ -121,7 +120,7 @@ impl TTY {
 
 
 
-impl RDevice<u8> for TTY {
+impl RDeviceMut<u8> for TTY {
     #[allow(unused_variables)]
     fn read_from(&mut self, offset : uint, buf: &mut [u8]) -> KResult<uint> {
         let blocker = self.driver.block_io();
@@ -131,7 +130,7 @@ impl RDevice<u8> for TTY {
     }
 }
 
-impl WDevice<u8> for TTY {
+impl WDeviceMut<u8> for TTY {
     #[allow(unused_variables)]
     fn write_to(&mut self, _: uint, buf: &[u8]) -> KResult<uint> {
         let blocker = self.driver.block_io();
@@ -140,8 +139,6 @@ impl WDevice<u8> for TTY {
         Ok(buf.len())
     }
 }
-
-impl Device<u8> for TTY {}
 
 extern "Rust" fn handle_keyboard_input(event: keyboard::Event) {
     let ct = get_current_tty();

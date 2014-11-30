@@ -27,7 +27,7 @@ macro_rules! twrite(
     ($t:expr, $($e:expr),*) => (assert!(write!(&mut ByteWriter($t), $($e),*).is_ok()))
 )
 pub fn start(i: i32) {
-    let tty = ProcArgs::new(bytedev::lookup_mut(DeviceId::create(2,i as u8)).unwrap()).unwrap();
+    let tty = ProcArgs::new(bytedev::lookup(DeviceId::create(2,i as u8)).unwrap()).unwrap();
     assert!(KProc::new(String::from_str("KSHELL proc"), tty_proc_run, 0, unsafe { tty.to_arg() }).is_ok());
 }
 
@@ -248,7 +248,7 @@ fn do_newkshell(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
             return Err(errno::EINVAL);
         },
     };
-    let tty = try!(ProcArgs::new(match bytedev::lookup_mut(DeviceId::create(2, id)) {
+    let tty = try!(ProcArgs::new(match bytedev::lookup(DeviceId::create(2, id)) {
         Some(v) => v,
         None => {
             twriteln!(io, "{} is not a valid tty!", id);
@@ -273,7 +273,7 @@ fn do_bdread(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         }
     };
     let mut buf : Box<[[u8, ..page::SIZE], ..1]> = box [[0,..page::SIZE], ..1];
-    let disk = blockdev::lookup_mut(DeviceId::create(1,0)).expect("should have disk 0");
+    let disk = blockdev::lookup(DeviceId::create(1,0)).expect("should have disk 0");
     let res = disk.read_from(blk, &mut *buf).and(Ok(()));
     if res.is_err() {
         twriteln!(io, "failed to read block {}", blk);
@@ -345,7 +345,7 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         copy_memory(&mut out, &example);
         buf.push(out);
     }
-    let disk = blockdev::lookup_mut(DeviceId::create(1,0)).expect("should have disk 0");
+    let disk = blockdev::lookup(DeviceId::create(1,0)).expect("should have disk 0");
     disk.write_to(start, buf.as_slice()).and(Ok(()))
 }
 

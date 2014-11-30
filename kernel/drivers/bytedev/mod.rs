@@ -9,6 +9,7 @@ use collections::*;
 use core::fmt;
 
 mod tty;
+mod memdev;
 
 /// Do initialization that does not require allocating memory.
 pub fn init_stage1() {
@@ -48,9 +49,6 @@ fn get_device_tree() -> &'static mut TreeMap<DeviceId, Box<ByteDevice>> {
 /// A device capable of reading and writing at byte granularity.
 pub type ByteDevice = Device<u8>;
 
-pub fn lookup_mut(dev: DeviceId) -> Option<&'static mut (Device<u8> + 'static)> {
-    get_device_tree().get_mut(&dev).map(|bd| { &mut **bd })
-}
 pub fn lookup(dev: DeviceId) -> Option<&'static (Device<u8> + 'static)> {
     get_device_tree().get(&dev).map(|bd| { &**bd })
 }
