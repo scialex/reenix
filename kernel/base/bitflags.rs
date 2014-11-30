@@ -10,17 +10,36 @@
 /// bits are set.
 #[macro_export]
 macro_rules! bitmask_create {
-    (flags $name:ident : $t:ty
+    ($(#[$base:meta])* flags $name:ident : $t:ty
+     {  #[$hm:meta] default $d:ident, $(#[$m:meta] $f:ident = $v:expr),+ }) => {
+        #[deriving(Default, PartialEq, Eq)]
+        $(#[$base])*
+        pub struct $name($t);
+        $(#[$m] pub const $f : $name = $name(0x1 << $v);)*
+        #[$hm] pub const $d : $name = $name(0);
+        bitmask_create!(inner_flags $name { $($f,)* $d })
+    };
+    ($(#[$base:meta])* flags $name:ident : $t:ty
+     { $(#[$m:meta] $f:ident = $v:expr),+ }) => {
+        #[deriving(Default, PartialEq, Eq)]
+        $(#[$base])*
+        pub struct $name($t);
+        $(#[$m] pub const $f : $name = $name(0x1 << $v);)*
+        bitmask_create!(inner_flags $name { $($f),* })
+    };
+    ($(#[$base:meta])* flags $name:ident : $t:ty
      {  default $d:ident, $($f:ident = $v:expr),+ }) => {
         #[deriving(Default, PartialEq, Eq)]
+        $(#[$base])*
         pub struct $name($t);
         $(pub const $f : $name = $name(0x1 << $v);)*
         pub const $d : $name = $name(0);
         bitmask_create!(inner_flags $name { $($f,)* $d })
     };
-    (flags $name:ident : $t:ty
+    ($(#[$base:meta])* flags $name:ident : $t:ty
      { $($f:ident = $v:expr),+ }) => {
         #[deriving(Default, PartialEq, Eq)]
+        $(#[$base])*
         pub struct $name($t);
         $(pub const $f : $name = $name(0x1 << $v);)*
         bitmask_create!(inner_flags $name { $($f),* })

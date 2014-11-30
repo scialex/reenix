@@ -13,8 +13,7 @@ use core::cmp::*;
 use base::errno::{mod, KResult, Errno};
 use base::make::*;
 use libc::c_void;
-use mm::{Allocation, AllocError, page, tlb};
-use core::mem::size_of;
+use mm::{AllocError, page, tlb};
 use mmobj::*;
 
 pub use pframe::pfstate::PFState;
@@ -57,25 +56,42 @@ pub fn init_stage3() {
 /// Get the pframe cache
 fn get_cache() -> &'static mut PinnableCache<PFrameId, PFrame> { unsafe { PFRAME_CACHE.as_mut().expect("pframe cache should not be null") } }
 
+/// The different states a pframe can be in as it is being used.
 pub mod pfstate {
     use core::fmt;
     use core::prelude::*;
-    bitmask_create!(flags PFState : u8 {
-        default NORMAL,
-        DIRTY   = 0,
-        BUSY    = 1,
-        INITING = 2
-    })
+    bitmask_create!(
+        #[doc = "The different states a pframe can be in"]
+        flags PFState : u8 {
+            #[doc = "Nothing is being done to this pframe"]
+            default NORMAL,
+            #[doc = "this pframe is dirty, meaning it has been modified"]
+            DIRTY   = 0,
+            #[doc = "this pframe is busy, meaning it is currently being modified"]
+            BUSY    = 1,
+            #[doc = "this pframe is still being initialized. No pframe should ever have this state after being returned."]
+            INITING = 2
+        }
+    )
 }
 
+/// A page frame structure used to manage memory in the kernel.
 pub struct PFrame {
     /// A weak reference to the creating mmobj.
     obj     : Weak<Box<MMObj + 'static >>,
+
+    /// The pagenumber of this page-frame.
+    ///
+    /// This and the object serve to uniquely identify this pframe.
     pagenum : PageNum,
 
+    /// The actual memory this pageframe holds.
     page : *mut c_void,
 
+    /// The current state of the pframe, holding whether we are dirty and other data.
     flags : Cell<PFState>,
+
+    /// Queue used to wait for the frame to stop being busy.
     queue : WQueue,
 }
 
@@ -93,10 +109,10 @@ impl PFrame {
         let key = &PFrameId::new(mmo.clone(), pagenum);
         get_cache().add_or_get(key.clone()).map_err(|e| {
             match e {
-                InsertError::KeyPresent         => { kpanic!("illegal state of pframe cache, concurrency error"); },
                 InsertError::MemoryError(_)     => { dbg!(debug::PFRAME, "Unable to add {} to cache, oom", key); errno::ENOMEM },
                 InsertError::SysError(Some(er)) => { dbg!(debug::PFRAME, "unable to add {} to cache because of {}", key, er); er },
-                _ => { kpanic!("unknown error occured"); }
+                InsertError::KeyPresent         => { kpanic!("illegal state of pframe cache, concurrency error"); },
+                _                               => { kpanic!("unknown error occured"); }
             }
         })
     }

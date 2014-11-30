@@ -1,7 +1,6 @@
 
 //! An LRU cache where we can 'pin' items.
 
-use alloc::rc::*;
 use core::mem::size_of;
 use core::cell::*;
 use collections::*;
@@ -175,7 +174,7 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
 
     /// attempts to insert the value into the cache.
     #[inline]
-    pub fn insert_unpinned(&self, key: K, val: V) { self.insert(key, val); }
+    pub fn insert_unpinned(&self, key: K, val: V) -> Result<(), InsertError> { self.insert(key, val).map(|_| ()) }
 
     /// Returns true if the key is contained within this cache.
     #[inline]

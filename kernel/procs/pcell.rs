@@ -85,7 +85,7 @@ impl<T> ProcRefCell<T> {
     #[unstable = "may be renamed, depending on global conventions"]
     pub fn unwrap(self) -> T {
         debug_assert!(self.borrow.get() == UNUSED);
-        unsafe{self.value.unwrap()}
+        unsafe{self.value.into_inner()}
     }
 
     /// Attempts to immutably borrow the wrapped value.

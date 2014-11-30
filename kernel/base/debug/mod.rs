@@ -11,28 +11,37 @@ use core::fmt;
 pub mod printing;
 mod flags;
 
+/// The currently printed debug modes.
 static mut DBG_ACTIVE : DbgMode = ALL;
-pub fn get_debug_active() -> DbgMode {
-    unsafe { DBG_ACTIVE }
-}
 
+/// Gets the currently printed debug modes.
+#[inline]
+pub fn get_debug_active() -> DbgMode { unsafe { DBG_ACTIVE } }
+
+#[doc(hidden)]
 pub fn setup() {
     unsafe {
         DBG_ACTIVE = flags::DbgMode::get_default();
     }
 }
 
+/// Sets a mode as one that should not be printed.
 pub fn remove_mode(m: DbgMode) {
     unsafe { DBG_ACTIVE = DBG_ACTIVE - m; }
 }
 
+/// Sets a mode as being one that should be printed
 pub fn add_mode(m: DbgMode) {
     unsafe { DBG_ACTIVE = DBG_ACTIVE + m; }
 }
 
 mod macros;
 
-extern "C" { fn get_dbg_pid() -> &'static fmt::Show; }
+extern "C" {
+    /// A function which can be used to get the current pid number to aid in debuging.
+    fn get_dbg_pid() -> &'static fmt::Show;
+}
+#[doc(hidden)]
 pub fn dbg_pid() -> &'static (fmt::Show + 'static) {
     unsafe { get_dbg_pid() }
 }

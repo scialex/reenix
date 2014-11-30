@@ -1,5 +1,7 @@
 // TODO Copyright Header
 
+//! The flags for dbg!.
+
 use core::prelude::*;
 use core::fmt::*;
 use core::fmt;
@@ -26,10 +28,13 @@ pub mod color {
 
 macro_rules! dbg_modes (
     ($(($n:ident, $v:expr, $c:expr, $ex:expr)),+) => (
-        bitmask_create!(flags DbgMode : u64 {
-            default NONE,
-            $($n = $v),+
+        bitmask_create!(
+            #[doc="The different debugging modes"]
+            flags DbgMode : u64 {
+            #[doc = "no error"] default NONE,
+            $(#[doc = $ex ] $n = $v),+
         })
+        #[doc="All the errors at once"]
         pub const ALL : DbgMode = DbgMode(-1);
         impl DbgMode {
             #[allow(dead_code)]

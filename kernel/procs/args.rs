@@ -27,5 +27,5 @@ impl<T: Sized> ProcArgs<T> {
         ProcArgs { val: transmute(v), }
     }
 
-    pub fn unwrap(self) -> T { unsafe { (*self.val).unwrap() } }
+    pub fn unwrap(self) -> T { unsafe { (*self.val).into_inner() } }
 }

@@ -3,15 +3,12 @@
 
 use core::fmt;
 use core::prelude::*;
-use base::*;
 use util::cacheable::*;
 use base::errno::*;
 use pframe;
 use alloc::rc::*;
 use util::pinnable_cache::*;
 use alloc::boxed::*;
-use collections::TreeMap;
-use mm::Allocation;
 use base::devices::*;
 
 // Cheating to get a uuid by just incrementing a counter. This is not really good in general but we
@@ -23,6 +20,7 @@ const FAKE_DEVICE : DeviceId = DeviceId_static!(0xFF,0x00);
 static mut NEXT_ID : MMObjId = MMObjId(FAKE_DEVICE,0);
 
 impl MMObjId {
+    /// Create a globaly unique MMObjId
     pub fn unique() -> MMObjId {
         let out = unsafe { NEXT_ID };
         let MMObjId(dev, cnt) = out;
@@ -70,7 +68,7 @@ pub trait MMObj : fmt::Show + Cacheable {
      */
     // TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
     // better. Using this stuff is annoying.
-    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: uint, writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
+    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: uint, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
         pframe::PFrame::get(this, pagenum)
     }
 
