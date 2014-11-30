@@ -70,7 +70,7 @@ KERNEL     := $(BUILD_DIR)/kernel.bin
 IMAGE      := $(BUILD_DIR)/weenix.img
 ISO_IMAGE  := $(BUILD_DIR)/weenix.iso
 GDBCOMM    := $(BUILD_DIR)/gdb-commands
-ISO_DIR    := $(BUILD_DIR)/.iso
+ISO_DIR    := $(BUILD_DIR)/iso
 
 ISO_CFG    := $(ISO_DIR)/boot/grub/grub.cfg
 ISO_KERNEL := $(ISO_DIR)/boot/kernel.bin
@@ -104,7 +104,7 @@ $(eval $(call crate-rule,      startup, $(BASIC_REQS)))
 $(eval $(call crate-rule,      util,    $(BASIC_REQS)))
 $(eval $(call crate-rule,      procs,   $(BASIC_REQS) startup))
 $(eval $(call crate-rule,      umem,    $(BASIC_REQS) util procs))
-$(eval $(call long-crate-rule, drivers, $(BASIC_REQS) procs, --opt-level=1)) # TODO For some reason LLVM doesn't like -O2 in drivers.
+$(eval $(call long-crate-rule, drivers, $(BASIC_REQS) procs umem, --opt-level=1)) # TODO For some reason LLVM doesn't like -O2 in drivers.
 
 # The `main` crate.
 $(eval $(call crate-rule, main,  $(filter-out main, $(CRATES))))
