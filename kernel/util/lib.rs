@@ -16,7 +16,7 @@
 extern crate alloc;
 extern crate libc;
 
-pub use pinnable_cache::Cacheable;
+pub use cacheable::Cacheable;
 
 pub fn init_stage1() {}
 pub fn init_stage2() {}
@@ -25,6 +25,7 @@ pub fn init_stage3() {}
 pub mod format;
 pub mod lru_cache;
 pub mod pinnable_cache;
+pub mod cacheable;
 
 mod list_node;
 

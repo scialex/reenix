@@ -1,16 +1,25 @@
 
 //! The mmobj definitions.
 
+use core::fmt;
+use core::prelude::*;
+use base::*;
+use util::cacheable::*;
+use base::errno::*;
+use pframe;
+use alloc::rc::*;
+use util::pinnable_cache::*;
+use alloc::boxed::*;
 use collections::TreeMap;
 use mm::Allocation;
-use drivers::DeviceId;
+use base::devices::*;
 
 // Cheating to get a uuid by just incrementing a counter. This is not really good in general but we
 // have 128 bits, which means we will probably never really run out...
 // There has got to be a better way but this is just easier for now.
 #[deriving(Copy, Eq, PartialEq, Show)]
 pub struct MMObjId(DeviceId, u64);
-static FAKE_DEVICE : DeviceId = DeviceId_static!(0xFF,0x00);
+const FAKE_DEVICE : DeviceId = DeviceId_static!(0xFF,0x00);
 static mut NEXT_ID : MMObjId = MMObjId(FAKE_DEVICE,0);
 
 impl MMObjId {
@@ -19,7 +28,7 @@ impl MMObjId {
         let MMObjId(dev, cnt) = out;
         unsafe {
             NEXT_ID = if cnt + 1 == 0 {
-                MMObjId(DeviceId::new(dev.get_major(), dev.get_minor() + 1), 0)
+                MMObjId(DeviceId::create(dev.get_major(), dev.get_minor() + 1), 0)
             } else {
                 MMObjId(dev, cnt + 1)
             };
@@ -33,26 +42,17 @@ impl Ord for MMObjId {
     fn cmp(&self, other: &MMObjId) -> Ordering {
         let &MMObjId(mdev, mpiece) = self;
         let &MMObjId(odev, opiece) = other;
-        match mdev.cmp(odev) {
-            Equal => mpiece.cmp(opiece),
+        match mdev.cmp(&odev) {
+            Equal => mpiece.cmp(&opiece),
             Less => Less,
             Greater => Greater,
         }
     }
 }
 
-pub trait MMObj {
+pub trait MMObj : fmt::Show + Cacheable {
     /// Return an MMObjId for this object.
     fn get_id<'a>(&'a self) -> &'a MMObjId;
-
-    /**
-     * Get a pframe for the given page in this mmobj if there is one already present. This should
-     * never allocate one and should return None if we don't already have the pframe.
-     */
-    // TODO I almost definitely need to wrap these somehow so they are pinned until we return
-    fn get_resident<'a>(&self, pagenum : uint) -> Option<Rc<PFrame>> {
-        // TODO
-    }
 
     /**
      * Finds the correct page frame from a high-level perspective
@@ -70,12 +70,14 @@ pub trait MMObj {
      */
     // TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
     // better. Using this stuff is annoying.
-    fn lookup_page(&self, pagenum: uint, writable: bool) -> KResult<Rc<Pframe>>;
+    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: uint, writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
+        pframe::PFrame::get(this, pagenum)
+    }
 
     /**
      * Fill the given page frame with the data that should be in it.
      */
-    fn fill_page(&self, pf: &mut PFrame) -> KResult<()>;
+    fn fill_page(&self, pf: &mut pframe::PFrame) -> KResult<()>;
 
     /**
      * A hook; called when a request is made to dirty a non-dirty page.
@@ -86,7 +88,7 @@ pub trait MMObj {
      * block in the fs before allowing a write to the block to proceed).
      * This may block.
      */
-    fn dirty_page(&self, pf: &PFrame) -> KResult<()>;
+    fn dirty_page(&self, pf: &pframe::PFrame) -> KResult<()>;
 
     /**
      * Write the contents of the page frame starting at address
@@ -95,10 +97,13 @@ pub trait MMObj {
      * This may block.
      * Return 0 on success and -errno otherwise.
      */
-    fn clean_page(&self, pf: &PFrame) -> KResult<()>;
+    fn clean_page(&self, pf: &pframe::PFrame) -> KResult<()>;
+
+    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "mmobj for {}", self.get_id()) }
 }
 
-impl PartialOrd for MMObj { fn partial_cmp(&self, o: &MMObj) -> Option<Ordering> { self.get_id().partial_cmp(o.get_id()) } }
-impl PartialEq  for MMObj { fn eq(&self, o: &MMObj) -> bool { self.get_id().eq(o.get_id()) } }
-impl Ord        for MMObj { fn cmp(&self, o: &MMObj) -> Ordering { self.get_id().cmp(o.get_id()) } }
-impl Eq         for MMObj {}
+impl<'a> fmt::Show  for MMObj + 'a { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.show(f) } }
+impl<'a> PartialOrd for MMObj + 'a { fn partial_cmp(&self, o: &MMObj) -> Option<Ordering> { self.get_id().partial_cmp(o.get_id()) } }
+impl<'a> PartialEq  for MMObj + 'a { fn eq(&self, o: &MMObj) -> bool { self.get_id().eq(o.get_id()) } }
+impl<'a> Ord        for MMObj + 'a { fn cmp(&self, o: &MMObj) -> Ordering { self.get_id().cmp(o.get_id()) } }
+impl<'a> Eq         for MMObj + 'a {}

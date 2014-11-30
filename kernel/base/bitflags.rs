@@ -26,8 +26,9 @@ macro_rules! bitmask_create {
         bitmask_create!(inner_flags $name { $($f),* })
     };
     (inner_flags $name:ident { $($f:ident),+ }) => {
-        impl Show for $name {
-            fn fmt(&self, fmt: &mut Formatter) -> Result {
+        impl fmt::Show for $name {
+            fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+                use core::result::*;
                 try!(fmt.write(stringify!($name).as_bytes()))
                 try!(fmt.write("[".as_bytes()))
                 let mut started = false;

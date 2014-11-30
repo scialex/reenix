@@ -1,6 +1,7 @@
 
 //! An LRU cache where we can 'pin' items.
 
+use alloc::rc::*;
 use core::mem::size_of;
 use core::cell::*;
 use collections::*;
@@ -14,18 +15,7 @@ use alloc::boxed::*;
 use core::mem::transmute;
 use core::fmt;
 use mm::{Allocation, AllocError};
-
-/// A trait that indicates the type could be dropped but we will not nessecarially want to do so.
-/// For example think of a data-point in an LRU cache, even if we have no reffernces if the data
-/// can be recovered we might want to keep it around if there is no urgent need for new space.
-pub trait Cacheable {
-    /// This is called if we have determined this object is dropable (no body references it) and
-    /// wish to see if it would be better to save it or not.
-    /// Note the caller is allowed to ignore this value and might drop it anyways even if true is
-    /// returned. Further note the default implementation of this returns false, one should be very
-    /// sure that this value is actually useful before returning true.
-    fn is_still_useful(&self) -> bool;
-}
+use cacheable::*;
 
 /// An item in a pinnable cache.
 struct CacheItem<K, V> {
@@ -119,11 +109,11 @@ pub fn request_pinnable_cache_allocator<K, V>(n: &'static str) {
 ///
 /// Although this only works if we gaurentee that multiple threads do not use this cache
 /// concurrently. This shouldn't be a problem as long as we do not have Kernel Preemption.
-struct PinnableCache<K: Ord, V> {
+pub struct PinnableCache<K: Ord, V> {
     /// The map of unpinned values, which are eligible for deletion if we start to run out of space.
-    pub unpinned : UnsafeCell<LruCache<KeyRef<K>, Box<CacheItem<K, V>>>>,
+    unpinned : UnsafeCell<LruCache<KeyRef<K>, Box<CacheItem<K, V>>>>,
     /// The map of pinned values that may not be deleted.
-    pub pinned   : UnsafeCell<TreeMap <KeyRef<K>, Box<CacheItem<K, V>>>>,
+    pinned   : UnsafeCell<TreeMap <KeyRef<K>, Box<CacheItem<K, V>>>>,
 }
 
 impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
@@ -245,27 +235,19 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
         }
     }
 }
-impl<'a, K, V:'a> PinnableCache<K, V> where K: Ord, V: RefMake<'a, K> + Cacheable {
+
+impl<'a, K, V:'a> PinnableCache<K, V> where K: Ord + Clone, V: TryMake<K, Errno> + Cacheable {
     pub fn add<'b: 'a>(&'b mut self, k: K) -> Result<PinnedValue<'b, K, V>,InsertError> {
-        let val = RefMake::make_from(&k);
+        let val = try!(TryMake::try_make(k.clone()).map_err(|e| InsertError::SysError(Some(e))));
         self.insert(k, val)
     }
-    pub fn add_or_get<'b: 'a>(&'b mut self, k: K) -> Allocation<PinnedValue<'b, K, V>> {
+
+    pub fn add_or_get<'b: 'a>(&'b mut self, k: K) -> Result<PinnedValue<'a, K, V>, InsertError> {
         if self.contains_key(&k) {
             Ok(self.get(&k).unwrap())
         } else {
-            match self.add(k) {
-                Ok(v) => Ok(v),
-                Err(InsertError::MemoryError(_)) => Err(()),
-                Err(e) => { panic!("Unable to insert value because, likely race: {}", e) },
-            }
+            self.add(k)
         }
-    }
-}
-
-impl<'a, K, V:'a> PinnableCache<K, V> where K: Ord + Clone, V: RefMake<'a, K> + Cacheable {
-    pub fn force_get<'b: 'a>(&'b mut self, k: &K) -> Allocation<PinnedValue<'b, K, V>> {
-        self.add_or_get(k.clone())
     }
 }
 

@@ -19,6 +19,7 @@ extern crate libc;
 extern crate collections;
 extern crate drivers;
 //extern crate util;
+extern crate umem;
 
 use procs::cleanup_bootstrap_function;
 use base::kernel;
@@ -60,6 +61,8 @@ fn run_init() {
     //dbg!(debug::CORE, "util initialized stage 1");
     procs::init_stage1();
     dbg!(debug::CORE, "procs initialized stage 1");
+    umem::init_stage1();
+    dbg!(debug::CORE, "umem initialized stage 1");
     drivers::init_stage1();
     dbg!(debug::CORE, "drivers initialized stage 1");
 
@@ -75,6 +78,8 @@ fn run_init() {
     //dbg!(debug::CORE, "util initialized stage 2");
     procs::init_stage2();
     dbg!(debug::CORE, "procs initialized stage 2");
+    umem::init_stage2();
+    dbg!(debug::CORE, "umem initialized stage 2");
     drivers::init_stage2();
     dbg!(debug::CORE, "drivers initialized stage 2");
 }
@@ -112,6 +117,7 @@ fn finish_init() {
     use base::gdb;
     // TODO VFS Setup.
     procs::init_stage3();
+    umem::init_stage3();
     drivers::init_stage3();
     interrupt::enable();
     interrupt::set_ipl(interrupt::LOW);
@@ -161,7 +167,7 @@ static EMPTY_STR : Estr = Estr;
 
 #[no_mangle]
 #[no_stack_check]
-pub extern "C" fn get_dbg_pid() -> &'static fmt::Show + 'static {
+pub extern "C" fn get_dbg_pid() -> &'static (fmt::Show + 'static) {
     if unsafe { !IS_PROCS_UP } { &EMPTY_STR as &'static fmt::Show } else { ((current_pid!()) as &'static fmt::Show) }
 }
 

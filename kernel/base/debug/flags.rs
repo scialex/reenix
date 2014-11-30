@@ -2,6 +2,7 @@
 
 use core::prelude::*;
 use core::fmt::*;
+use core::fmt;
 
 /// The colors we can have
 pub mod color {

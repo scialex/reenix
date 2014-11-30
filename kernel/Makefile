@@ -20,7 +20,7 @@ endif
 # Plugins
 PLUGINS        := enabled hoare bassert
 # Crates for the kernel
-REENIX_CRATES  := main base mm startup procs drivers util #umem
+REENIX_CRATES  := main base mm startup procs drivers util umem
 # Crates from the Rust standard library
 BUILTIN_CRATES := alloc libc collections
 # C code helpers for Rust

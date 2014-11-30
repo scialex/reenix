@@ -3,7 +3,7 @@
 #![crate_name="umem"]
 #![crate_type="rlib"]
 #![no_std]
-#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics, if_let)]
+#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics, if_let, unsafe_destructor, tuple_indexing)]
 
 //! # The Reenix User memory stuff.
 ///
@@ -11,7 +11,6 @@
 
 #[phase(plugin)] extern crate bassert;
 
-#[phase(plugin, link)] extern crate drivers;
 #[phase(plugin, link)] extern crate procs;
 #[phase(plugin, link)] extern crate base;
 #[phase(plugin, link)] extern crate core;
@@ -22,8 +21,9 @@ extern crate alloc;
 extern crate libc;
 
 // TODO We should have a MaybePinnedList that uses a LRUCache under the hood...
-pub mod pframe;
-pub mod mmobj;
+mod mmobj;
+mod pframe;
+
 pub fn init_stage1() {
     pframe::init_stage1();
 }
@@ -36,3 +36,13 @@ pub fn init_stage3() {
     pframe::init_stage3();
 }
 
+#[doc(hidden)]
+mod std {
+    pub use core::kinds;
+    pub use core::cmp;
+    pub use core::fmt;
+    pub use core::option;
+    pub use core::num;
+    pub use core::default;
+    pub use core::clone;
+}

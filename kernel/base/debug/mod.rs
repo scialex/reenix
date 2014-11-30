@@ -33,7 +33,7 @@ pub fn add_mode(m: DbgMode) {
 mod macros;
 
 extern "C" { fn get_dbg_pid() -> &'static fmt::Show; }
-pub fn dbg_pid() -> &'static fmt::Show + 'static {
+pub fn dbg_pid() -> &'static (fmt::Show + 'static) {
     unsafe { get_dbg_pid() }
 }
 

@@ -8,58 +8,56 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-/*!
- * Generic hashing support.
- *
- * This module provides a generic way to compute the hash of a value. The
- * simplest way to make a type hashable is to use `#[deriving(Hash)]`:
- *
- * # Example
- *
- * ```rust
- * use std::hash;
- * use std::hash::Hash;
- *
- * #[deriving(Hash)]
- * struct Person {
- *     id: uint,
- *     name: String,
- *     phone: u64,
- * }
- *
- * let person1 = Person { id: 5, name: "Janet".to_string(), phone: 555_666_7777 };
- * let person2 = Person { id: 5, name: "Bob".to_string(), phone: 555_666_7777 };
- *
- * assert!(hash::hash(&person1) != hash::hash(&person2));
- * ```
- *
- * If you need more control over how a value is hashed, you need to implement
- * the trait `Hash`:
- *
- * ```rust
- * use std::hash;
- * use std::hash::Hash;
- * use std::hash::sip::SipState;
- *
- * struct Person {
- *     id: uint,
- *     name: String,
- *     phone: u64,
- * }
- *
- * impl Hash for Person {
- *     fn hash(&self, state: &mut SipState) {
- *         self.id.hash(state);
- *         self.phone.hash(state);
- *     }
- * }
- *
- * let person1 = Person { id: 5, name: "Janet".to_string(), phone: 555_666_7777 };
- * let person2 = Person { id: 5, name: "Bob".to_string(), phone: 555_666_7777 };
- *
- * assert!(hash::hash(&person1) == hash::hash(&person2));
- * ```
- */
+//! Generic hashing support.
+//!
+//! This module provides a generic way to compute the hash of a value. The
+//! simplest way to make a type hashable is to use `#[deriving(Hash)]`:
+//!
+//! # Example
+//!
+//! ```rust
+//! use std::hash;
+//! use std::hash::Hash;
+//!
+//! #[deriving(Hash)]
+//! struct Person {
+//!     id: uint,
+//!     name: String,
+//!     phone: u64,
+//! }
+//!
+//! let person1 = Person { id: 5, name: "Janet".to_string(), phone: 555_666_7777 };
+//! let person2 = Person { id: 5, name: "Bob".to_string(), phone: 555_666_7777 };
+//!
+//! assert!(hash::hash(&person1) != hash::hash(&person2));
+//! ```
+//!
+//! If you need more control over how a value is hashed, you need to implement
+//! the trait `Hash`:
+//!
+//! ```rust
+//! use std::hash;
+//! use std::hash::Hash;
+//! use std::hash::sip::SipState;
+//!
+//! struct Person {
+//!     id: uint,
+//!     name: String,
+//!     phone: u64,
+//! }
+//!
+//! impl Hash for Person {
+//!     fn hash(&self, state: &mut SipState) {
+//!         self.id.hash(state);
+//!         self.phone.hash(state);
+//!     }
+//! }
+//!
+//! let person1 = Person { id: 5, name: "Janet".to_string(), phone: 555_666_7777 };
+//! let person2 = Person { id: 5, name: "Bob".to_string(), phone: 555_666_7777 };
+//!
+//! assert!(hash::hash(&person1) == hash::hash(&person2));
+//! ```
 
 #![allow(unused_must_use)]
 
@@ -67,6 +65,7 @@ use core::prelude::*;
 
 use alloc::boxed::Box;
 use alloc::rc::Rc;
+use core::borrow::{Cow, ToOwned};
 use core::intrinsics::TypeId;
 use core::mem;
 use core::num::Int;
@@ -281,6 +280,13 @@ impl<S: Writer, T: Hash<S>, U: Hash<S>> Hash<S> for Result<T, U> {
             Ok(ref t) => { 1u.hash(state); t.hash(state); }
             Err(ref t) => { 2u.hash(state); t.hash(state); }
         }
+    }
+}
+
+impl<'a, T, Sized? B, S> Hash<S> for Cow<'a, T, B> where B: Hash<S> + ToOwned<T> {
+    #[inline]
+    fn hash(&self, state: &mut S) {
+        Hash::hash(&**self, state)
     }
 }
 

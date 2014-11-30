@@ -95,8 +95,8 @@ impl SlabMap {
 
     pub fn find_smallest(&self, key: uint) -> Option<SlabAllocator> {
         match self.vals.slice_to(self.cnt).binary_search(|v| -> Ordering { (v.expect("should have value").get_size() as uint).cmp(&key) }) {
-            Found(v)    => Some(self.vals[v].expect("should have value")),
-            NotFound(v) => if v == self.cnt { None } else { Some(self.vals[v].expect("should have value")) },
+            BinarySearchResult::Found(v)    => Some(self.vals[v].expect("should have value")),
+            BinarySearchResult::NotFound(v) => if v == self.cnt { None } else { Some(self.vals[v].expect("should have value")) },
         }
     }
 

@@ -94,7 +94,7 @@ use core::cmp;
 use core::kinds::Sized;
 use core::mem::size_of;
 use core::mem;
-use core::prelude::{Clone, Greater, Iterator, Less, None, Option};
+use core::prelude::{Clone, Greater, Iterator, IteratorExt, Less, None, Option};
 use core::prelude::{Ord, Ordering, RawPtr, Some, range};
 use core::ptr;
 use core::iter::{range_step, MultiplicativeIterator};
@@ -106,7 +106,7 @@ pub use core::slice::{OrdSlicePrelude, SlicePrelude, Items, MutItems};
 pub use core::slice::{ImmutableIntSlice, MutableIntSlice};
 pub use core::slice::{MutSplits, MutChunks, Splits};
 pub use core::slice::{bytes, mut_ref_slice, ref_slice, CloneSlicePrelude};
-pub use core::slice::{Found, NotFound, from_raw_buf, from_raw_mut_buf};
+pub use core::slice::{from_raw_buf, from_raw_mut_buf, BinarySearchResult};
 
 // Functional utilities
 

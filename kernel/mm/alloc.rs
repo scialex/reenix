@@ -461,7 +461,7 @@ pub fn stats_print() {
 }
 
 #[precond = "requests_closed()"]
-pub fn get_stats() -> &'static fmt::Show + 'static {
+pub fn get_stats() -> &'static (fmt::Show + 'static) {
     let x = unsafe { &BASE_ALLOCATOR };
     x as &'static fmt::Show
 }
