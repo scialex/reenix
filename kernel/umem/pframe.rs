@@ -53,8 +53,25 @@ pub fn init_stage3() {
     // TODO
 }
 
+/*
+pub extern "C" fn pageoutd_run(_: i32, _: *mut c_void) -> *mut c_void {
+    // TODO This might be totally bad.
+    while !(current_thread!()).canceled {
+        pageoutd_sleep();
+        if (current_thread!()).canceled { break; }
+        let removed = get_cache().clean_unpinned();
+        dbg!(debug::PFRAME, "Removed {} items from page cache", removed);
+        if removed == 0 {
+            get_cache().clear_unpinned();
+        }
+    }
+}
+*/
+
 /// Get the pframe cache
-fn get_cache() -> &'static mut PinnableCache<PFrameId, PFrame> { unsafe { PFRAME_CACHE.as_mut().expect("pframe cache should not be null") } }
+fn get_cache() -> &'static mut PinnableCache<PFrameId, PFrame> {
+    unsafe { PFRAME_CACHE.as_mut().expect("pframe cache should not be null") }
+}
 
 /// The different states a pframe can be in as it is being used.
 pub mod pfstate {
@@ -111,8 +128,8 @@ impl PFrame {
             match e {
                 InsertError::MemoryError(_)     => { dbg!(debug::PFRAME, "Unable to add {} to cache, oom", key); errno::ENOMEM },
                 InsertError::SysError(Some(er)) => { dbg!(debug::PFRAME, "unable to add {} to cache because of {}", key, er); er },
-                InsertError::KeyPresent         => { kpanic!("illegal state of pframe cache, concurrency error"); },
-                _                               => { kpanic!("unknown error occured"); }
+                InsertError::KeyPresent         => { kpanic!("illegal state of pframe cache, concurrency error!"); },
+                _                               => { kpanic!("unknown SysError occured!"); }
             }
         })
     }

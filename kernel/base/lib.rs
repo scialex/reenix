@@ -20,6 +20,7 @@ extern crate libc;
 mod bitflags;
 mod macros;
 
+pub mod make;
 pub mod devices;
 
 pub mod gdb;
@@ -29,7 +30,6 @@ pub mod errno;
 pub mod io;
 pub mod debug;
 pub mod kernel;
-pub mod make;
 
 /// Another, more in-depth information to print.
 pub mod describe {

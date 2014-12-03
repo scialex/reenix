@@ -104,6 +104,7 @@ static NFUNCS : &'static [KFunction<'static>] = &[
     KFunc!("read-block", "read a block", do_bdread),
     KFunc!("ipl", "prints the ipl", do_ipl),
     KFunc!("mem-stats", "prints memory statistics", do_memstats),
+    KFunc!("pid", "prints current pid", do_pid),
 ];
 
 impl<'a> KShell<'a> {
@@ -185,6 +186,11 @@ impl<'a> KShell<'a> {
 fn do_memstats(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {
     twriteln!(io, "{}", alloc::get_stats());
     alloc::stats_print();
+    Ok(())
+}
+
+fn do_pid(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {
+    twriteln!(io, "pid is {}", current_pid!());
     Ok(())
 }
 

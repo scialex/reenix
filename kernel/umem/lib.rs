@@ -19,6 +19,7 @@
 #[phase(plugin, link)] extern crate util;
 #[phase(plugin, link)] extern crate mm;
 extern crate collections;
+extern crate startup;
 extern crate alloc;
 extern crate libc;
 

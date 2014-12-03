@@ -24,10 +24,20 @@ pub fn init_stage2() {}
 pub fn init_stage3() {}
 
 pub const NULL_DEVID : DeviceId = DeviceId_static!(3, 0);
-pub const ZERO_DEVID : DeviceId = DeviceId_static!(4, 0);
+pub const ZERO_DEVID : DeviceId = DeviceId_static!(3, 1);
 
+static NEXT_NULL_ID : u32 = 0;
 /// The device for /dev/null
-struct NullDev;
+struct NullDev(u32);
+
+impl NullDev {
+    pub fn new() -> NullDev {
+        unsafe {
+            NEXT_NULL_ID += 1;
+            NullDev(NEXT_NULL_ID)
+        }
+    }
+}
 
 impl Cacheable for NullDev {
     fn is_still_useful(&self) -> bool { true }
@@ -44,7 +54,7 @@ impl RDevice<u8> for NullDev {
 }
 
 impl MMObj for NullDev {
-    fn get_id(&self) -> MMObjId { MMObjId::new(NULL_DEVID, 0) }
+    fn get_id(&self) -> MMObjId { MMObjId::new(NULL_DEVID, self.0) }
     fn fill_page(&self,  pf: &mut PFrame)  -> KResult<()> { Err(Errno::ENOTSUP) }
     fn dirty_page(&self, pf: &PFrame)      -> KResult<()> { Ok(()) }
     fn clean_page(&self, pf: &PFrame)      -> KResult<()> { dbg!(debug::MEMDEV, "clean-page called on null device"); Err(Errno::ENOTSUP) }
@@ -52,7 +62,7 @@ impl MMObj for NullDev {
 }
 
 /// The device for /dev/zero
-struct ZeroDev;
+struct ZeroDev(u32);
 
 impl Cacheable for ZeroDev {
     fn is_still_useful(&self) -> bool { true }
@@ -66,13 +76,13 @@ impl WDevice<u8> for ZeroDev {
 impl RDevice<u8> for ZeroDev {
     /// Reads succeed and get all 0's
     fn read_from(&self, _: uint, buf: &mut [u8]) -> KResult<uint> {
-        for i in range(0, buf.len()) { buf[i] = 0; }
+        for i in buf.iter_mut() { *i = 0; }
         Ok(buf.len())
     }
 }
 
 impl MMObj for ZeroDev {
-    fn get_id(&self) -> MMObjId { MMObjId::new(ZERO_DEVID, 0) }
+    fn get_id(&self) -> MMObjId { MMObjId::new(ZERO_DEVID, self.0) }
     fn fill_page(&self,  pf: &mut PFrame)  -> KResult<()> { self.read_from(0, pf.get_page_mut()).map(|_| ()) }
     fn dirty_page(&self, pf: &PFrame)      -> KResult<()> { Ok(()) }
     fn clean_page(&self, pf: &PFrame)      -> KResult<()> { dbg!(debug::MEMDEV, "clean-page called on zero device"); Err(Errno::ENOTSUP) }

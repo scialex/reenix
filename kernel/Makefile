@@ -102,7 +102,7 @@ $(eval $(call crate-rule,      base,    libc))
 $(eval $(call crate-rule,      mm,      libc base))
 $(eval $(call crate-rule,      startup, $(BASIC_REQS)))
 $(eval $(call crate-rule,      util,    $(BASIC_REQS)))
-$(eval $(call crate-rule,      procs,   $(BASIC_REQS) startup))
+$(eval $(call crate-rule,      procs,   $(BASIC_REQS) util startup))
 $(eval $(call crate-rule,      umem,    $(BASIC_REQS) util procs))
 $(eval $(call long-crate-rule, drivers, $(BASIC_REQS) procs umem, --opt-level=1)) # TODO For some reason LLVM doesn't like -O2 in drivers.
 

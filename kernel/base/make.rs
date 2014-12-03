@@ -8,6 +8,9 @@ pub trait Make<A> {
     fn make(a: A) -> Self;
 }
 
+impl<A> Make<A> for A { fn make(a: A) -> A { a } }
+impl<'a, 'b: 'a, A> Make<&'a A> for A where A: Clone + 'b { fn make(a: &'a A) -> A { a.clone() } }
+
 /// A trait for creating a value using a reference to another one.
 ///
 /// The generated value might outlive the reference used to create it and should not hold a
@@ -17,6 +20,8 @@ pub trait RefMake<'a, A: 'a> {
     /// generated value.
     fn make_from<'b, 'a: 'b>(v: &'b A) -> Self;
 }
+
+impl<A> RefMake<'static, A> for A where A: Clone + 'static { fn make_from<'b, 'a: 'b>(v: &'b A) -> A { v.clone() }}
 
 /// A trait where one attempts to make a value but it can fail.
 pub trait TryMake<A, E> {

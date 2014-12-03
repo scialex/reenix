@@ -9,7 +9,6 @@ use collections::*;
 use core::fmt;
 
 mod tty;
-mod memdev;
 
 /// Do initialization that does not require allocating memory.
 pub fn init_stage1() {
