@@ -23,6 +23,7 @@ pub fn init_stage2() {}
 pub fn init_stage3() {}
 
 pub mod format;
+pub mod uid;
 pub mod lru_cache;
 pub mod pinnable_cache;
 pub mod cacheable;

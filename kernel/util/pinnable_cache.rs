@@ -211,6 +211,7 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
     /// Remove all unpinned values that say they are not useful at this time. Returns the number of
     /// values removed from the cache.
     pub fn clean_unpinned(&mut self) -> uint {
+        // TODO I might need to put some locks around this.
         let mut cnt = 0;
         for m in self.unpinned_mut().iter_modify_least() {
             let &(_, v) = m.deref();

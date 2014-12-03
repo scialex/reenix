@@ -9,6 +9,7 @@ use core::fmt;
 use core::fmt::{Show, Formatter};
 use core::cell::*;
 use core::ptr::*;
+use core::atomic::*;
 use sync::Wakeup;
 
 pub fn init_stage1() {
@@ -19,7 +20,7 @@ pub fn init_stage2() {}
 
 pub struct KMutex {
     name : &'static str,
-    held : Cell<bool>,
+    held : AtomicBool,
     queue : UnsafeCell<KQueue>,
     //no_copy : core::kinds::marker::NoCopy,
 }
@@ -27,17 +28,16 @@ pub struct KMutex {
 impl KMutex {
     /// Create a new mutex with the given name.
     pub fn new(name: &'static str) -> KMutex {
-        KMutex { name : name, held : Cell::new(false), queue : UnsafeCell::new(KQueue::new()) }
+        KMutex { name : name, held : AtomicBool::new(false), queue : UnsafeCell::new(KQueue::new()) }
     }
 
     /// Obtain the lock, waiting until it is freed. Note that there are no ordering/fairness
     /// gaurentees on who gets a lock when it is contested.
     pub fn lock_nocancel(&self) {
         dbg!(debug::SCHED, "locking {} for {} of {}", self, current_thread!(), current_proc!());
-        while self.held.get() {
+        while self.held.compare_and_swap(false, true, Ordering::SeqCst) != false {
             unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait_on(false) };
         }
-        self.held.set(true);
         return;
     }
 
@@ -45,20 +45,18 @@ impl KMutex {
     #[warn(unused_results)]
     pub fn lock(&self) -> bool {
         dbg!(debug::SCHED, "cancelable locking {} for {} of {}", self, current_thread!(), current_proc!());
-        while self.held.get() {
+        while self.held.compare_and_swap(false, true, Ordering::SeqCst) != false {
             if unsafe { !self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait_on(true) } {
                 return false;
             }
         }
-        self.held.set(true);
         return true;
     }
 
     /// Returns true if we get the lock. False, without sleeping, if we did not.
     pub fn try_lock(&self) -> bool {
-        if !self.held.get() {
+        if !self.held.compare_and_swap(false, true, Ordering::SeqCst) {
             dbg!(debug::SCHED, "locking {} for {} of {}", self, current_thread!(), current_proc!());
-            self.held.set(true);
             true
         } else {
             dbg!(debug::SCHED, "locking {} for {} of {} failed", self, current_thread!(), current_proc!());
@@ -69,15 +67,15 @@ impl KMutex {
     /// Unlocks the lock. This should only be called by the thread that originally locked it.
     pub fn unlock(&self) {
         dbg!(debug::SCHED, "unlocking {} for {} of {}", self, current_thread!(), current_proc!());
-        assert!(self.held.get());
-        self.held.set(false);
+        assert!(self.held.load(Ordering::SeqCst));
+        self.held.store(false, Ordering::SeqCst);
         unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null")}.signal();
     }
 }
 
 impl Show for KMutex {
     fn fmt(&self, f : &mut Formatter) -> fmt::Result {
-        write!(f, "KMutex '{}' {{ held: {}, waiters: {} }}", self.name, self.held.get(),
+        write!(f, "KMutex '{}' {{ held: {}, waiters: {} }}", self.name, self.held.load(Ordering::SeqCst),
                 unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null")}.len())
     }
 }

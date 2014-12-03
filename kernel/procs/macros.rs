@@ -44,6 +44,7 @@ macro_rules! current_pid(
     () => ({
         use startup::gdt;
         use core::any::*;
+        use procs::kproc::ProcId;
         use procs::kproc::CUR_PID_SLOT;
         ((**gdt::get_tsd().get_slot(CUR_PID_SLOT).expect(add_file!("CUR_PID slot not used")))
                            .downcast_ref::<ProcId>().expect(add_file!("Item at curpid was not the right type!")))

@@ -19,6 +19,7 @@
 #[phase(link, plugin)] extern crate collections;
 #[phase(link, plugin)] extern crate mm;
 extern crate startup;
+extern crate util;
 extern crate alloc;
 extern crate libc;
 
@@ -106,6 +107,7 @@ mod apic {
 }
 
 
+#[doc(hidden)]
 mod std {
     pub use core::clone;
     pub use core::cmp;
@@ -113,4 +115,5 @@ mod std {
     pub use core::num;
     pub use core::option;
     pub use collections::hash;
+    pub use core::kinds;
 }

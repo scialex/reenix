@@ -22,13 +22,23 @@ use kqueue::WQueue;
 use sync::Wait;
 use mm::pagetable::PageDir;
 use mm::AllocError;
+use util::uid::*;
 
 pub use self::WaitProcId::*;
 pub const CUR_PROC_SLOT : uint = 1;
 pub const CUR_PID_SLOT  : uint = 2;
 
-#[deriving(Eq, PartialEq, Show, PartialOrd, Ord, Clone)]
-pub struct ProcId(pub uint);
+#[cfg(not(SMALL_PID))] type PidInner = uint;
+#[cfg(SMALL_PID)]      type PidInner = u8;
+
+#[deriving(Eq, PartialEq, Show, PartialOrd, Ord, Clone, Copy)]
+pub struct ProcId(pub PidInner);
+impl Id for ProcId {
+    fn successor(&mut self) {
+        let &ProcId(n) = self;
+        *self = ProcId(n + 1)
+    }
+}
 
 static mut INIT_PROC : *mut Rc<ProcRefCell<KProc>> = 0 as *mut Rc<ProcRefCell<KProc>>;
 static INIT_PID : ProcId = ProcId(1);
@@ -36,32 +46,14 @@ static INIT_PID : ProcId = ProcId(1);
 static mut IDLE_PROC : *mut Rc<ProcRefCell<KProc>> = 0 as *mut Rc<ProcRefCell<KProc>>;
 static IDLE_PID : ProcId = ProcId(0);
 
-static mut NEXT_PID : uint = 0;
-impl ProcId {
-    pub fn new() -> ProcId {
-        use core;
-        block_interrupts!({
-            let nxt = unsafe { NEXT_PID };
-            let res = match range(nxt, core::uint::MAX).map(|i| { ProcId(i) })
-                                                       .filter(|p| { KProc::get_proc(p).is_none() })
-                                                       .nth(0) {
-                None => {
-                    match range(0, nxt).map(|i| { ProcId(i) })
-                                       .filter(|p| { KProc::get_proc(p).is_none() })
-                                       .nth(0) {
-                        Some(pid) => pid,
-                        None => kpanic!("Could not allocate a thread id!"),
-                    }
-                },
-                Some(pid) => pid,
-            };
-            unsafe { NEXT_PID = (res.0) + 1; }
-            res
-        })
-    }
+/// A generator capable of making unique PID's.
+static mut PID_GEN : *mut UIDSource<ProcId> = 0 as *mut UIDSource<ProcId>;
+/// Get a PID from our generator.
+fn get_pid() -> Option<ProcId> {
+    unsafe { PID_GEN.as_mut().expect("PID_GEN not initialized") }.get()
 }
-
-impl Copy for ProcId {}
+/// Notify that we are done with a pid.
+fn drop_pid(i: &ProcId) { unsafe { &mut *PID_GEN }.destroy(i); }
 
 #[deriving(Show,Eq,PartialEq)]
 pub enum ProcState { RUNNING, DEAD }
@@ -100,6 +92,8 @@ pub fn init_stage2() {
     unsafe {
         let y : Box<TreeMap<ProcId, Rc<ProcRefCell<KProc>>>> = box TreeMap::new();
         PROC_LIST = transmute(y);
+        let z : Box<UIDSource<ProcId>> = box UIDSource::new(ProcId(0)).unwrap();
+        PID_GEN = transmute(z);
     }
 }
 
@@ -308,7 +302,7 @@ impl KProc {
     /// The base creation function for a process. This should not generally be used.
     pub fn create(name: String) -> Result<KProc, AllocError> {
         Ok(KProc {
-            pid : ProcId::new(),
+            pid : try!(get_pid().ok_or_else(|| { dbg!(debug::PROC, "Unable to allocate PID!"); () })),
             command : name,
             // TODO Maybe I should just have this be a box for now.
             threads : try!(alloc!(try TreeMap::new())),
@@ -374,6 +368,7 @@ impl KProc {
             unsafe { INIT_PROC = transmute(tmp); }
         }
         rcp.borrow_mut().threads.get_mut(&hash).expect("thread must still be present").make_runable();
+        dbg!(debug::PROC, "created {}", pid);
         return Ok(pid);
     }
 
@@ -431,6 +426,13 @@ impl KProc {
         // TODO VM  DELETE VMMAP
 
         parent.borrow().wait.signal();
+    }
+}
+
+#[unsafe_destructor]
+impl Drop for KProc {
+    fn drop(&mut self) {
+        drop_pid(&self.pid);
     }
 }
 
