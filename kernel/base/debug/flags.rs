@@ -6,26 +6,6 @@ use core::prelude::*;
 use core::fmt::*;
 use core::fmt;
 
-/// The colors we can have
-pub mod color {
-    pub static NORMAL   : &'static str = "\x1b[0m";
-    pub static BLACK    : &'static str = "\x1b[30;47m";
-    pub static RED      : &'static str = "\x1b[31;40m";
-    pub static GREEN    : &'static str = "\x1b[32;40m";
-    pub static YELLOW   : &'static str = "\x1b[33;40m";
-    pub static BLUE     : &'static str = "\x1b[34;40m";
-    pub static MAGENTA  : &'static str = "\x1b[35;40m";
-    pub static CYAN     : &'static str = "\x1b[36;40m";
-    pub static WHITE    : &'static str = "\x1b[37;40m";
-    pub static BRED     : &'static str = "\x1b[1;31;40m";
-    pub static BGREEN   : &'static str = "\x1b[1;32;40m";
-    pub static BYELLOW  : &'static str = "\x1b[1;33;40m";
-    pub static BBLUE    : &'static str = "\x1b[1;34;40m";
-    pub static BMAGENTA : &'static str = "\x1b[1;35;40m";
-    pub static BCYAN    : &'static str = "\x1b[1;36;40m";
-    pub static BWHITE   : &'static str = "\x1b[1;37;40m";
-}
-
 macro_rules! dbg_modes (
     ($(($n:ident, $v:expr, $c:expr, $ex:expr)),+) => (
         bitmask_create!(
@@ -56,6 +36,9 @@ macro_rules! dbg_modes (
         }
     )
 )
+
+#[cfg(TEST_LOW_MEMORY)] pub const BACKUP_MM : DbgMode = MM;
+#[cfg(not(TEST_LOW_MEMORY))] pub const BACKUP_MM : DbgMode = DANGER;
 
 dbg_modes!(
     (CORE,        0,  color::GREEN,   "core boot code"),
@@ -101,3 +84,22 @@ dbg_modes!(
     (PANIC,       63, color::RED,     "PANIC!")
 )
 
+/// The colors we can have
+pub mod color {
+    pub static NORMAL   : &'static str = "\x1b[0m";
+    pub static BLACK    : &'static str = "\x1b[30;47m";
+    pub static RED      : &'static str = "\x1b[31;40m";
+    pub static GREEN    : &'static str = "\x1b[32;40m";
+    pub static YELLOW   : &'static str = "\x1b[33;40m";
+    pub static BLUE     : &'static str = "\x1b[34;40m";
+    pub static MAGENTA  : &'static str = "\x1b[35;40m";
+    pub static CYAN     : &'static str = "\x1b[36;40m";
+    pub static WHITE    : &'static str = "\x1b[37;40m";
+    pub static BRED     : &'static str = "\x1b[1;31;40m";
+    pub static BGREEN   : &'static str = "\x1b[1;32;40m";
+    pub static BYELLOW  : &'static str = "\x1b[1;33;40m";
+    pub static BBLUE    : &'static str = "\x1b[1;34;40m";
+    pub static BMAGENTA : &'static str = "\x1b[1;35;40m";
+    pub static BCYAN    : &'static str = "\x1b[1;36;40m";
+    pub static BWHITE   : &'static str = "\x1b[1;37;40m";
+}

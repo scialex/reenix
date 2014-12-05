@@ -128,20 +128,20 @@ impl BackupAllocator {
         if !res.is_null() {
             unsafe { set_memory(res, ALOC_FILL, size); }
             let recieved_size =  unsafe { (res as *const Tag).offset(-1).as_ref().expect("shouldn't be null").size() };
-            dbg!(debug::MM, "allocated {:p}-{:p} which is {} bytes long for request for {}",
+            dbg!(debug::MM|debug::BACKUP_MM, "allocated {:p}-{:p} which is {} bytes long for request for {}",
                  res, unsafe { res.offset(recieved_size as int) }, recieved_size, size);
             if self.is_memory_low() {
-                dbg!(debug::MM|debug::CORE, "We are currently low on memory! Largest space is {}", self.largest_space);
+                dbg!(debug::MM|debug::DANGER, "We are currently low on memory! Largest space is {}", self.largest_space);
             }
         } else {
-            dbg!(debug::MM, "unable to allocate {} bytes from backup", size);
+            dbg!(debug::MM|debug::BACKUP_MM, "unable to allocate {} bytes from backup", size);
         }
         res
     }
     fn real_allocate(&self, size: uint, _align: uint) -> *mut u8 {
         assert!((size % size_of::<Tag>()) == 0, "size of {} is not aligned to {}", size, size_of::<Tag>());
         if pg_size(size) > self.largest_space + 1 {
-            dbg!(debug::MM|debug::CORE, "Unable to allocate {} bytes from backup memory allocator!", size);
+            dbg!(debug::MM|debug::DANGER, "Unable to allocate {} bytes from backup memory allocator!", size);
             0 as *mut u8
         } else if size >= page::SIZE {
             self.allocate_pages(pg_size(size))
@@ -181,7 +181,7 @@ impl BackupAllocator {
                 tag.get_start()
             },
             None => {
-                dbg!(debug::MM|debug::CORE, "Unable to allocate {} bytes from backup memory allocator!. No suitable segments", req);
+                dbg!(debug::MM|debug::DANGER, "Unable to allocate {} bytes from backup memory allocator!. No suitable segments", req);
                 0 as *mut u8
             }
         }
@@ -222,14 +222,14 @@ impl BackupAllocator {
                 start.get_start()
             }
         } else {
-            dbg!(debug::MM|debug::CORE, "Unable to to allocate {} pages from backup allocator!", pgs);
+            dbg!(debug::MM|debug::DANGER, "Unable to to allocate {} pages from backup allocator!", pgs);
             0 as *mut u8
         }
     }
 
     pub fn deallocate(&self, ptr: *mut u8, size: uint, align: uint) {
         unsafe { set_memory(ptr, FREE_FILL, size); }
-        dbg!(debug::MM, "Request to deallocate {:p} of size {}", ptr, size);
+        dbg!(debug::MM|debug::BACKUP_MM, "Request to deallocate {:p} of size {}", ptr, size);
         let req = (size + (size_of::<Tag>() - 1)) & (!(size_of::<Tag>() - 1));
         self.real_deallocate(ptr, req, align);
         unsafe { transmute::<&BackupAllocator, &mut BackupAllocator>(self).recalculate(); }
@@ -308,7 +308,7 @@ impl BackupAllocator {
     /// Recalculate all the information about the backup allocator.
     fn recalculate(&mut self) {
         self.largest_space = self.do_recalculate();
-        dbg!(debug::MM, "largest space is {}", self.largest_space);
+        dbg!(debug::MM|debug::BACKUP_MM, "largest space is {}", self.largest_space);
     }
 
     pub fn finish(&mut self) {

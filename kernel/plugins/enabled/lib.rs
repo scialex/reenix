@@ -1,6 +1,6 @@
 #![crate_type="dylib"]
 #![crate_name="enabled"]
-#![feature(plugin_registrar)]
+#![feature(plugin_registrar, globs)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
@@ -19,20 +19,38 @@ use syntax::ext::cfg;
 use syntax::ext::base::{ExtCtxt, MacResult, DummyResult};
 use rustc::plugin::Registry;
 
+enum IDType {
+    Titled(token::InternedString, token::InternedString),
+    Normal(token::InternedString),
+}
+
+impl IDType {
+    fn get_full(&self) -> String {
+        match *self {
+            IDType::Titled(ref t, ref n) => {
+                let mut ret = String::from_str(t.get());
+                ret.push('_');
+                ret.push_str(n.get());
+                ret
+            },
+            IDType::Normal(ref n) => String::from_str(n.get()),
+        }
+    }
+}
 
 fn expand(prefix: String, cx: &mut ExtCtxt, sp: Span, args: &[TokenTree]) -> Box<MacResult + 'static> {
-    let (title, name) = match args {
+    use IDType::*;
+    let id = match args {
         [TtToken(_, token::Ident(title, _)), TtToken(_, token::RArrow), TtToken(_, token::Ident(name, _))] =>
-            (token::get_ident(title), token::get_ident(name)),
+            Titled(token::get_ident(title), token::get_ident(name)),
+        [TtToken(_, token::Ident(name, _))] => Normal(token::get_ident(name)),
         _ => {
-            cx.span_err(sp, "Argument should be 'module_name->option_name' to check for cfg of 'Nmodule_name_option_name'");
+            cx.span_err(sp, "Argument should be 'module_name->option_name' or 'option_name'");
             return DummyResult::any(sp);
         }
     };
     let mut check_name = prefix;
-    check_name.push_str(title.get());
-    check_name.push('_');
-    check_name.push_str(name.get());
+    check_name.push_str(id.get_full().as_slice());
     let outtok = token::gensym_ident(check_name.as_slice());
     let toktree = [TtToken(sp, token::Ident(outtok, token::Plain))];
     cfg::expand_cfg(cx, sp, &toktree)

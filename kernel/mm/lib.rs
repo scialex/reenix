@@ -14,6 +14,7 @@
 
 #[phase(plugin)] extern crate hoare;
 #[phase(plugin)] extern crate bassert;
+#[phase(plugin)] extern crate enabled;
 #[phase(link, plugin)] extern crate core;
 #[phase(link, plugin)] extern crate base;
 extern crate libc;

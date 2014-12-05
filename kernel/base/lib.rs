@@ -9,7 +9,7 @@
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![feature(asm, macro_rules, globs, concat_idents,lang_items, trace_macros, phase)]
 
-
+#[phase(plugin)] extern crate bassert;
 #[phase(plugin)] extern crate enabled;
 #[phase(plugin, link)] extern crate core;
 extern crate libc;
@@ -30,6 +30,7 @@ pub mod errno;
 pub mod io;
 pub mod debug;
 pub mod kernel;
+pub mod sync;
 
 /// Another, more in-depth information to print.
 pub mod describe {
