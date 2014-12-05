@@ -19,7 +19,8 @@
 extern crate libc;
 
 use libc::{c_void, size_t};
-pub use alloc::{AllocError, Allocation};
+pub use alloc::{AllocError, Allocation, allocate, deallocate, reallocate};
+pub use alloc::{reallocate_inplace, usable_size, stats_print};
 
 /// Initialize this crate. This must be called exactly once during startup.
 #[deny(dead_code)]

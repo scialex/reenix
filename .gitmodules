@@ -2,3 +2,6 @@
 	path = doc
 	url = https://github.com/scialex/empty.git
 	branch = master
+[submodule "kernel/external/rust"]
+	path = kernel/external/rust
+	url = https://github.com/rust-lang/rust.git

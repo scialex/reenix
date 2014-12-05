@@ -5,18 +5,6 @@ use base::debug::printing::DBG_WRITER;
 
 #[cold]
 #[no_mangle]
-#[no_stack_check]
-#[allow(unused_must_use)]
-pub extern "C" fn __morestack() {
-    use base::debug::printing::DBG_WRITER;
-    use core::fmt::*;
-    use base::kernel;
-    unsafe { DBG_WRITER.write(b"\n__morestack was called. We ran out of stack space!\n"); }
-    kernel::halt();
-}
-
-#[cold]
-#[no_mangle]
 #[inline(never)]
 #[lang="panic_fmt"]
 pub extern fn rust_begin_unwind(msg: &core::fmt::Arguments,

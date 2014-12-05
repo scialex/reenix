@@ -341,7 +341,7 @@ pub mod types {
 
     // Standard types that are scalar but vary by OS and arch.
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "reenix", target_os = "linux", target_os = "android"))]
     pub mod os {
         pub mod common {
             pub mod posix01 {
@@ -2348,7 +2348,7 @@ pub mod consts {
     }
 
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
+    #[cfg(any(target_os = "reenix", target_os = "linux", target_os = "android"))]
     pub mod os {
         pub mod c95 {
             use types::os::arch::c95::{c_int, c_uint};
@@ -3025,7 +3025,7 @@ pub mod consts {
             pub const MAP_NONBLOCK : c_int = 0x020000;
             pub const MAP_STACK : c_int = 0x040000;
         }
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "reenix", target_os = "linux"))]
         pub mod sysconf {
             use types::os::arch::c95::c_int;
 

@@ -9,6 +9,14 @@
 # Should we show the build commands as we run them?
 HIDE ?= "true"
 
+# What is the directory where a rust source tree is checked out.
+RUST_SOURCE_DIR ?= "external/rust"
+
+# Build compiler-rt from source. this might take a while.
+BUILD_COMPILER_RT ?= "false"
+# Use this file as libcompiler-rt.a
+COMPILER_RT_PATH ?= ""
+
 # Should we run ld with --gc-sections flag. If ttrue then we will remove unused
 # sections, making the binary much smaller, we could lose some debug
 # information.
