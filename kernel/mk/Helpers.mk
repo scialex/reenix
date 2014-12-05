@@ -1,8 +1,10 @@
 # A bunch of extra targets for stuff.
 
-cscope: $(HEAD) $(SRC)
+.PHONY: cscope nyi todo
+
+cscope: $(wildcard include/*/*.h include/*/*/*.h) $(SRC)
 	@ echo "  Updating cscope symbol cross-reference..."
-	@ echo $(HEAD) $(SRC) > cscope.files
+	@ echo $^ > cscope.files
 	@ $(CSCOPE) -k -b -q -v > /dev/null
 
 FILTER=`echo "DRIVERS $(DRIVERS)\nVFS $(VFS)\nS5FS $(S5FS)\nVM $(VM)" | grep 1 | cut -f1 -d" " | tr "\n" "|"`PROCS

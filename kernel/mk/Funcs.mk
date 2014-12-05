@@ -9,29 +9,49 @@ endef
 # $(1) is the name of the crate
 # $(2) is the directory it is in.
 define set-base-crate-name
-$(eval $(1)_LIB := $(BUILD_DIR)/libs/$(shell $(RUST) --print-file-name $(2)/lib.rs))
+$(strip $(1))_LIB := $$(BUILD_DIR)/libs/$$(shell $$(RUST) --print-file-name $(strip $(2))/lib.rs)
+$(strip $(1))_DIR := $(strip $(2))
 endef
 
 define set-lib-name
-$(eval $(1)_LIB := $(BUILD_DIR)/libs/$(2))
+$(eval $(strip $(1))_LIB := $(BUILD_DIR)/libs/$(strip $(2)))
 endef
 
 define set-builtin-crate-name
-$(call set-base-crate-name,$(1),$(RUST_SOURCE_DIR)/src/lib$(1))
+$(eval $(call set-base-crate-name,$(1),$(RUST_SOURCE_DIR)/src/lib$(1)))
 endef
 
 define set-plugin-crate-name
-$(call set-base-crate-name,$(1),plugins/$(1))
+$(eval $(call set-base-crate-name,$(1),plugins/$(1)))
+endef
+
+define set-other-crate-name
+$(eval $(call set-base-crate-name,$(1),rustlibs/$(1)))
+endef
+
+define set-patched-crate-name
+$(eval $(call set-base-crate-name,$(1),rustlibs/lib$(1)))
 endef
 
 define set-crate-name
-$(call set-base-crate-name,$(1),$(1))
+$(eval $(call set-base-crate-name,$(1),$(1)))
 endef
 
+# Get the director name of a crate name
+# $(1) is the name of the crate
+define dir-name
+$($(strip $(1))_DIR)
+endef
 # Get the file name of a crate name
 # $(1) is the name of the crate
 define lib-name
-$($(1)_LIB)
+$($(strip $(1))_LIB)
+endef
+
+# Get the compiled object's name.
+# $(1) a c/S file to get the object name of
+define obj-name
+$(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(1))))
 endef
 
 # a rule that copies a file.
@@ -52,7 +72,7 @@ endef
 define ld-rule
 $(1) : $(2) $(3) | $$(dir $(1))
 	@ echo "[LD  ] Linking for \"kernel/$$@\"..."
-ifeq (,$(3))
+ifeq ("",$(3))
 	$$(HIDE_SIGIL) $$(LD) $$(LDFLAGS) $(4) $(2) -o $$@
 else
 	$$(HIDE_SIGIL) $$(LD) -T $(3) $$(LDFLAGS) $(4) $(2) -o $$@
@@ -73,7 +93,17 @@ endef
 define configure-targets
 $(addprefix $(1)/,$(3)) : $(1)/configure
 	@ echo "[CONF] configuring \"kernel/$$@\"..."
-	$$(HIDE_SIGIL) cd $(1); ./configure $(2) $(SILENT_SUFFIX)
+	$$(HIDE_SIGIL) cd $(1) && ./configure $(2) $(SILENT_SUFFIX)
+endef
+
+# $(1) the objects that need directories.
+define ensure-build-dir
+# Make sure build-directory dirs are there.
+$(1) : | $(foreach l,$(1), $(dir $(l)))
+$(sort $(foreach l,$(1), $(dir $(l)))) :
+	@ echo "[MKDR] Make build-directory \"kernel/$$@\"..."
+	$(HIDE_SIGIL) mkdir -p $$@
+
 endef
 
 # Get rules for external targets.
@@ -94,31 +124,36 @@ $(call copy-rule,external/$(1)/$(3),$$(BUILD_DIR)/external/$(notdir $(3)))
 .PHONEY:
 clean-$(strip $(1)):
 	$$(HIDE_SIGIL) rm -f $$(BUILD_DIR)/external/$(notdir $(strip $(3))) 2>/dev/null
-	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C external/$(strip $(1)) clean $(strip $(5))
+	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C external/$(strip $(1)) clean $(strip $(5)) 2>/dev/null || true
 endef
 
 # Make rules to build a crate
-# $(1) is the directory the library is in
-# $(2) is the name of the crate
-# $(3) is the list of crates that this library depends on.
-# $(4) is any rust flags you want.
-# $(5) is any rustdoc flags you want.
+# $(1) is the name of the crate
+# $(2) is the list of crates that this library depends on.
+# $(3) is any rust flags you want.
+# $(4) is any rustdoc flags you want.
+# $(5) is any addional files to depend on
 define base-crate-rule
-$(call lib-name,$(2)) : $$(shell find $(1) -type f -name "*.rs") \
-                          $$(foreach l,$(3), $$(call lib-name,$$(l))) \
+
+$(call lib-name,$(1)) : $$(shell find $(call dir-name,$(1)) -type f -name "*.rs") \
+                          $$(foreach l,$(2), $$(call lib-name,$$(l)))             \
+						  $(5)                                                    \
                         | $$(dir $$(call lib-name,$(2)))
-	@ echo "[RS  ] Compiling \"kernel/$(1)/lib.rs\"..." # for \"kernel/$$@\""
-	$$(HIDE_SIGIL) $$(RUST) $(4) $(1)/lib.rs --out-dir $$(BUILD_DIR)/libs
+	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..." # for \"kernel/$$@\""
+	$$(HIDE_SIGIL) $$(RUST) $$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))) \
+		                    $(3)                                                       \
+						   	$$(call dir-name,$(1))/lib.rs                              \
+						   	--out-dir $$(dir $(call lib-name,$(1)))
 
-$(call doc-name,$(2)) : $$(shell find $(1) -type f -name "*.rs") \
-						$$(foreach l,$(3), $$(call lib-name,$$(l)))
-	@ echo "[RDOC] Documenting \"kernel/$(1)\"..."
-	$$(HIDE_SIGIL) $$(RUSTDOC) $(5) --output $(DOC_DIR) $(1)/lib.rs
+$(call doc-name,$(1)) : $$(shell find $(call dir-name,$(1)) -type f -name "*.rs") \
+	                    $(5)                                                      \
+						$$(foreach l,$(2), $$(call lib-name,$$(l)))
+	@ echo "[RDOC] Documenting \"kernel/$$(call dir-name,$(1))\"..."
+	$$(HIDE_SIGIL) $$(RUSTDOC) $$(foreach l,$(2),--extern $$(l)=$$(call lib-name,$$(l))) \
+	                           $(4)                                                      \
+							   --output $$(DOC_DIR)                                      \
+							   $$(call dir-name,$(1))/lib.rs
 
-endef
-
-define kernel-crate-rule
-$(eval $(call base-crate-rule,$(1),$(2),$(3),$(4) $$(RSFLAGS),$(5) $$(RDFLAGS)))
 endef
 
 # A Crate with custom flags
@@ -126,43 +161,20 @@ endef
 # $(2) is the list of dependencies
 # $(3) is a list of custom rust flags
 define long-crate-rule
-$(eval $(call kernel-crate-rule,$(strip $(1)),$(strip $(1)),$(2) $$(PLUGINS),$(3) $$(KERNEL_RSFLAGS),$$(KERNEL_RDFLAGS)))
+$(eval $(call base-crate-rule,$(strip $(1)),$(2) $$(PLUGINS),$(3) $$(RSFLAGS),$$(RDFLAGS),$$(TARGET_FILENAME)))
 endef
 
-# A Crate from reenix
+# A Crate
 # $(1) is the name of the crate
 # $(2) is the list of dependencies
 define crate-rule
-$(eval $(call long-crate-rule,$(strip $(1)),$(2),--opt-level=$$(DEFAULT_CRATE_OPT)))
-endef
-
-# A module that is part of rusts stdlib.
-# $(1) is the name of the crate.
-# $(2) is the list of dependencies
-# $(3) is a list of custom rust flags
-define long-builtin-crate-rule
-$(eval $(call kernel-crate-rule,$$(RUST_SOURCE_DIR)/src/lib$(strip $(1)),$(strip $(1)),$(2),$$(KERNEL_RSFLAGS) --opt-level=$$(DEFAULT_BUILTIN_CRATE_OPT) $(strip $(3)),$$(KERNEL_RDFLAGS) ))
-endef
-
-# A module that is part of rusts stdlib.
-# $(1) is the name of the crate.
-# $(2) is the list of dependencies
-define builtin-crate-rule
-$(eval $(call long-builtin-crate-rule,$(1),$(2), --allow=dead-code))
-endef
-
-# A module that is part of rusts stdlib but patched.
-# $(1) is the name of the crate.
-# $(2) is the path it is at.
-# $(3) is the list of dependencies
-define other-crate-rule
-$(eval $(call kernel-crate-rule,$(strip $(2)),$(strip $(1)),$(3), --allow=dead-code $$(KERNEL_RSFLAGS) --opt-level=$$(DEFAULT_BUILTIN_CRATE_OPT),$$(KERNEL_RDFLAGS) ))
+$(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2)),--opt-level=$$(DEFAULT_CRATE_OPT)))
 endef
 
 # A plugin
 # $(1) is the name of the plugin
 # $(2) is the list of dependencies.
 define plugin-rule
-$(eval $(call base-crate-rule,plugins/$(strip $(1)),$(strip $(1)),$(2),,,))
+$(eval $(call base-crate-rule,$(strip $(1)),$(2),,,,))
 endef
 

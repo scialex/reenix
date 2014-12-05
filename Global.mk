@@ -28,7 +28,7 @@ RSFLAGS   += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
 RDFLAGS   += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
 
 ifeq ($(USE_STACK_CHECK),"FALSE")
-RSFLAGS += -C no-stack-check --cfg NO_STACK_CHECK
+RSFLAGS += -C no-stack-check --cfg NSTACK_CHECK
 endif
 
 CFLAGS    += $(foreach bool,$(COMPILE_CONFIG_BOOLS), \

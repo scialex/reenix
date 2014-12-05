@@ -10,7 +10,7 @@
 HIDE ?= "true"
 
 # What is the directory where a rust source tree is checked out.
-RUST_SOURCE_DIR ?= "external/rust"
+RUST_SOURCE_DIR ?= external/rust
 
 # Build compiler-rt from source. this might take a while.
 BUILD_COMPILER_RT ?= "false"
@@ -23,12 +23,11 @@ COMPILER_RT_PATH ?= ""
 LD_OPT ?= "true"
 
 # Should we use stack check. FALSE we will not. Anything else we will.
-USE_STACK_CHECK=TRUE
+USE_STACK_CHECK ?= "TRUE"
 #USE_STACK_CHECK=FALSE
 
 # The opt levels for crates.
 DEFAULT_CRATE_OPT := 2
-DEFAULT_BUILTIN_CRATE_OPT := 3
 
 #
 # Setting any of these variables will control which parts of the source tree
@@ -73,14 +72,17 @@ DEFAULT_BUILTIN_CRATE_OPT := 3
          SHADOWD=0 # shadow page cleanup
 
 # These are some options that can be used for stress testing stuff
-        ADDITIONAL_CFGS= 
-#       ADDITIONAL_CFGS=TEST_LOW_MEMORY
+       SMALL_PID=0 # Make a process id be a u8, so it will overflow and run out quickly.
+ TEST_LOW_MEMORY=0 # Only use the backup allocator.
+
+# A list of any other cfgs one wants to pass in.
+ ADDITIONAL_CFGS=
 
 # These are some options that were in-file #defines in the C version. We are making them cfg's now.
  SLAB_CHECK_FREE=1 # Do we have slab checking on.
 # Boolean options specified in this specified in this file that should be
 # included as definitions at compile time
-        COMPILE_CONFIG_BOOLS=" DRIVERS VFS S5FS VM FI DYNAMIC MOUNTING MTP SHADOWD GETCWD UPREEMPT PIPES SLAB_CHECK_FREE "
+        COMPILE_CONFIG_BOOLS=" DRIVERS VFS S5FS VM FI DYNAMIC MOUNTING MTP SHADOWD GETCWD UPREEMPT PIPES SLAB_CHECK_FREE REAL_SPIN_ONCE TEST_LOW_MEMORY SMALL_PID "
 # As above, but not booleans
         COMPILE_CONFIG_DEFS=" NTERMS NDISKS DBG DISK_SIZE BOCHS_INSTALL_DIR "
 
