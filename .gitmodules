@@ -5,3 +5,6 @@
 [submodule "kernel/external/rust"]
 	path = kernel/external/rust
 	url = https://github.com/rust-lang/rust.git
+[submodule "kernel/external/openlibm"]
+	path = kernel/external/openlibm
+	url = https://github.com/JuliaLang/openlibm.git

@@ -119,12 +119,12 @@ $(call copy-rule,external/$(strip $(1))/$(strip $(3)),$$(BUILD_DIR)/external/$(n
 
 ./external/$(strip $(1))/$(strip $(3)) : $$(shell find ./external/$(strip $(1))/$(strip $(4)) -type f -not -path ./external/$(strip $(1))/$(strip $(3)) -not -name "* *") $(strip $(6))
 	@ echo "[MAKE] Recursive make of \"kernel/$$@\"..."
-	$$(HIDE_SIGIL) $$(MAKE) HIDE_SIGIL=$$(HIDE_SIGIL) $$(MFLAGS) --no-print-directory -C external/$(strip $(1)) $(strip $(2)) $(strip $(5))
+	$$(HIDE_SIGIL) $$(MAKE) HIDE_SIGIL=$$(HIDE_SIGIL) $$(MFLAGS) --no-print-directory -C external/$(strip $(1)) $(strip $(2)) $(strip $(5)) $$(SILENT_SUFFIX)
 
 .PHONEY:
 clean-$(strip $(1)):
 	$$(HIDE_SIGIL) rm -f $$(BUILD_DIR)/external/$(notdir $(strip $(3))) 2>/dev/null
-	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C external/$(strip $(1)) clean $(strip $(5)) 2>/dev/null || true
+	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C external/$(strip $(1)) clean $(strip $(5)) $$(SILENT_SUFFIX) 2>/dev/null || true
 endef
 
 # Make rules to build a crate

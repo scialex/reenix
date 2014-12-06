@@ -1,5 +1,0 @@
-Rust annoyingly wants a bunch of functions from libm. Since this
-is not terribly connected to my goal of making a kernel I am
-just taking it from the Julia projects openlibm, downloaded from
-https://github.com/JuliaLang/openlibm on 09/22/14.
-
