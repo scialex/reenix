@@ -73,5 +73,8 @@ mod std {
 // This lets us use the macro's exported from here locally.
 #[doc(hidden)]
 mod base {
-    pub use super::*;
+    pub use super::kernel;
+    pub mod debug {
+        pub use super::super::debug::*;
+    }
 }
