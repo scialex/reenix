@@ -1,3 +1,4 @@
+KERNEL_DIR     := .
 BUILD_DIR      := build
 DOC_DIR        := doc
 CFLAGS         := -ffreestanding
@@ -6,7 +7,6 @@ RDFLAGS        := --no-defaults --passes collapse-docs --passes strip-hidden
 LDFLAGS        := -m elf_i386 -z nodefaultlib
 KERNEL_LDFLAGS := --strip-all
 
-TARGET         := mk/i686-reenix.json
 SYMBOLS        := $(BUILD_DIR)/weenix.dbg
 BSYMBOLS       := $(BUILD_DIR)/symbols.dbg
 KERNEL         := $(BUILD_DIR)/kernel.bin
@@ -14,6 +14,8 @@ IMAGE          := $(BUILD_DIR)/weenix.img
 ISO_IMAGE      := $(BUILD_DIR)/weenix.iso
 GDBCOMM        := $(BUILD_DIR)/gdb-commands
 ISO_DIR        := $(BUILD_DIR)/iso
+# The target if we build LIBCOMPILER_RT from source
+LIBCOMPILER_RT := $(BUILD_DIR)/external/libcompiler-rt.a
 
 ISO_CFG        := $(ISO_DIR)/boot/grub/grub.cfg
 ISO_KERNEL     := $(ISO_DIR)/boot/kernel.bin
@@ -25,35 +27,6 @@ RDFLAGS += -L $(BUILD_DIR)/libs --cfg kernel --target $(TARGET)
 RSFLAGS += -L $(BUILD_DIR)/libs --cfg kernel --target $(TARGET)
 CFLAGS  += -D__KERNEL__
 
-ifeq ("true",$(LD_OPT))
-    LDFLAGS += --gc-sections
-endif
-
-# Get which LIBCOMPILER_RT we will use.
-ifeq (true,$(BUILD_COMPILER_RT))
-    # Build it from the rust tree. This might take a while.
-    LIBCOMPILER_RT_SOURCE := $(BUILD_DIR)/external/libcompiler-rt.a
-else
-    ifneq ("",$(COMPILER_RT_PATH))
-        # Take it from the configured place
-        LIBCOMPILER_RT_SOURCE := $(COMPILER_RT_PATH)
-    else
-        # By default we will just take libgcc.a
-        LIBCOMPILER_RT_SOURCE := $(shell $(CC) $(CFLAGS) -print-libgcc-file-name)
-    endif
-endif
-
-ifneq ("",$(wildcard "$(TARGET)"))
-    TARGET_FILENAME := $(TARGET)
-else
-	$(warning bye)
-    TARGET_FILENAME :=
-endif
-
-# Lets catch missing file errors
-%.c %.S %.rs %.h :
-	$(error unable to find source file '$@'! Are all submodules initialized?)
-
 ###
 
 # Plugins these are in plugins/<name>
@@ -63,7 +36,7 @@ PLUGINS        := enabled hoare bassert
 REENIX_CRATES  := main base mm startup procs drivers util umem
 
 # Crates from the Rust standard library
-BUILTIN_CRATES := alloc core collections unicode
+BUILTIN_CRATES := alloc core collections unicode rand
 
 # Crates from the Rust standard library that have been patched. They are in rustlibs/lib<name>/
 PATCHED_CRATES := libc
@@ -156,6 +129,7 @@ MAIN_REQS := $(filter-out main, $(CRATES)) morestack compiler-rt
 BASIC_REQS := alloc base collections core libc mm
 $(eval $(call crate-rule,      core, ))
 $(eval $(call crate-rule,      libc,        core))
+$(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
 $(eval $(call crate-rule,      base,        core libc))
 $(eval $(call crate-rule,      mm,          core libc base))
@@ -169,7 +143,9 @@ $(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem,    $(DRIVE
 $(eval $(call crate-rule,      main,        $(MAIN_REQS)))
 
 # Make the target for libm
-$(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,.,              \
+$(eval $(call external-targets, openlibm,                                           \
+	libopenlibm.a,                                                                  \
+	libopenlibm.a,. ,                                                               \
 	SFLAGS="-m32 -march=i386"                                                       \
    	LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static"                     \
 	CFLAGS="-Wno-maybe-uninitialized -g3 -gdwarf-3 -m32 -march=i386 -ffreestanding" \
@@ -177,9 +153,11 @@ $(eval $(call external-targets,openlibm,libopenlibm.a,libopenlibm.a,.,          
 
 # Make the targets for building libcompiler-rt.a, if we want to.
 $(eval $(call configure-targets,external/rust,--target=i686-unknown-linux-gnu,Makefile))
-$(eval $(call external-targets,rust,                                                      \
-	i686-unknown-linux-gnu/rt/libcompiler-rt.a,i686-unknown-linux-gnu/rt/libcompiler-rt.a,\
-    src/compiler-rt/,,external/rust/Makefile))
+$(eval $(call external-targets, rust,           \
+	i686-unknown-linux-gnu/rt/libcompiler-rt.a, \
+	i686-unknown-linux-gnu/rt/libcompiler-rt.a, \
+    src/compiler-rt/, ,                         \
+	external/rust/Makefile))
 
 # TODO linking twice is bad and fragile.
 # TODO We really should be modifying $(KERNEL) to make it's paddr's match the vaddr's in its program headers.

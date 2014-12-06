@@ -1,4 +1,5 @@
 SHELL := /bin/sh
+KERNEL_DIR := ../kernel
 
 # XXX why is this here?
 CFLAGS :=

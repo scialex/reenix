@@ -1,5 +1,9 @@
 # A bunch of extra targets for stuff.
 
+# Lets catch missing file errors
+%.c %.S %.rs %.h :
+	$(error unable to find source file '$@'! Are all submodules initialized?)
+
 .PHONY: cscope nyi todo
 
 cscope: $(wildcard include/*/*.h include/*/*/*.h) $(SRC)

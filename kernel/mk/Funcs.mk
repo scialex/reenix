@@ -115,7 +115,7 @@ endef
 # $(6) are any additional prereqs we wish to give
 define external-targets
 
-$(call copy-rule,external/$(1)/$(3),$$(BUILD_DIR)/external/$(notdir $(3)))
+$(call copy-rule,external/$(strip $(1))/$(strip $(3)),$$(BUILD_DIR)/external/$(notdir $(strip $(3))))
 
 ./external/$(strip $(1))/$(strip $(3)) : $$(shell find ./external/$(strip $(1))/$(strip $(4)) -type f -not -path ./external/$(strip $(1))/$(strip $(3)) -not -name "* *") $(strip $(6))
 	@ echo "[MAKE] Recursive make of \"kernel/$$@\"..."

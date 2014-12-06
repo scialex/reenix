@@ -9,22 +9,26 @@
 # Should we show the build commands as we run them?
 HIDE ?= "true"
 
+# What should we build for
+TARGET ?= $(KERNEL_DIR)/mk/i686-reenix.json
+
 # What is the directory where a rust source tree is checked out.
-RUST_SOURCE_DIR ?= external/rust
+RUST_SOURCE_DIR ?= $(KERNEL_DIR)/external/rust
 
 # Build compiler-rt from source. this might take a while.
 BUILD_COMPILER_RT ?= "false"
+#BUILD_COMPILER_RT ?= "true"
+
 # Use this file as libcompiler-rt.a
 COMPILER_RT_PATH ?= ""
 
-# Should we run ld with --gc-sections flag. If ttrue then we will remove unused
+# Should we run ld with --gc-sections flag. If true then we will remove unused
 # sections, making the binary much smaller, we could lose some debug
 # information.
 LD_OPT ?= "true"
 
-# Should we use stack check. FALSE we will not. Anything else we will.
-USE_STACK_CHECK ?= "TRUE"
-#USE_STACK_CHECK=FALSE
+# Should we use stack check. true we will. Anything else we will not.
+USE_STACK_CHECK ?= "true"
 
 # The opt levels for crates.
 DEFAULT_CRATE_OPT := 2
@@ -73,7 +77,7 @@ DEFAULT_CRATE_OPT := 2
 
 # These are some options that can be used for stress testing stuff
        SMALL_PID=0 # Make a process id be a u8, so it will overflow and run out quickly.
- TEST_LOW_MEMORY=0 # Only use the backup allocator.
+ TEST_LOW_MEMORY=0 # Only use the backup allocator. It will give it a much bigger chunk.
 
 # A list of any other cfgs one wants to pass in.
  ADDITIONAL_CFGS=
@@ -82,7 +86,23 @@ DEFAULT_CRATE_OPT := 2
  SLAB_CHECK_FREE=1 # Do we have slab checking on.
 # Boolean options specified in this specified in this file that should be
 # included as definitions at compile time
-        COMPILE_CONFIG_BOOLS=" DRIVERS VFS S5FS VM FI DYNAMIC MOUNTING MTP SHADOWD GETCWD UPREEMPT PIPES SLAB_CHECK_FREE REAL_SPIN_ONCE TEST_LOW_MEMORY SMALL_PID "
+        COMPILE_CONFIG_BOOLS=DRIVERS \
+							 VFS \
+							 S5FS \
+							 VM \
+							 FI \
+							 DYNAMIC \
+							 MOUNTING \
+							 MTP \
+							 SHADOWD \
+							 GETCWD \
+							 UPREEMPT \
+							 PIPES \
+							 SLAB_CHECK_FREE \
+							 REAL_SPIN_ONCE \
+							 TEST_LOW_MEMORY \
+							 SMALL_PID
+
 # As above, but not booleans
         COMPILE_CONFIG_DEFS=" NTERMS NDISKS DBG DISK_SIZE BOCHS_INSTALL_DIR "
 
