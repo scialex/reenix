@@ -1,4 +1,4 @@
-KERNEL_DIR     := .
+PROJECT_ROOT   := ..
 BUILD_DIR      := build
 DOC_DIR        := doc
 CFLAGS         := -ffreestanding
@@ -54,7 +54,9 @@ REENIX_CSRC    := drivers/pci.c               \
                   entry/entry.c
 
 # morestack.S location
-MORESTACK      := $(RUST_SOURCE_DIR)/src/rt/arch/i386/morestack.S
+MORESTACK      := morestack.S
+MORESTACK_DIR  := $(RUST_SOURCE_DIR)/src/rt/arch/i386
+MORESTACK_SRC  := $(MORESTACK_DIR)/$(MORESTACK)
 
 # File containing multiboot header.
 BOOT_FILE      := boot/boot.S
@@ -98,7 +100,7 @@ OBJS := $(call obj-name, $(BOOT_FILE)) \
 
 SECONDARY_OBJS := $(call obj-name, $(MORESTACK)) \
               	  $(call lib-name, morestack)    \
-				  $(call lib-name,compiler-rt)
+				  $(call lib-name, compiler-rt)
 
 RSFLAGS := $(strip $(RSFLAGS))
 RDFLAGS := $(strip $(RDFLAGS))
@@ -126,13 +128,13 @@ $(eval $(call plugin-rule, hoare  ,))
 MAIN_REQS := $(filter-out main, $(CRATES)) morestack compiler-rt
 
 # Reenix Crates.
-BASIC_REQS := alloc base collections core libc mm
+BASIC_REQS := alloc base collections core libc mm $(PLUGINS)
 $(eval $(call crate-rule,      core, ))
 $(eval $(call crate-rule,      libc,        core))
 $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
-$(eval $(call crate-rule,      base,        core libc))
-$(eval $(call crate-rule,      mm,          core libc base))
+$(eval $(call crate-rule,      base,        bassert enabled core libc))
+$(eval $(call crate-rule,      mm,          $(PLUGINS) core libc base))
 $(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_FLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
 $(eval $(call crate-rule,      startup,     $(BASIC_REQS)))
@@ -156,7 +158,7 @@ $(eval $(call configure-targets,external/rust,--target=i686-unknown-linux-gnu,Ma
 $(eval $(call external-targets, rust,           \
 	i686-unknown-linux-gnu/rt/libcompiler-rt.a, \
 	i686-unknown-linux-gnu/rt/libcompiler-rt.a, \
-    src/compiler-rt/, ,                         \
+	src/compiler-rt/, ,                         \
 	external/rust/Makefile))
 
 # TODO linking twice is bad and fragile.
@@ -164,8 +166,10 @@ $(eval $(call external-targets, rust,           \
 $(eval $(call ld-rule,   $(SYMBOLS),  $(OBJS), mk/debug.ld, ))
 $(eval $(call ld-rule,   $(KERNEL),   $(OBJS), mk/link.ld,  $(KERNEL_LDFLAGS)))
 
-# Make libmorestack.a by archiving morestack.o
-$(eval $(call ar-rule,   $(call lib-name,morestack), $(call obj-name, $(MORESTACK))))
+# Make libmorestack.a by archiving compiling morestack.S
+$(eval $(call as-rule, $(call obj-name, $(MORESTACK)), \
+                       $(MORESTACK_SRC)))
+$(eval $(call ar-rule, $(call lib-name,morestack), $(call obj-name, $(MORESTACK))))
 
 # get either libgcc.a or libcompiler-rt.a to where it belongs
 $(eval $(call copy-rule, $(LIBCOMPILER_RT_SOURCE), $(call lib-name,compiler-rt)))
@@ -174,8 +178,8 @@ $(eval $(call copy-rule, $(KERNEL),   $(ISO_KERNEL)))
 $(eval $(call copy-rule, $(GRUB_CFG), $(ISO_CFG)))
 
 # Make sure build-directory dirs are there.
-BUILT_FILES := $(OBJS) $(SECONDARY_OBJS) $(foreach l,$(CRATES),$(call lib-name,$(l)))
-$(eval $(call ensure-build-dir, $(BUILT_FILES)))
+BUILT_FILES := $(OBJS) $(SECONDARY_OBJS) $(call lib-name,$(CRATES))
+$(eval $(call make-build-dir, $(BUILT_FILES)))
 
 $(BSYMBOLS): $(SYMBOLS)
 	@ echo "[ELF ] Generating kernel symbols list..."

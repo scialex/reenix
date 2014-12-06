@@ -40,25 +40,25 @@ endef
 # Get the director name of a crate name
 # $(1) is the name of the crate
 define dir-name
-$($(strip $(1))_DIR)
+$(foreach l,$(1),$($(l)_DIR))
 endef
 # Get the file name of a crate name
 # $(1) is the name of the crate
 define lib-name
-$($(strip $(1))_LIB)
+$(foreach l,$(1),$($(l)_LIB))
 endef
 
 # Get the compiled object's name.
 # $(1) a c/S file to get the object name of
 define obj-name
-$(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(1))))
+$(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(basename $(strip $(1)))))
 endef
 
 # a rule that copies a file.
 # $(1) is the source
 # $(2) is the destination
 define copy-rule
-$(2) : $(1)
+$(strip $(2)) : $(strip $(1))
 	@ echo "[CP  ] Copying \"kernel/$$@\"..."
 	$$(HIDE_SIGIL) mkdir -p $$(dir $$@)
 	$$(HIDE_SIGIL) cp $$< $$@
@@ -70,7 +70,7 @@ endef
 # $(3) is the ld to give the linker
 # $(4) is the extra ldflags to pass
 define ld-rule
-$(1) : $(2) $(3) | $$(dir $(1))
+$(strip $(1)) : $(strip $(2)) $(strip $(3))
 	@ echo "[LD  ] Linking for \"kernel/$$@\"..."
 ifeq ("",$(3))
 	$$(HIDE_SIGIL) $$(LD) $$(LDFLAGS) $(4) $(2) -o $$@
@@ -81,9 +81,39 @@ endef
 
 # invoke the archiver
 define ar-rule
-$(1) : $(2)
+$(strip $(1)) : $(strip $(2))
 	@ echo "[AR  ] Archiving for \"kernel/$$@\"..."
 	$$(HIDE_SIGIL) $$(AR) qsc $$@ $$<
+endef
+
+# invoke as
+# $(1) is the object to compile
+# $(2) is the source files.
+define as-rule
+$(strip $(1)) : $(strip $(2))
+	@ echo "[AS  ] Compiling \"kernel/$$<\"..."
+	$$(HIDE_SIGIL) $$(CC) -c $$(ASFLAGS) $$(CFLAGS) $$< -o $$@
+
+endef
+
+# invoke cc
+# $(1) is the object to compile
+# $(2) is the source files.
+define cc-rule
+$(strip $(1)) : $(strip $(2))
+	@ echo "[CC  ] Compiling \"kernel/$$<\"..."
+	$$(HIDE_SIGIL) $$(CC) -c $$(CFLAGS) $$< -o $$@
+
+endef
+
+# compile one file
+# $(1) the file to compile
+define compile-rule
+    ifeq (.c,$(strip $(suffix $(2))))
+       $(call cc-rule, $(call obj-name, $(1)), $(1))
+    else ifeq (.S,$(strip $(suffix $(2))))
+       $(call as-rule, $(call obj-name, $(1)), $(1))
+    endif
 endef
 
 # run ./configure on a target
@@ -93,16 +123,16 @@ endef
 define configure-targets
 $(addprefix $(1)/,$(3)) : $(1)/configure
 	@ echo "[CONF] configuring \"kernel/$$@\"..."
-	$$(HIDE_SIGIL) cd $(1) && ./configure $(2) $(SILENT_SUFFIX)
+	$$(HIDE_SIGIL) cd $(1) && ./configure $(2) $$(SILENT_SUFFIX)
 endef
 
 # $(1) the objects that need directories.
-define ensure-build-dir
+define make-build-dir
 # Make sure build-directory dirs are there.
-$(1) : | $(foreach l,$(1), $(dir $(l)))
-$(sort $(foreach l,$(1), $(dir $(l)))) :
+$(1) : | $(sort $(dir $(1)))
+$(sort $(dir $(1))) :
 	@ echo "[MKDR] Make build-directory \"kernel/$$@\"..."
-	$(HIDE_SIGIL) mkdir -p $$@
+	$$(HIDE_SIGIL) mkdir -p $$@
 
 endef
 
@@ -115,16 +145,16 @@ endef
 # $(6) are any additional prereqs we wish to give
 define external-targets
 
-$(call copy-rule,external/$(strip $(1))/$(strip $(3)),$$(BUILD_DIR)/external/$(notdir $(strip $(3))))
+$(call copy-rule,$(PROJECT_ROOT)/external/$(strip $(1))/$(strip $(3)),$$(BUILD_DIR)/external/$(notdir $(strip $(3))))
 
-./external/$(strip $(1))/$(strip $(3)) : $$(shell find ./external/$(strip $(1))/$(strip $(4)) -type f -not -path ./external/$(strip $(1))/$(strip $(3)) -not -name "* *") $(strip $(6))
+$$(PROJECT_ROOT)/external/$(strip $(1))/$(strip $(3)) : $$(shell find $$(PROJECT_ROOT)/external/$(strip $(1))/$(strip $(4)) -type f -not -path $$(PROJECT_ROOT)/external/$(strip $(1))/$(strip $(3)) -not -name "* *") $(strip $(6))
 	@ echo "[MAKE] Recursive make of \"kernel/$$@\"..."
-	$$(HIDE_SIGIL) $$(MAKE) HIDE_SIGIL=$$(HIDE_SIGIL) $$(MFLAGS) --no-print-directory -C external/$(strip $(1)) $(strip $(2)) $(strip $(5)) $$(SILENT_SUFFIX)
+	$$(HIDE_SIGIL) $$(MAKE) HIDE_SIGIL=$$(HIDE_SIGIL) $$(MFLAGS) --no-print-directory -C $$(PROJECT_ROOT)/external/$(strip $(1)) $(strip $(2)) $(strip $(5)) $$(SILENT_SUFFIX)
 
 .PHONEY:
 clean-$(strip $(1)):
 	$$(HIDE_SIGIL) rm -f $$(BUILD_DIR)/external/$(notdir $(strip $(3))) 2>/dev/null
-	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C external/$(strip $(1)) clean $(strip $(5)) $$(SILENT_SUFFIX) 2>/dev/null || true
+	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C $$(PROJECT_ROOT)/external/$(strip $(1)) clean $(strip $(5)) $$(SILENT_SUFFIX) 2>/dev/null || true
 endef
 
 # Make rules to build a crate
@@ -136,9 +166,8 @@ endef
 define base-crate-rule
 
 $(call lib-name,$(1)) : $$(shell find $(call dir-name,$(1)) -type f -name "*.rs") \
-                          $$(foreach l,$(2), $$(call lib-name,$$(l)))             \
-						  $(5)                                                    \
-                        | $$(dir $$(call lib-name,$(2)))
+                          $$(call lib-name,$(2))                                  \
+						  $(5)
 	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..." # for \"kernel/$$@\""
 	$$(HIDE_SIGIL) $$(RUST) $$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))) \
 		                    $(3)                                                       \
@@ -147,7 +176,7 @@ $(call lib-name,$(1)) : $$(shell find $(call dir-name,$(1)) -type f -name "*.rs"
 
 $(call doc-name,$(1)) : $$(shell find $(call dir-name,$(1)) -type f -name "*.rs") \
 	                    $(5)                                                      \
-						$$(foreach l,$(2), $$(call lib-name,$$(l)))
+						$$(call lib-name,$(2))
 	@ echo "[RDOC] Documenting \"kernel/$$(call dir-name,$(1))\"..."
 	$$(HIDE_SIGIL) $$(RUSTDOC) $$(foreach l,$(2),--extern $$(l)=$$(call lib-name,$$(l))) \
 	                           $(4)                                                      \
@@ -161,7 +190,7 @@ endef
 # $(2) is the list of dependencies
 # $(3) is a list of custom rust flags
 define long-crate-rule
-$(eval $(call base-crate-rule,$(strip $(1)),$(2) $$(PLUGINS),$(3) $$(RSFLAGS),$$(RDFLAGS),$$(TARGET_FILENAME)))
+$(eval $(call base-crate-rule,$(strip $(1)),$(2) ,$(3) $$(RSFLAGS),$$(RDFLAGS),$$(TARGET_FILENAME)))
 endef
 
 # A Crate

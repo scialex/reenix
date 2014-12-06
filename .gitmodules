@@ -2,9 +2,9 @@
 	path = doc
 	url = https://github.com/scialex/empty.git
 	branch = master
-[submodule "kernel/external/rust"]
-	path = kernel/external/rust
+[submodule "external/rust"]
+	path = external/rust
 	url = https://github.com/rust-lang/rust.git
-[submodule "kernel/external/openlibm"]
-	path = kernel/external/openlibm
+[submodule "external/openlibm"]
+	path = external/openlibm
 	url = https://github.com/JuliaLang/openlibm.git

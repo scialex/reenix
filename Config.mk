@@ -10,10 +10,10 @@
 HIDE ?= "true"
 
 # What should we build for
-TARGET ?= $(KERNEL_DIR)/mk/i686-reenix.json
+TARGET ?= $(PROJECT_ROOT)/kernel/mk/i686-reenix.json
 
 # What is the directory where a rust source tree is checked out.
-RUST_SOURCE_DIR ?= $(KERNEL_DIR)/external/rust
+RUST_SOURCE_DIR ?= $(PROJECT_ROOT)/external/rust
 
 # Build compiler-rt from source. this might take a while.
 BUILD_COMPILER_RT ?= "false"

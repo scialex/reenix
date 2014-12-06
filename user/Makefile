@@ -1,5 +1,5 @@
 SHELL := /bin/sh
-KERNEL_DIR := ../kernel
+PROJECT_ROOT   := ..
 
 # XXX why is this here?
 CFLAGS :=
