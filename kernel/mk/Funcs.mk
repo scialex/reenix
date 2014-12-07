@@ -6,11 +6,48 @@ define doc-name
 $(DOC_DIR)/$(1)/index.html
 endef
 
+# Create a local variable to be destroyed with local-var-destroy
+# $(1) the name of the variable
+# $(2) the initial value
+define local-var-init
+    ifneq (,$(value $(value 1)))
+        $$(error local variable $(1) is in use and is "$($(1))"!)
+    endif
+    $(eval $(value 1) := $(strip $(value 2)))
+endef
+
+# destroy local variable.
+define local-var-destroy
+$(1) :=
+endef
+# destroy local variables.
+define local-vars-destroy
+$(foreach l,$(1),$(eval $(call local-var-destroy,$(l))))
+endef
+
 # $(1) is the name of the crate
 # $(2) is the directory it is in.
 define set-base-crate-name
-$(strip $(1))_LIB := $$(BUILD_DIR)/libs/$$(shell $$(RUST) --print-file-name $(strip $(2))/lib.rs)
-$(strip $(1))_DIR := $(strip $(2))
+$(call local-var-init,TMP_SBCN_TYPE,)
+
+ifneq (,$$(findstring $(1),$$(STATIC_CRATES)))
+    TMP_SBCN_TYPE := staticlib
+else ifneq (,$$(findstring $(1),$$(DYLIB_CRATES)))
+    TMP_SBCN_TYPE := dylib
+else ifneq (,$$(findstring $(1),$$(BINARY_CRATES)))
+    TMP_SBCN_TYPE := bin
+else ifneq (,$$(findstring $(1),$$(LIB_CRATES)))
+    TMP_SBCN_TYPE := lib
+else ifneq (,$$(findstring $(1),$$(RLIB_CRATES)))
+    TMP_SBCN_TYPE := rlib
+else
+    $$(error $(1) is not given any type of crate!)
+endif
+$(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) --crate-type $$(TMP_SBCN_TYPE) --print-file-name $(strip $(2))/lib.rs))
+$(strip $(1))_DIR  := $(strip $(2))
+$(strip $(1))_TYPE := $$(TMP_SBCN_TYPE)
+
+$(call local-var-destroy,TMP_SBCN_TYPE)
 endef
 
 define set-lib-name
@@ -48,6 +85,10 @@ define lib-name
 $(foreach l,$(1),$($(l)_LIB))
 endef
 
+define lib-type
+$($(1)_TYPE)
+endef
+
 # Get the compiled object's name.
 # $(1) a c/S file to get the object name of
 define obj-name
@@ -83,7 +124,7 @@ endef
 define ar-rule
 $(strip $(1)) : $(strip $(2))
 	@ echo "[AR  ] Archiving for \"kernel/$$@\"..."
-	$$(HIDE_SIGIL) $$(AR) qsc $$@ $$<
+	$$(HIDE_SIGIL) $$(AR) rsc $$@ $$<
 endef
 
 # invoke as
@@ -104,16 +145,6 @@ $(strip $(1)) : $(strip $(2))
 	@ echo "[CC  ] Compiling \"kernel/$$<\"..."
 	$$(HIDE_SIGIL) $$(CC) -c $$(CFLAGS) $$< -o $$@
 
-endef
-
-# compile one file
-# $(1) the file to compile
-define compile-rule
-    ifeq (.c,$(strip $(suffix $(2))))
-       $(call cc-rule, $(call obj-name, $(1)), $(1))
-    else ifeq (.S,$(strip $(suffix $(2))))
-       $(call as-rule, $(call obj-name, $(1)), $(1))
-    endif
 endef
 
 # run ./configure on a target
@@ -144,17 +175,24 @@ endef
 # $(5) are any flags we wish to pass down.
 # $(6) are any additional prereqs we wish to give
 define external-targets
+$(call local-var-init, TMP_EXT_TARGET,       $$(BUILD_DIR)/external/$(notdir $(strip $(3))))
+$(call local-var-init, TMP_EXT_DIR,          $$(PROJECT_ROOT)/external/$(strip $(1)))
+$(call local-var-init, TMP_EXT_INTERMEDIATE, $(TMP_EXT_DIR)/$(strip $(3)))
+$(call local-var-init, TMP_EXT_SOURCE,       $(TMP_EXT_DIR)/$(strip $(4)))
+$(call local-var-init, TMP_EXT_PREREQS,      $$(shell find $(TMP_EXT_SOURCE) -type f -not -path $(TMP_EXT_INTERMEDIATE) -not -name "* *"))
 
-$(call copy-rule,$(PROJECT_ROOT)/external/$(strip $(1))/$(strip $(3)),$$(BUILD_DIR)/external/$(notdir $(strip $(3))))
+$(call copy-rule, $(TMP_EXT_INTERMEDIATE), $(TMP_EXT_TARGET))
 
-$$(PROJECT_ROOT)/external/$(strip $(1))/$(strip $(3)) : $$(shell find $$(PROJECT_ROOT)/external/$(strip $(1))/$(strip $(4)) -type f -not -path $$(PROJECT_ROOT)/external/$(strip $(1))/$(strip $(3)) -not -name "* *") $(strip $(6))
+$(TMP_EXT_INTERMEDIATE) : $(TMP_EXT_PREREQS) $(strip $(6))
 	@ echo "[MAKE] Recursive make of \"kernel/$$@\"..."
-	$$(HIDE_SIGIL) $$(MAKE) HIDE_SIGIL=$$(HIDE_SIGIL) $$(MFLAGS) --no-print-directory -C $$(PROJECT_ROOT)/external/$(strip $(1)) $(strip $(2)) $(strip $(5)) $$(SILENT_SUFFIX)
+	$$(HIDE_SIGIL) $$(MAKE) HIDE_SIGIL=$$(HIDE_SIGIL) $$(MFLAGS) --no-print-directory -C $(TMP_EXT_DIR) $(strip $(2)) $(strip $(5)) $$(SILENT_SUFFIX)
 
 .PHONEY:
-clean-$(strip $(1)):
-	$$(HIDE_SIGIL) rm -f $$(BUILD_DIR)/external/$(notdir $(strip $(3))) 2>/dev/null
-	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C $$(PROJECT_ROOT)/external/$(strip $(1)) clean $(strip $(5)) $$(SILENT_SUFFIX) 2>/dev/null || true
+clean-$(strip $(1)) :
+	$$(HIDE_SIGIL) $(RM) $(TMP_EXT_TARGET) 2>/dev/null
+	$$(HIDE_SIGIL) $$(MAKE) $$(MFLAGS) $$(SILENT_FLAG) -C $(TMP_EXT_DIR) clean $(strip $(5)) $$(SILENT_SUFFIX) 2>/dev/null || true
+
+$(call local-vars-destroy, TMP_EXT_DIR TMP_EXT_TARGET TMP_EXT_INTERMEDIATE TMP_EXT_SOURCE TMP_EXT_TARGET TMP_EXT_PREREQS)
 endef
 
 # Make rules to build a crate
@@ -164,25 +202,25 @@ endef
 # $(4) is any rustdoc flags you want.
 # $(5) is any addional files to depend on
 define base-crate-rule
+$(call local-var-init, TMP_BCR_RSFILES,$$(shell find $(call dir-name,$(1)) -type f -name "*.rs"))
+$(call local-var-init, TMP_BCR_CRATES,)
 
-$(call lib-name,$(1)) : $$(shell find $(call dir-name,$(1)) -type f -name "*.rs") \
-                          $$(call lib-name,$(2))                                  \
-						  $(5)
-	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..." # for \"kernel/$$@\""
+$(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(call lib-name,$(2))
+	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..."
 	$$(HIDE_SIGIL) $$(RUST) $$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))) \
-		                    $(3)                                                       \
+		                    $(3) --crate-type $(call lib-type,$(1))                    \
 						   	$$(call dir-name,$(1))/lib.rs                              \
 						   	--out-dir $$(dir $(call lib-name,$(1)))
 
-$(call doc-name,$(1)) : $$(shell find $(call dir-name,$(1)) -type f -name "*.rs") \
-	                    $(5)                                                      \
-						$$(call lib-name,$(2))
+$(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $$(call lib-name,$(2))
 	@ echo "[RDOC] Documenting \"kernel/$$(call dir-name,$(1))\"..."
 	$$(HIDE_SIGIL) $$(RUSTDOC) $$(foreach l,$(2),--extern $$(l)=$$(call lib-name,$$(l))) \
 	                           $(4)                                                      \
 							   --output $$(DOC_DIR)                                      \
 							   $$(call dir-name,$(1))/lib.rs
 
+$(call local-var-destroy, TMP_BCR_RSFILES)
+$(call local-var-destroy, TMP_BCR_CRATES)
 endef
 
 # A Crate with custom flags

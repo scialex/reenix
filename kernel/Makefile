@@ -36,15 +36,26 @@ PLUGINS        := enabled hoare bassert
 REENIX_CRATES  := main base mm startup procs drivers util umem
 
 # Crates from the Rust standard library
-BUILTIN_CRATES := alloc core collections unicode rand
+BUILTIN_CRATES := alloc arena core collections unicode rand
 
 # Crates from the Rust standard library that have been patched. They are in rustlibs/lib<name>/
 PATCHED_CRATES := libc
 
 # Crates that are not really part of the stdlib or kernel. They are in rustlibs/<name>/
-OTHER_CRATES   :=
+OTHER_CRATES   := basic
 
 CRATES         := $(REENIX_CRATES) $(BUILTIN_CRATES) $(PLUGINS) $(PATCHED_CRATES) $(OTHER_CRATES)
+
+# Crates that should be made as dylibs.
+DYLIB_CRATES   := $(PLUGINS)
+# Crates that should be made as staticlibs
+STATIC_CRATES  := main
+# Crates that should be made as libs
+LIB_CRATES     :=
+# Cratest that should be made as binaries
+BINARY_CRATES  :=
+# Crates that should be made as rlibs
+RLIB_CRATES    := $(filter-out $(DYLIB_CRATES) $(STATIC_CRATES) $(LIB_CRATES) $(BINARY_CRATES), $(CRATES))
 
 # C code helpers for Rust
 REENIX_CSRC    := drivers/pci.c               \
@@ -116,6 +127,7 @@ docs: $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 # We need to tell liballoc to use our memory manager.
 LIBALLOC_FLAGS := -A dead_code --cfg external_crate --extern external=$(call lib-name,mm) \
                   --opt-level=$(DEFAULT_CRATE_OPT)
+LIBARENA_FLAGS := --extern std=$(call lib-name,basic) --opt-level=$(DEFAULT_CRATE_OPT)
 # TODO For some reason LLVM doesn't like -O2 in drivers.
 DRIVERS_FLAGS  := --opt-level=1
 
@@ -129,7 +141,7 @@ MAIN_REQS := $(filter-out main, $(CRATES)) morestack compiler-rt
 
 # Reenix Crates.
 BASIC_REQS := alloc base collections core libc mm $(PLUGINS)
-$(eval $(call crate-rule,      core, ))
+$(eval $(call crate-rule,      core,  ))
 $(eval $(call crate-rule,      libc,        core))
 $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
@@ -137,6 +149,9 @@ $(eval $(call crate-rule,      base,        bassert enabled core libc))
 $(eval $(call crate-rule,      mm,          $(PLUGINS) core libc base))
 $(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_FLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
+# basic is a libstd mock with core, alloc and collections.
+$(eval $(call crate-rule,      basic,       core alloc collections))
+$(eval $(call long-crate-rule, arena,       basic,                       $(LIBARENA_FLAGS)))
 $(eval $(call crate-rule,      startup,     $(BASIC_REQS)))
 $(eval $(call crate-rule,      util,        $(BASIC_REQS)))
 $(eval $(call crate-rule,      procs,       $(BASIC_REQS) util startup))
@@ -202,10 +217,10 @@ $(BUILD_DIR)/%.o: %.S
 	$(HIDE_SIGIL) $(CC) -g3 -c $(ASFLAGS) $(CFLAGS) $< -o $@
 
 tidy:
-	$(HIDE_SIGIL) rm -f	cscope*.out cscope.files 2>/dev/null
-	$(HIDE_SIGIL) rm -rf $(BUILD_DIR)            2>/dev/null
+	$(HIDE_SIGIL) $(RM) cscope*.out cscope.files 2>/dev/null
+	$(HIDE_SIGIL) $(RM) -r $(BUILD_DIR)          2>/dev/null
 
 clean: tidy $(foreach d,$(EXTERNAL_LIBS) $(EXTERNAL_DEPS),clean-$(d))
-	$(HIDE_SIGIL) rm -rf $(DOC_DIR)
+	$(HIDE_SIGIL) $(RM) -r $(DOC_DIR)
 
 include mk/Helpers.mk
