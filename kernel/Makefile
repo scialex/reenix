@@ -29,9 +29,6 @@ CFLAGS  += -D__KERNEL__
 
 ###
 
-# Plugins these are in plugins/<name>
-PLUGINS        := enabled hoare bassert
-
 # Crates for the kernel. they are in <name>/
 REENIX_CRATES  := main base mm startup procs drivers util umem
 
@@ -44,18 +41,10 @@ PATCHED_CRATES := libc
 # Crates that are not really part of the stdlib or kernel. They are in rustlibs/<name>/
 OTHER_CRATES   := basic
 
-CRATES         := $(REENIX_CRATES) $(BUILTIN_CRATES) $(PLUGINS) $(PATCHED_CRATES) $(OTHER_CRATES)
-
-# Crates that should be made as dylibs.
-DYLIB_CRATES   := $(PLUGINS)
-# Crates that should be made as staticlibs
-STATIC_CRATES  := main
-# Crates that should be made as libs
-LIB_CRATES     :=
-# Cratest that should be made as binaries
-BINARY_CRATES  :=
-# Crates that should be made as rlibs
-RLIB_CRATES    := $(filter-out $(DYLIB_CRATES) $(STATIC_CRATES) $(LIB_CRATES) $(BINARY_CRATES), $(CRATES))
+# Plugins these are in plugins/<name>
+HOST_CRATES    := enabled hoare bassert
+TARGET_CRATES  := $(REENIX_CRATES) $(BUILTIN_CRATES) $(PATCHED_CRATES) $(OTHER_CRATES)
+CRATES         := $(HOST_CRATES) $(TARGET_CRATES)
 
 # C code helpers for Rust
 REENIX_CSRC    := drivers/pci.c               \
@@ -95,7 +84,7 @@ EXTERNAL_DEPS  := rust
 # Set all the name/dir metadata.
 $(foreach dr, $(REENIX_CRATES),  $(call set-crate-name,$(dr)))
 $(foreach dr, $(BUILTIN_CRATES), $(call set-builtin-crate-name,$(dr)))
-$(foreach dr, $(PLUGINS),        $(call set-plugin-crate-name,$(dr)))
+$(foreach dr, $(HOST_CRATES),    $(call set-plugin-crate-name,$(dr)))
 $(foreach dr, $(PATCHED_CRATES), $(call set-patched-crate-name,$(dr)))
 $(foreach dr, $(OTHER_CRATES),   $(call set-other-crate-name,$(dr)))
 
@@ -140,13 +129,13 @@ $(eval $(call plugin-rule, hoare  ,))
 MAIN_REQS := $(filter-out main, $(CRATES)) morestack compiler-rt
 
 # Reenix Crates.
-BASIC_REQS := alloc base collections core libc mm $(PLUGINS)
+BASIC_REQS := alloc base collections core libc mm $(HOST_CRATES)
 $(eval $(call crate-rule,      core,  ))
 $(eval $(call crate-rule,      libc,        core))
 $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
 $(eval $(call crate-rule,      base,        bassert enabled core libc))
-$(eval $(call crate-rule,      mm,          $(PLUGINS) core libc base))
+$(eval $(call crate-rule,      mm,          $(HOST_CRATES) core libc base))
 $(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_FLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
 # basic is a libstd mock with core, alloc and collections.

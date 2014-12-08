@@ -4,7 +4,7 @@
     "target-endian": "little",
     "target-word-size": "32",
     "linker-is-gnu": true,
-    "dynamic-linking": true,
+    "dynamic-linking": false,
     "arch": "x86",
     "os": "reenix",
     "morestack": true,

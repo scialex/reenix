@@ -28,26 +28,18 @@ endef
 # $(1) is the name of the crate
 # $(2) is the directory it is in.
 define set-base-crate-name
-$(call local-var-init,TMP_SBCN_TYPE,)
+$(call local-var-init,TMP_SBCN_FLAG,)
 
-ifneq (,$$(findstring $(1),$$(STATIC_CRATES)))
-    TMP_SBCN_TYPE := staticlib
-else ifneq (,$$(findstring $(1),$$(DYLIB_CRATES)))
-    TMP_SBCN_TYPE := dylib
-else ifneq (,$$(findstring $(1),$$(BINARY_CRATES)))
-    TMP_SBCN_TYPE := bin
-else ifneq (,$$(findstring $(1),$$(LIB_CRATES)))
-    TMP_SBCN_TYPE := lib
-else ifneq (,$$(findstring $(1),$$(RLIB_CRATES)))
-    TMP_SBCN_TYPE := rlib
+ifneq (,$$(findstring $(1),$$(HOST_CRATES)))
+    TMP_SBCN_FLAG :=
+else ifneq (,$$(findstring $(1),$$(TARGET_CRATES)))
+    TMP_SBCN_FLAG := --target $(TARGET)
 else
     $$(error $(1) is not given any type of crate!)
 endif
-$(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) --crate-type $$(TMP_SBCN_TYPE) --print-file-name $(strip $(2))/lib.rs))
+$(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) $$(TMP_SBCN_FLAG) --print-file-name $(strip $(2))/lib.rs 2>/dev/null))
 $(strip $(1))_DIR  := $(strip $(2))
-$(strip $(1))_TYPE := $$(TMP_SBCN_TYPE)
-
-$(call local-var-destroy,TMP_SBCN_TYPE)
+$(call local-var-destroy,TMP_SBCN_FLAG)
 endef
 
 define set-lib-name
@@ -83,10 +75,6 @@ endef
 # $(1) is the name of the crate
 define lib-name
 $(foreach l,$(1),$($(l)_LIB))
-endef
-
-define lib-type
-$($(1)_TYPE)
 endef
 
 # Get the compiled object's name.
@@ -208,8 +196,7 @@ $(call local-var-init, TMP_BCR_CRATES,)
 $(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(call lib-name,$(2))
 	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..."
 	$$(HIDE_SIGIL) $$(RUST) $$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))) \
-		                    $(3) --crate-type $(call lib-type,$(1))                    \
-						   	$$(call dir-name,$(1))/lib.rs                              \
+		                    $(3) $$(call dir-name,$(1))/lib.rs                         \
 						   	--out-dir $$(dir $(call lib-name,$(1)))
 
 $(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $$(call lib-name,$(2))
