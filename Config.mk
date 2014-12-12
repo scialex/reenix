@@ -38,7 +38,7 @@ DEFAULT_CRATE_OPT := 2
 # are built. To enable something set it to 1, otherwise set it to 0.
 #
      DRIVERS=1
-         VFS=0
+         VFS=1
         S5FS=0
           VM=0
      DYNAMIC=0

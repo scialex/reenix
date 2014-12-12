@@ -12,6 +12,7 @@ use alloc::rc::*;
 use util::pinnable_cache::*;
 use alloc::boxed::*;
 use base::devices::*;
+use traits::VNode;
 
 // Cheating to get a uuid by just incrementing a counter. This is not really good in general but we
 // have 48 bits, which means we will probably never really run out...
@@ -23,19 +24,6 @@ static mut NEXT_ID : MMObjId = MMObjId(FAKE_DEVICE,0);
 
 impl MMObjId {
     pub fn new(dev: DeviceId, n: u32) -> MMObjId { MMObjId(dev, n) }
-    /// Create a globaly unique MMObjId
-    pub fn unique() -> MMObjId {
-        let out = unsafe { NEXT_ID };
-        let MMObjId(dev, cnt) = out;
-        unsafe {
-            NEXT_ID = if cnt + 1 == 0 {
-                MMObjId(DeviceId::create(dev.get_major(), dev.get_minor() + 1), 0)
-            } else {
-                MMObjId(dev, cnt + 1)
-            };
-        }
-        out
-    }
 }
 
 impl PartialOrd for MMObjId { fn partial_cmp(&self, other: &MMObjId) -> Option<Ordering> { Some(self.cmp(other)) } }
@@ -53,7 +41,7 @@ impl Ord for MMObjId {
 
 /// An mmobj that needs interior mutability. This is used just like a regular mmobj through the use
 /// of cells.
-pub trait MMObjMut : fmt::Show + Cacheable {
+pub trait MMObjMut {
     /// Return an MMObjId for this object.
     fn get_id(&self) -> MMObjId;
 
@@ -85,7 +73,7 @@ pub trait MMObjMut : fmt::Show + Cacheable {
     fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "mmobj_mut for {}", self.get_id()) }
 }
 
-pub trait MMObj : Cacheable {
+pub trait MMObj {
     /// Return an MMObjId for this object.
     fn get_id(&self) -> MMObjId;
 
@@ -105,7 +93,7 @@ pub trait MMObj : Cacheable {
      */
     // TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
     // better. Using this stuff is annoying.
-    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: uint, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
+    fn lookup_page(this: Rc<T>, pagenum: uint, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
         pframe::PFrame::get(this, pagenum)
     }
 

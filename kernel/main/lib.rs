@@ -6,9 +6,10 @@
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
-#![feature(globs, phase, macro_rules, asm, if_let, unsafe_destructor,lang_items)]
+#![feature(globs, phase, macro_rules, asm, unsafe_destructor,lang_items)]
 
 
+#[phase(plugin)] extern crate bassert;
 #[phase(plugin, link)] extern crate core;
 #[phase(plugin, link)] extern crate base;
 #[phase(plugin, link)] extern crate procs;
@@ -107,6 +108,7 @@ pub extern "C" fn bootstrap(_: i32, _: *mut c_void) -> *mut c_void {
 }
 
 fn shutdown() -> ! {
+    dbg!(debug::CORE, "Final Shutdown");
     drivers::bytedev::shutdown();
     kernel::halt();
 }
@@ -129,13 +131,22 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     cleanup_bootstrap_function();
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
     finish_init();
-    assert!(KProc::new(String::from_str("Init Proc"), init_proc_run, 0, 0 as *mut c_void).is_ok(),
+    bassert!(KProc::new(String::from_str("Init Proc"), init_proc_run, 0, 0 as *mut c_void) == Ok(ProcId(1)),
             "Unable to create init proc");
-    let x = KProc::waitpid(Pid(ProcId(1)), 0);
-    dbg!(debug::CORE, "done with waitpid");
-    match x {
-        Ok((pid, pst)) => { dbg!(debug::CORE, "Returned {}, 0x{:x}", pid, pst); },
-        Err(errno) => {dbg!(debug::CORE, "returned errno {}", errno);}
+    let pageoutd_id = KProc::new(String::from_str("PageOutD"), umem::pageoutd_run, 0, 0 as *mut c_void).unwrap();
+    dbg!(debug::CORE, "pageoutd is {}", pageoutd_id);
+
+    match KProc::waitpid(Pid(ProcId(1)), 0) {
+        Ok((pid, pst)) => { dbg!(debug::CORE, "init Returned {}, 0x{:x}", pid, pst); },
+        Err(errno) => {dbg!(debug::CORE, "init returned errno {}", errno);}
+    }
+
+    let pgd = KProc::get_proc(&pageoutd_id).expect("Pageoutd was reaped!?");
+    pgd.borrow_mut().kill(0);
+    drop(pgd);
+    match KProc::waitpid(Pid(pageoutd_id), 0) {
+        Ok((pid, pst)) => { dbg!(debug::CORE, "pagetoutd Returned {}, 0x{:x}", pid, pst); },
+        Err(errno) => {kpanic!("pageoutd returned errno {}", errno); }
     }
     shutdown();
 }
@@ -143,6 +154,7 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
 extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     interrupt::enable();
     dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
+
     kshell::start(0);
     loop {
         let x = KProc::waitpid(kproc::Any, 0);

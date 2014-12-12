@@ -372,8 +372,8 @@ impl KProc {
         return Ok(pid);
     }
 
-    pub fn get_pid(&self) -> &ProcId {
-        &self.pid
+    pub fn get_pid(&self) -> ProcId {
+        self.pid
     }
 
     /// This has nothing to do with signals and kill(1).
@@ -412,11 +412,15 @@ impl KProc {
         dbg!(debug::PROC, "{} cleaning up. Sending wakeup to parent {}, exit status was 0x{:x}", self, parent.borrow(), status);
         self.status = status;
         self.state = ProcState::DEAD;
-        let init = init_proc!();
-        for (pid, child) in self.children.iter() {
-            dbg!(debug::PROC, "moving {} to init proc", pid);
-            (**child).borrow_mut().parent = Some(init.clone().downgrade());
-            init.borrow_mut().children.insert(pid.clone(), child.clone());
+        if parent.borrow().get_pid() != IDLE_PID {
+            let init = init_proc!();
+            for (pid, child) in self.children.iter() {
+                dbg!(debug::PROC, "moving {} to init proc", pid);
+                (**child).borrow_mut().parent = Some(init.clone().downgrade());
+                init.borrow_mut().children.insert(pid.clone(), child.clone());
+            }
+        } else {
+            bassert!(self.children.len() == 0);
         }
         // get rid of our ref's to the children.
         self.children.clear();

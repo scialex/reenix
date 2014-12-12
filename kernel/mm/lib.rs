@@ -9,7 +9,7 @@
 #![allow(non_camel_case_types)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(phase, globs, macro_rules, asm, if_let, tuple_indexing)]
+#![feature(phase, globs, macro_rules, asm)]
 #![no_std]
 
 #[phase(plugin)] extern crate hoare;
@@ -20,7 +20,9 @@
 extern crate libc;
 
 use libc::{c_void, size_t};
+/// Reexports for liballoc.
 pub use alloc::{AllocError, Allocation, allocate, deallocate, reallocate};
+/// Reexports for liballoc.
 pub use alloc::{reallocate_inplace, usable_size, stats_print};
 
 /// Initialize this crate. This must be called exactly once during startup.

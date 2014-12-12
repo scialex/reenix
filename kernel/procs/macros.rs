@@ -2,6 +2,11 @@
 #![macro_escape]
 
 #[macro_export]
+macro_rules! add_file(
+    ($s:expr) => ({ concat!(file!(),":",line!()," ", $s) })
+)
+
+#[macro_export]
 macro_rules! current_thread(
     () => ({
         use startup::gdt;
@@ -9,9 +14,9 @@ macro_rules! current_thread(
         use procs::kthread::{CUR_THREAD_SLOT, KThread};
         use core::ptr::RawMutPtr;
         unsafe {
-            (**gdt::get_tsd().get_slot(CUR_THREAD_SLOT).expect("CUR_THREAD slot not used"))
-                             .downcast_ref::<*mut KThread>().expect("Item at cur_thread was the wrong type")
-                             .as_mut().expect("KThread was null")
+            (**gdt::get_tsd().get_slot(CUR_THREAD_SLOT).expect(add_file!("CUR_THREAD slot not used")))
+                             .downcast_ref::<*mut KThread>().expect(add_file!("Item at cur_thread was the wrong type"))
+                             .as_mut().expect(add_file!("KThread was null"))
         }
     })
 )
@@ -20,7 +25,7 @@ macro_rules! current_thread(
 macro_rules! idle_proc(
     () => ({
         use procs::kproc::IDLE_PROC;
-        unsafe { IDLE_PROC.as_mut().expect("IDLE_PROC is not yet set") }
+        unsafe { IDLE_PROC.as_mut().expect(add_file!("IDLE_PROC is not yet set")) }
     })
 )
 
@@ -28,13 +33,8 @@ macro_rules! idle_proc(
 macro_rules! init_proc(
     () => ({
         use procs::kproc::INIT_PROC;
-        unsafe { INIT_PROC.as_mut().expect("INIT_PROC is not yet set") }
+        unsafe { INIT_PROC.as_mut().expect(add_file!("INIT_PROC is not yet set")) }
     })
-)
-
-#[macro_export]
-macro_rules! add_file(
-    ($s:expr) => ({ concat!(file!(),":",line!()," ", $s) })
 )
 
 /// Returns the current pid. This is useful to avoid borrowing the current proc when it might

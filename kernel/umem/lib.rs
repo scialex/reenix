@@ -5,9 +5,10 @@
 #![no_std]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics, if_let, unsafe_destructor, tuple_indexing)]
+#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics, unsafe_destructor)]
 
-//! # The Reenix User memory stuff.
+// TODO I should maybe rename this...
+//! The Reenix User memory stuff.
 ///
 /// It has things like the pframe
 
@@ -19,13 +20,15 @@
 #[phase(plugin, link)] extern crate util;
 #[phase(plugin, link)] extern crate mm;
 extern crate collections;
-extern crate startup;
 extern crate alloc;
 extern crate libc;
+
+pub use pframe::pageout::{pageoutd_wakeup, pageoutd_run};
 
 // TODO We should have a MaybePinnedList that uses a LRUCache under the hood...
 pub mod mmobj;
 pub mod pframe;
+//pub mod vnode;
 
 pub fn init_stage1() {
     pframe::init_stage1();

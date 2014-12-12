@@ -46,27 +46,53 @@ pub fn init_stage2() {
     use core::mem::transmute;
     let pfcache : Box<PinnableCache<PFrameId, PFrame>> = box PinnableCache::new().unwrap();
     unsafe { PFRAME_CACHE = transmute(pfcache); }
-    // TODO
+    pageout::init_pageoutd();
 }
 
 pub fn init_stage3() {
     // TODO
 }
 
-/*
-pub extern "C" fn pageoutd_run(_: i32, _: *mut c_void) -> *mut c_void {
-    // TODO This might be totally bad.
-    while !(current_thread!()).canceled {
-        pageoutd_sleep();
-        if (current_thread!()).canceled { break; }
-        let removed = get_cache().clean_unpinned();
-        dbg!(debug::PFRAME, "Removed {} items from page cache", removed);
-        if removed == 0 {
-            get_cache().clear_unpinned();
+/// Module holding the pageoutd stuff.
+pub mod pageout {
+    use libc::c_void;
+    use procs::sync::*;
+    use core::prelude::*;
+    use core::ptr::*;
+    use super::get_cache;
+    use alloc::boxed::*;
+    use core::mem::transmute;
+
+    pub fn init_pageoutd() {
+        let pd : Box<PageOutD> = box PageOutD { queue: WQueue::new() };
+        unsafe { PAGEOUTD = transmute(pd); }
+    }
+
+    /// the pageoutd's queue.
+    struct PageOutD { pub queue: WQueue, }
+    /// The pagetoutd
+    static mut PAGEOUTD : *mut PageOutD = 0 as *mut PageOutD;
+    /// Get the Pageoutd
+    fn get_pageoutd() -> &'static PageOutD { unsafe { PAGEOUTD.as_ref().expect("pageoutd is null!") } }
+
+    /// Wakeup the pageoutd.
+    pub fn pageoutd_wakeup() { dbg!(debug::PFRAME_CACHE, "pageoutd being signaled by {}", current_thread!()); get_pageoutd().queue.signal(); }
+    pub extern "C" fn pageoutd_run(_: i32, _: *mut c_void) -> *mut c_void {
+        // TODO This might be totally bad.
+        while !(current_thread!()).cancelled {
+            if let Err(_) = get_pageoutd().queue.wait() { break; }
+            if (current_thread!()).cancelled { break; }
+            dbg!(debug::PFRAME_CACHE, "pageoutd woken up!");
+            let removed = get_cache().clean_unpinned();
+            dbg!(debug::PFRAME_CACH, "Removed {} items from page cache", removed);
+            if removed == 0 {
+                // TODO Should I do this?
+                get_cache().clear_unpinned();
+            }
         }
+        0 as *mut c_void
     }
 }
-*/
 
 /// Get the pframe cache
 fn get_cache() -> &'static mut PinnableCache<PFrameId, PFrame> {
@@ -134,7 +160,10 @@ impl PFrame {
         })
     }
 
+    /// Gets a mutable view of the page. This can ONLY be called from within an `MMObj`'s
+    /// `fill_page` function since that is the only place where a mutable pframe can be obtained
     pub fn get_page_mut(&mut self) -> &mut [u8, ..page::SIZE] { unsafe { self.page.as_mut().expect("cannot be null") } }
+    /// Gets a read only view of this page. Use `PFrame::dirty` to get a read-write view.
     pub fn get_page(&self) -> &[u8, ..page::SIZE] { unsafe { self.page.as_ref().expect("cannot be null") } }
 
     // TODO pframe_migrate?
@@ -169,10 +198,12 @@ impl PFrame {
         return res;
     }
 
+    #[inline]
     fn set_busy(&self) {
         self.flags.set(self.flags.get() | pfstate::BUSY);
     }
 
+    #[inline]
     fn clear_busy(&self) {
         self.flags.set(self.flags.get() & !pfstate::BUSY);
         self.queue.signal();
@@ -204,13 +235,20 @@ impl PFrame {
      *
      * This routine can block at the mmobj operation level.
      */
-    pub fn dirty(&self) -> Result<(),errno::Errno> {
+    pub fn dirty(&self) -> Result<&mut [u8,..page::SIZE],errno::Errno> {
         assert!(!self.is_busy());
         self.set_busy();
-        let ret = self.get_mmo().dirty_page(self);
-        if let Ok(_) = ret { self.flags.set(self.flags.get() | pfstate::DIRTY); }
-        self.clear_busy();
-        ret
+        match self.get_mmo().dirty_page(self) {
+            Ok(_) => {
+                self.flags.set(self.flags.get() | pfstate::DIRTY);
+                self.clear_busy();
+                unsafe { Ok(self.page.as_mut().expect("pframe cannot have an empty page")) }
+            },
+            Err(e) => {
+                self.clear_busy();
+                Err(e)
+            }
+        }
     }
 
 
@@ -248,12 +286,13 @@ impl PFrame {
     /// Remove this pframe from the page frame tables of all the procs it is loaded in.
     fn remove_from_pts(&self) {
         // TODO figure out how to do this.
+        kpanic!("not yet implemented remove from pts called");
     }
 }
 
 impl Cacheable for PFrame {
     fn is_still_useful(&self) -> bool {
-        self.get_mmo().deref().is_still_useful()
+        self.get_mmo().deref().is_still_useful() || self.is_dirty()
     }
 }
 

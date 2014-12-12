@@ -4,7 +4,7 @@
 #![crate_type="rlib"]
 
 #![no_std]
-#![feature(phase, globs, macro_rules, asm, if_let, default_type_params, unsafe_destructor, tuple_indexing)]
+#![feature(phase, globs, macro_rules, asm, default_type_params, unsafe_destructor)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
