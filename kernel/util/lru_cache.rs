@@ -114,17 +114,17 @@ impl<'a, K: Ord, V> Iterator<ModifiableEntry<'a, K, V>> for LTMModifyEntries<'a,
 }
 
 pub type ModifyEntries<'a, K, V> = LTMModifyEntries<'a, K, V>;
-pub type LTMRemoveEntries<'a, K, V> = iter::Map<'static, ModifiableEntry<'a, K, V>, (K, V), LTMModifyEntries<'a, K, V>>;
-pub type MTLRemoveEntries<'a, K, V> = iter::Map<'static, ModifiableEntry<'a, K, V>, (K, V), MTLModifyEntries<'a, K, V>>;
+pub type LTMRemoveEntries<'a, K, V> = iter::Map<ModifiableEntry<'a, K, V>, (K, V), LTMModifyEntries<'a, K, V>, for<'b> fn(ModifiableEntry<'b, K, V>) -> (K, V)>;
+pub type MTLRemoveEntries<'a, K, V> = iter::Map<ModifiableEntry<'a, K, V>, (K, V), MTLModifyEntries<'a, K, V>, for<'b> fn(ModifiableEntry<'b, K, V>) -> (K, V)>;
 pub type RemoveEntries<'a, K, V> = LTMRemoveEntries<'a, K, V>;
 pub type Entries<'a, K, V> = LTMEntries<'a, K, V>;
 pub type MutEntries<'a, K, V> = LTMMutEntries<'a, K, V>;
-pub type LTMKeys<'a, K, V> = iter::Map<'static, (&'a K, &'a V), &'a K, LTMEntries<'a, K, V>>;
-pub type MTLKeys<'a, K, V> = iter::Map<'static, (&'a K, &'a V), &'a K, MTLEntries<'a, K, V>>;
-pub type Keys<'a, K, V> = iter::Map<'static, (&'a K, &'a V), &'a K, Entries<'a, K, V>>;
-pub type LTMValues<'a, K, V> = iter::Map<'static, (&'a K, &'a V), &'a V, LTMEntries<'a, K, V>>;
-pub type MTLValues<'a, K, V> = iter::Map<'static, (&'a K, &'a V), &'a V, MTLEntries<'a, K, V>>;
-pub type Values<'a, K, V> = iter::Map<'static, (&'a K, &'a V), &'a V, Entries<'a, K, V>>;
+pub type LTMKeys<'a, K, V> = iter::Map<(&'a K, &'a V), &'a K, LTMEntries<'a, K, V>, for<'b> fn((&'b K, &'b V)) -> &'b K>;
+pub type MTLKeys<'a, K, V> = iter::Map<(&'a K, &'a V), &'a K, MTLEntries<'a, K, V>, for<'b> fn((&'b K, &'b V)) -> &'b K>;
+pub type Keys<'a, K, V> = iter::Map<(&'a K, &'a V), &'a K, Entries<'a, K, V>, for<'b> fn((&'b K, &'b V)) -> &'b K>;
+pub type LTMValues<'a, K, V> = iter::Map<(&'a K, &'a V), &'a V, LTMEntries<'a, K, V>, for<'b> fn((&'b K, &'b V)) -> &'b V>;
+pub type MTLValues<'a, K, V> = iter::Map<(&'a K, &'a V), &'a V, MTLEntries<'a, K, V>, for<'b> fn((&'b K, &'b V)) -> &'b V>;
+pub type Values<'a, K, V> = iter::Map<(&'a K, &'a V), &'a V, Entries<'a, K, V>, for<'b> fn((&'b K, &'b V)) -> &'b V>;
 
 impl<K: Ord, V> LruCache<K, V> {
     pub fn new() -> Allocation<LruCache<K, V>> {
@@ -257,29 +257,31 @@ impl<K: Ord, V> LruCache<K, V> {
         ent.insert_after(&*self.ptr);
     }
 
+    fn key<'a>((k, _): (&'a K, &'a V)) -> &'a K { k }
+    fn val<'a>((_, v): (&'a K, &'a V)) -> &'a V { v }
     /// Gets a lazy iterator over the keys in the map in an undefined order.
     /// Note this does not count as a use of the keys for the purposes of the cache.
-    pub fn keys<'a>(&'a self) -> Keys<'a, K, V> { self.iter().map(|(k, _)| k) }
+    pub fn keys<'a>(&'a self) -> Keys<'a, K, V> { self.iter().map(LruCache::key) }
 
     /// Gets a lazy iterator over the keys in the map in an least to most recently used order.
     /// Note this does not count as a use of the keys for the purposes of the cache.
-    pub fn keys_least<'a>(&'a self) -> LTMKeys<'a, K, V> { self.iter_least().map(|(k, _)| k) }
+    pub fn keys_least<'a>(&'a self) -> LTMKeys<'a, K, V> { self.iter_least().map(LruCache::key) }
 
     /// Gets a lazy iterator over the keys in the map in an most to least recently used order.
     /// Note this does not count as a use of the keys for the purposes of the cache.
-    pub fn keys_most<'a>(&'a self) -> MTLKeys<'a, K, V> { self.iter_most().map(|(k, _)| k) }
+    pub fn keys_most<'a>(&'a self) -> MTLKeys<'a, K, V> { self.iter_most().map(LruCache::key) }
 
     /// Gets a lazy iterator over the values in the map in an undefined order.
     /// Note this does not count as a use of the values for the purposes of the cache.
-    pub fn values<'a>(&'a self) -> Values<'a, K, V> { self.iter().map(|(_k, v)| v) }
+    pub fn values<'a>(&'a self) -> Values<'a, K, V> { self.iter().map(LruCache::val) }
 
     /// Gets a lazy iterator over the values in the map in an least to most recently used order.
     /// Note this does not count as a use of the values for the purposes of the cache.
-    pub fn values_least<'a>(&'a self) -> LTMValues<'a, K, V> { self.iter_least().map(|(_k, v)| v) }
+    pub fn values_least<'a>(&'a self) -> LTMValues<'a, K, V> { self.iter_least().map(LruCache::val) }
 
     /// Gets a lazy iterator over the values in the map in an most to least recently used order.
     /// Note this does not count as a use of the values for the purposes of the cache.
-    pub fn values_most<'a>(&'a self) -> MTLValues<'a, K, V> { self.iter_most().map(|(_k, v)| v) }
+    pub fn values_most<'a>(&'a self) -> MTLValues<'a, K, V> { self.iter_most().map(LruCache::val) }
 
     /// An iterator of the keys and values in the iterator in an undefined order.
     /// Note this does not count as a use of the values for the purposes of the LRU cache.
@@ -305,12 +307,13 @@ impl<K: Ord, V> LruCache<K, V> {
     /// used. Note this does not count as a use of the values for the purposes of the LRU cache.
     pub fn iter_least_mut<'a>(&'a mut self) -> LTMMutEntries<'a, K, V> { LTMMutEntries { cur: self.ptr.prev_mut(), } }
 
+    fn do_remove<'a>(v: ModifiableEntry<'a, K, V>) -> (K, V) { v.remove_entry() }
     /// Iterator that removes items from the cache as it goes.
     pub fn iter_remove<'a>(&'a mut self) -> RemoveEntries<'a, K, V> { self.iter_remove_least() }
     /// Iterator that removes items from the cache as it goes. Order is least to most recently used.
-    pub fn iter_remove_least<'a>(&'a mut self) -> LTMRemoveEntries<'a, K, V> { self.iter_modify_least().map(|x| x.remove_entry() ) }
+    pub fn iter_remove_least<'a>(&'a mut self) -> LTMRemoveEntries<'a, K, V> { self.iter_modify_least().map(LruCache::do_remove) }
     /// Iterator that removes items from the cache as it goes. Order is most to least recently used.
-    pub fn iter_remove_most<'a>(&'a mut self) -> MTLRemoveEntries<'a, K, V> { self.iter_modify_most().map(|x| x.remove_entry() ) }
+    pub fn iter_remove_most<'a>(&'a mut self) -> MTLRemoveEntries<'a, K, V> { self.iter_modify_most().map(LruCache::do_remove) }
 
     /// Iterator where you can choose to remove certain entries from the LRU cache.
     pub fn iter_modify<'a>(&'a mut self) -> ModifyEntries<'a, K, V> { self.iter_modify_least() }

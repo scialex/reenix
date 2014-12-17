@@ -26,7 +26,7 @@ pub trait Id : Clone + Ord + Eq {
 }
 
 impl<T> Id for T where T: Int {
-    #[inline] fn successor(&mut self) { *self = self.add(&Int::one()) }
+    #[inline] fn successor(&mut self) { *self = self.add(Int::one()) }
 }
 
 // TODO Make it use this.

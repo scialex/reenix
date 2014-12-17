@@ -21,6 +21,7 @@ pub const ZERO_DEVID : DeviceId = DeviceId_static!(3, 1);
 
 static mut NEXT_ZERO_ID : u32 = 0;
 /// The device for /dev/null
+#[allow(missing_copy_implementations)]
 pub struct NullDev;
 
 impl NullDev {
@@ -45,7 +46,7 @@ impl MMObj for NullDev {
     /// We can do LITERALLY nothing to a /dev/null. We don't need to have them being different.
     fn get_id(&self) -> MMObjId { MMObjId::new(NULL_DEVID, 0) }
     /// We fill it with 0's because thats what mmap wants.
-    fn fill_page(&self,  pf: &mut PFrame)  -> KResult<()> { for i in pf.get_page_mut().iter() { *i = 0 }; Ok(()) }
+    fn fill_page(&self,  pf: &mut PFrame)  -> KResult<()> { for i in pf.get_page_mut().iter_mut() { *i = 0 }; Ok(()) }
     // TODO The next two maybe should panic?
     fn dirty_page(&self, _pf: &PFrame)      -> KResult<()> { Ok(()) }
     fn clean_page(&self, _pf: &PFrame)      -> KResult<()> { Ok(()) }
@@ -53,6 +54,7 @@ impl MMObj for NullDev {
 }
 
 /// The device for /dev/zero
+#[allow(missing_copy_implementations)]
 pub struct ZeroDev(u32);
 
 impl ZeroDev {

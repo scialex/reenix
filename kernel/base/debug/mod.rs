@@ -50,7 +50,7 @@ pub fn dbg_pid() -> &'static (fmt::Show + 'static) {
 #[doc(hidden)]
 #[inline(never)]
 pub fn dbg_print(msg: &fmt::Arguments) {
-    use core::result::Err;
+    use core::result::Result::Err;
     use debug::printing::DBG_WRITER;
     match fmt::write(unsafe { &mut DBG_WRITER }, msg) {
         Err(_) => (),

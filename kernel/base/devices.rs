@@ -10,7 +10,7 @@ use errno::KResult;
 
 /// The ID number of a device, it consists of a pair of 8 bit numbers that together identify the
 /// device uniquely.
-#[deriving(Eq, PartialEq, Ord, PartialOrd, Clone)]
+#[deriving(Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
 pub struct DeviceId(pub u16);
 impl DeviceId {
     /// Create a DeviceId with the given major and minor Id numbers.

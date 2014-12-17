@@ -61,6 +61,7 @@ mod key_ref {
 #[doc(hidden)]
 mod std {
     pub use core::clone;
+    pub use core::kinds;
     pub use core::cmp;
     pub use core::fmt;
     pub use core::num;

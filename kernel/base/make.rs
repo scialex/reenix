@@ -18,10 +18,10 @@ impl<'a, 'b: 'a, A> Make<&'a A> for A where A: Clone + 'b { fn make(a: &'a A) ->
 pub trait RefMake<'a, A: 'a> {
     /// Make this value from a reference to another type, which might not live as long as the
     /// generated value.
-    fn make_from<'b, 'a: 'b>(v: &'b A) -> Self;
+    fn make_from<'b>(v: &'b A) -> Self;
 }
 
-impl<A> RefMake<'static, A> for A where A: Clone + 'static { fn make_from<'b, 'a: 'b>(v: &'b A) -> A { v.clone() }}
+impl<A> RefMake<'static, A> for A where A: Clone + 'static { fn make_from<'b>(v: &'b A) -> A { v.clone() }}
 
 /// A trait where one attempts to make a value but it can fail.
 pub trait TryMake<A, E> {

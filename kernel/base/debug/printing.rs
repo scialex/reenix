@@ -3,11 +3,12 @@
 //! actually printing debug info.
 
 use core;
-use core::result::Ok;
+use core::result::Result::Ok;
 use core::slice::*;
 use io;
 
 /// The struct which can print to the io port we look at for debug information.
+#[deriving(Copy)]
 pub struct DbgWriter;
 
 pub static PORT : u16 = 0x3f8;

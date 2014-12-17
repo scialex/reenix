@@ -141,11 +141,11 @@ impl<T> Wakeup for Mutex<T> {
 }
 
 impl<'a, T> Deref<T> for MGuard<'a, T> {
-    fn deref<'a>(&'a self) -> &'a T { &*self._data }
+    fn deref<'b>(&'b self) -> &'b T { &*self._data }
 }
 
 impl<'a, T> DerefMut<T> for MGuard<'a, T> {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut T { &mut *self._data }
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T { &mut *self._data }
 }
 
 /// A mutex with a containted condition that things can wait for.
@@ -185,11 +185,11 @@ impl<'a, T> Wait<(),()> for CGuard<'a, T> {
 }
 
 impl<'a, T> Deref<T> for CGuard<'a, T> {
-    fn deref<'a>(&'a self) -> &'a T { self._lock.deref() }
+    fn deref<'b>(&'b self) -> &'b T { self._lock.deref() }
 }
 
 impl<'a, T> DerefMut<T> for CGuard<'a, T> {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut T { self._lock.deref_mut() }
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T { self._lock.deref_mut() }
 }
 
 
@@ -337,9 +337,9 @@ impl<T> SpinMutex<T> {
 }
 
 impl<'a, T> Deref<T> for SMGuard<'a, T> {
-    fn deref<'a>(&'a self) -> &'a T { &*self._data }
+    fn deref<'b>(&'b self) -> &'b T { &*self._data }
 }
 
 impl<'a, T> DerefMut<T> for SMGuard<'a, T> {
-    fn deref_mut<'a>(&'a mut self) -> &'a mut T { &mut *self._data }
+    fn deref_mut<'b>(&'b mut self) -> &'b mut T { &mut *self._data }
 }

@@ -12,7 +12,7 @@
 macro_rules! bitmask_create {
     ($(#[$base:meta])* flags $name:ident : $t:ty
      {  #[$hm:meta] default $d:ident, $(#[$m:meta] $f:ident = $v:expr),+ }) => {
-        #[deriving(Default, PartialEq, Eq)]
+        #[deriving(Default, PartialEq, Eq, Copy, Clone)]
         $(#[$base])*
         pub struct $name($t);
         $(#[$m] pub const $f : $name = $name(0x1 << $v);)*
@@ -21,7 +21,7 @@ macro_rules! bitmask_create {
     };
     ($(#[$base:meta])* flags $name:ident : $t:ty
      { $(#[$m:meta] $f:ident = $v:expr),+ }) => {
-        #[deriving(Default, PartialEq, Eq)]
+        #[deriving(Default, PartialEq, Eq, Copy, Clone)]
         $(#[$base])*
         pub struct $name($t);
         $(#[$m] pub const $f : $name = $name(0x1 << $v);)*
@@ -29,7 +29,7 @@ macro_rules! bitmask_create {
     };
     ($(#[$base:meta])* flags $name:ident : $t:ty
      {  default $d:ident, $($f:ident = $v:expr),+ }) => {
-        #[deriving(Default, PartialEq, Eq)]
+        #[deriving(Default, PartialEq, Eq, Copy, Clone)]
         $(#[$base])*
         pub struct $name($t);
         $(pub const $f : $name = $name(0x1 << $v);)*
@@ -38,7 +38,7 @@ macro_rules! bitmask_create {
     };
     ($(#[$base:meta])* flags $name:ident : $t:ty
      { $($f:ident = $v:expr),+ }) => {
-        #[deriving(Default, PartialEq, Eq)]
+        #[deriving(Default, PartialEq, Eq, Copy, Clone)]
         $(#[$base])*
         pub struct $name($t);
         $(pub const $f : $name = $name(0x1 << $v);)*
@@ -47,7 +47,7 @@ macro_rules! bitmask_create {
     (inner_flags $name:ident { $($f:ident),+ }) => {
         impl fmt::Show for $name {
             fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-                use core::result::*;
+                use core::result::Result::{Ok, Err};
                 try!(fmt.write(stringify!($name).as_bytes()))
                 try!(fmt.write("[".as_bytes()))
                 let mut started = false;
@@ -63,32 +63,32 @@ macro_rules! bitmask_create {
             }
         }
         impl BitXor<$name,$name> for $name {
-            #[inline] fn bitxor(&self, r: &$name) -> $name {
-                let &$name(lhs) = self;
-                let &$name(rhs) = r;
+            #[inline] fn bitxor(self, r: $name) -> $name {
+                let $name(lhs) = self;
+                let $name(rhs) = r;
                 $name(lhs ^ rhs)
             }
         }
         impl BitOr<$name,$name> for $name {
-            #[inline] fn bitor(&self, r: &$name) -> $name {
-                let &$name(lhs) = self;
-                let &$name(rhs) = r;
+            #[inline] fn bitor(self, r: $name) -> $name {
+                let $name(lhs) = self;
+                let $name(rhs) = r;
                 $name(lhs | rhs)
             }
         }
         impl BitAnd<$name,$name> for $name {
-            #[inline] fn bitand(&self, r: &$name) -> $name {
-                let &$name(lhs) = self;
-                let &$name(rhs) = r;
+            #[inline] fn bitand(self, r: $name) -> $name {
+                let $name(lhs) = self;
+                let $name(rhs) = r;
                 $name(lhs & rhs)
             }
         }
         impl Add<$name,$name> for $name {
-            #[inline] fn add(&self, r: &$name) -> $name { self.bitor(r) }
+            #[inline] fn add(self, r: $name) -> $name { self.bitor(r) }
         }
         impl Sub<$name,$name> for $name {
-            #[inline] fn sub(&self, r: &$name) -> $name {
-                *self & r.not()
+            #[inline] fn sub(self, r: $name) -> $name {
+                self & r.not()
             }
         }
         impl Not<$name> for $name {

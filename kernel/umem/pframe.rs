@@ -76,15 +76,15 @@ pub mod pageout {
     fn get_pageoutd() -> &'static PageOutD { unsafe { PAGEOUTD.as_ref().expect("pageoutd is null!") } }
 
     /// Wakeup the pageoutd.
-    pub fn pageoutd_wakeup() { dbg!(debug::PFRAME_CACHE, "pageoutd being signaled by {}", current_thread!()); get_pageoutd().queue.signal(); }
+    pub fn pageoutd_wakeup() { dbg!(debug::PCACHE, "pageoutd being signaled by {}", current_thread!()); get_pageoutd().queue.signal(); }
     pub extern "C" fn pageoutd_run(_: i32, _: *mut c_void) -> *mut c_void {
         // TODO This might be totally bad.
         while !(current_thread!()).cancelled {
             if let Err(_) = get_pageoutd().queue.wait() { break; }
             if (current_thread!()).cancelled { break; }
-            dbg!(debug::PFRAME_CACHE, "pageoutd woken up!");
+            dbg!(debug::PCACHE, "pageoutd woken up!");
             let removed = get_cache().clean_unpinned();
-            dbg!(debug::PFRAME_CACH, "Removed {} items from page cache", removed);
+            dbg!(debug::PCACHE, "Removed {} items from page cache", removed);
             if removed == 0 {
                 // TODO Should I do this?
                 get_cache().clear_unpinned();
@@ -138,6 +138,7 @@ pub struct PFrame {
     queue : WQueue,
 }
 
+#[deriving(Copy)]
 pub enum PFError { Alloc(AllocError), Sys(errno::Errno), }
 impl PFrame {
     /**
@@ -292,7 +293,9 @@ impl PFrame {
 
 impl Cacheable for PFrame {
     fn is_still_useful(&self) -> bool {
-        self.get_mmo().deref().is_still_useful() || self.is_dirty()
+        // TODO Fix this.
+        //self.get_mmo().deref().is_still_useful() || self.is_dirty()
+        self.is_dirty()
     }
 }
 

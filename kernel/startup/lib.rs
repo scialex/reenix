@@ -126,7 +126,9 @@ pub mod tsd {
         }
     }
 
-    #[repr(C, packed)] pub struct InitialTSDInfo { vlow : [u8, ..0x30], stack_high : u32}
+    #[deriving(Copy)]
+    #[repr(C, packed)]
+    pub struct InitialTSDInfo { vlow : [u8, ..0x30], stack_high : u32}
     pub static INITIAL_TSD : InitialTSDInfo = InitialTSDInfo { vlow: [0, ..0x30], stack_high: 0};
 }
 
@@ -189,5 +191,6 @@ pub mod gdt {
 
 
 mod std {
+    pub use core::kinds;
     pub use core::fmt;
 }

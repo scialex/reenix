@@ -20,12 +20,27 @@ use collections::*;
 use core::iter::*;
 use procs::args::ProcArgs;
 
+/// Just a wraper to writeln! or panic.
 macro_rules! twriteln(
-    ($t:expr, $($e:expr),*) => (assert!(writeln!(&mut ByteWriter($t), $($e),*).is_ok()))
+    ($t:expr, $f:expr, $($e:expr),*) => ({
+        assert!(writeln!(&mut ByteWriter($t), $f, $($e),*).is_ok());
+        dbg!(debug::KSHELL, concat!("writing: ", $f, "\\n"), $($e),*);
+    });
+    ($t:expr, $e:expr) => ({
+        twriteln!($t, "{}", $e);
+    });
 )
+/// Just a wraper to write! or panic.
 macro_rules! twrite(
-    ($t:expr, $($e:expr),*) => (assert!(write!(&mut ByteWriter($t), $($e),*).is_ok()))
+    ($t:expr, $f:expr, $($e:expr),*) => ({
+        assert!(write!(&mut ByteWriter($t), $f, $($e),*).is_ok());
+        dbg!(debug::KSHELL, concat!("writing: ", $f), $($e),*);
+    });
+    ($t:expr, $e:expr) => ({
+        twrite!($t, "{}", $e);
+    });
 )
+
 pub fn start(i: i32) {
     let tty = ProcArgs::new(bytedev::lookup(DeviceId::create(2,i as u8)).unwrap()).unwrap();
     assert!(KProc::new(String::from_str("KSHELL proc"), tty_proc_run, 0, unsafe { tty.to_arg() }).is_ok());
@@ -40,26 +55,37 @@ extern "C" fn tty_proc_run(_:i32, t:*mut c_void) -> *mut c_void {
 }
 
 
+/// A shell function. It takes an io device and an argv.
 pub type ExternShellFunc = fn(io: &mut Device<u8>, argv: &[&str]) -> KResult<()>;
+/// An internal shell function. it can see and play with some elements of the kshell.
 type InternShellFunc = for<'a> fn(sh: &KShell<'a>, argv: &[&str]) -> KResult<()>;
 
+/// The different types of shell functions. Why can we not have the anonymous enum types.
 #[deriving(Clone)]
 enum ShellFunc {
+    /// An external shell function.
+    /// An external shell function.
     External(ExternShellFunc),
+    /// An internal shell function.
     Internal(InternShellFunc),
 }
 
+/// A function that is for the kshell.
 #[deriving(Clone)]
 pub struct KFunction<'a> {
     name : &'a str,
     description : &'a str,
     func : ShellFunc,
 }
+
+/// A built-in function is implemented by the kshell.
 macro_rules! KFunc_i(
     ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: ShellFunc::Internal($f) } );
     ($n:expr, $f:ident) => (KFunc!($n, $n, $f));
     ($f:ident) => (KFunc!(stringify!($f),$f));
 )
+
+/// A function for the kshell.
 macro_rules! KFunc(
     ($n:expr, $d:expr, $f:ident) => ( KFunction { name: $n, description: $d, func: ShellFunc::External($f) } );
     ($n:expr, $f:ident) => (KFunc!($n, $n, $f));
@@ -68,11 +94,11 @@ macro_rules! KFunc(
 
 impl<'a> KFunction<'a> {
     #[allow(dead_code)]
-    pub fn create<'a>(name: &'a str, func: ExternShellFunc) -> KFunction<'a> {
+    pub fn create<'b>(name: &'b str, func: ExternShellFunc) -> KFunction<'b> {
         KFunction { name : name, description: name, func : ShellFunc::External(func) }
     }
     #[allow(dead_code)]
-    pub fn new<'a>(name: &'a str, description: &'a str, func: ExternShellFunc) -> KFunction<'a> {
+    pub fn new<'b>(name: &'b str, description: &'b str, func: ExternShellFunc) -> KFunction<'b> {
         KFunction { name: name, description: description, func: ShellFunc::External(func) }
     }
     pub fn call<'b>(&'a self, ksh: &'a KShell<'b>, args: &[&str]) -> KResult<()> {
@@ -83,16 +109,16 @@ impl<'a> KFunction<'a> {
     }
 }
 
+/// A kshell. This is mostly just a list of functions.
 pub struct KShell<'a> {
     tty: UnsafeCell<&'a mut Device<u8>>,
-    // TODO A list of KFunction's
     funcs: TreeMap<&'a str, KFunction<'a>>,
 }
 
+/// All of the functions we have for our kshell. This will grow as time goes on.
 static NFUNCS : &'static [KFunction<'static>] = &[
     KFunc_i!("help", "Show this help message", do_help),
     KFunc_i!("repeat", "repeat the given command", do_repeat),
-    // TODO This parallel repeat command.
     KFunc_i!("prepeat", "repeat the given command in parallel", do_prepeat),
     KFunc_i!("parallel", "run commands seperated by || in parallel", do_parallel),
     KFunc!("exit", "exits the current process with the given value. (Actually just cancel it to allow for memory cleanup)", do_exit),
@@ -105,6 +131,7 @@ static NFUNCS : &'static [KFunction<'static>] = &[
     KFunc!("ipl", "prints the ipl", do_ipl),
     KFunc!("mem-stats", "prints memory statistics", do_memstats),
     KFunc!("pid", "prints current pid", do_pid),
+    KFunc!("cancel", "cancels a pid", do_cancel),
 ];
 
 impl<'a> KShell<'a> {
@@ -127,9 +154,7 @@ impl<'a> KShell<'a> {
         self.funcs.insert(n, f).is_none()
     }
 
-    #[allow(unused_must_use)]
     pub fn run(&self) {
-        // TODO Do stuff.
         loop {
             let mut buf : [u8, ..256] = [0, ..256];
             twrite!(self.get_tty(), "ksh# ");
@@ -148,7 +173,10 @@ impl<'a> KShell<'a> {
                     continue;
                 },
             };
-            self.run_command(cmd.split(' ').filter(|s| { s.len() != 0 }).collect::<Vec<&str>>().as_slice());
+            match self.run_command(cmd.split(' ').filter(|s| { s.len() != 0 }).collect::<Vec<&str>>().as_slice()) {
+                Ok(_) => {},
+                Err(e) => { dbg!(debug::KSHELL, "recieved {}", e); },
+            }
 
             if (current_thread!()).cancelled {
                 return;
@@ -263,6 +291,45 @@ fn do_newkshell(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     }).or_else(|_| Err(errno::ENOMEM)));
     twriteln!(io, "Creating new shell on tty {}", id);
     KProc::new(String::from_str("KSHELL proc"), tty_proc_run, 0, unsafe { tty.to_arg() }).and(Ok(())).or_else(|_| Err(errno::ENOMEM))
+}
+
+/// Cancel a specific thread.
+fn do_cancel(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
+    use procs::kproc::*;
+    if argv.len() < 2 {
+        twriteln!(io, "Usage: cancel pid [status]");
+        return Ok(());
+    }
+    let pid_num = match from_str(argv[1]) {
+        Some(v) => v,
+        None => {
+            twriteln!(io, "Illegal pid number {}, Usage: cancel pid", argv[1]);
+            return Ok(());
+        }
+    };
+    let exit_status = match argv.get(2).map_or(Some(0), |v| from_str(*v)) {
+        Some(v) => v,
+        None => {
+            twriteln!(io, "illegal exit status {} given.", argv[2]);
+            return Ok(());
+        },
+    };
+    let pid = ProcId(pid_num);
+    if pid == *current_pid!() {
+        (current_thread!()).cancel(exit_status as *mut c_void);
+        twriteln!(io, "canceled process {} with status {}", pid, exit_status);
+    } else {
+        match KProc::get_proc(&pid) {
+            Some(p) => {
+                p.borrow_mut().kill(exit_status);
+                twriteln!(io, "canceled process {} with status {}", pid, exit_status);
+            },
+            None => {
+                twriteln!(io, "no process with {} found", pid);
+            }
+        }
+    }
+    return Ok(());
 }
 
 fn do_bdread(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {

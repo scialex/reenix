@@ -55,7 +55,7 @@ fn get_pid() -> Option<ProcId> {
 /// Notify that we are done with a pid.
 fn drop_pid(i: &ProcId) { unsafe { &mut *PID_GEN }.destroy(i); }
 
-#[deriving(Show,Eq,PartialEq)]
+#[deriving(Show, Eq, PartialEq, Copy)]
 pub enum ProcState { RUNNING, DEAD }
 pub type ProcStatus = int;
 
@@ -121,6 +121,7 @@ pub fn start_idle_proc(init_main : ContextFunc, arg1: i32, arg2: *mut c_void) ->
     context::initial_ctx_switch();
 }
 
+#[deriving(Copy)]
 pub enum WaitProcId { Any, Pid(ProcId) }
 pub type WaitOps = u32;
 
@@ -412,7 +413,13 @@ impl KProc {
         dbg!(debug::PROC, "{} cleaning up. Sending wakeup to parent {}, exit status was 0x{:x}", self, parent.borrow(), status);
         self.status = status;
         self.state = ProcState::DEAD;
-        if parent.borrow().get_pid() != IDLE_PID {
+        // TODO This is actually pretty bad WRT borrowing. If parent-proc is INIT we might try to
+        // TODO double borrow, depending on drop-placement. This is not dangerous but it is annoying.
+        // TODO Therefore I should try to rearrange this so it is not dependent on the ordering of
+        // TODO Drops, possibly by doing some sort of callback routine.
+        let pref = parent.borrow();
+        if pref.get_pid() != IDLE_PID {
+            drop(pref);
             let init = init_proc!();
             for (pid, child) in self.children.iter() {
                 dbg!(debug::PROC, "moving {} to init proc", pid);
@@ -430,6 +437,8 @@ impl KProc {
         // TODO VM  DELETE VMMAP
 
         parent.borrow().wait.signal();
+
+        dbg!(debug::PROC, "process is dead");
     }
 }
 

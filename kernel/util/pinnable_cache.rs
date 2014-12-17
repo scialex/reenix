@@ -75,7 +75,7 @@ impl<K: Ord, V:Cacheable> Cacheable for CacheItem<K, V> {
 }
 
 /// The states a value in the cache can have.
-#[deriving(Eq, PartialEq)]
+#[deriving(Eq, PartialEq, Copy)]
 pub enum State {
     Pinned(uint),
     Unpinned,
@@ -83,7 +83,7 @@ pub enum State {
 }
 
 /// The errors that can happen when we try to insert a value into the cache.
-#[deriving(Show)]
+#[deriving(Show, Copy)]
 pub enum InsertError {
     /// There is already a key with that value in the cache.
     KeyPresent,

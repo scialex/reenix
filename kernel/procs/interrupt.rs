@@ -10,6 +10,7 @@ use super::apic;
 /// A struct containing the register state when a interrupt function is called. Note that modifying
 /// this structure in an ISR will change the state of the registers once the function returns to
 /// the source of the interrupt.
+#[allow(missing_copy_implementations)]
 #[repr(C)]
 #[deriving(Clone, Show)]
 pub struct Registers {
@@ -110,6 +111,7 @@ impl Drop for IPLWatchdog { fn drop(&mut self) { dbg!(debug::INTR, "reseting ipl
 
 #[unsafe_no_drop_flag]
 #[repr(C, packed)]
+#[deriving(Copy)]
 struct InterruptDescription {
     baselo   : u16,
     selector : u16,

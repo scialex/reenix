@@ -127,7 +127,7 @@ pub mod tlb {
 pub mod page {
     use core::intrinsics::transmute;
     use libc::{uintptr_t, c_void};
-    use core::result::*;
+    use core::prelude::*;
     use core::ptr::*;
     extern "C" {
         #[link_name = "page_add_range"]
@@ -219,6 +219,7 @@ pub mod page {
 
 #[doc(hidden)]
 mod std {
+    pub use core::kinds;
     pub use core::cmp;
     pub use core::fmt;
     pub use core::option;

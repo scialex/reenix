@@ -68,6 +68,7 @@ mod std {
     pub use core::num;
     pub use core::default;
     pub use core::clone;
+    pub use core::kinds;
 }
 
 // This lets us use the macro's exported from here locally.

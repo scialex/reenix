@@ -77,6 +77,7 @@ dbg_modes!(
     (ELF,         37, color::BGREEN,  "elf loader"),
     (USER,        38, color::BYELLOW, "user land"),
     (PCACHE,      39, color::BMAGENTA,"pinnable cache system"),
+    (KSHELL,      40, color::BBLUE   ,"Kshell messages"),
 
     (DANGER,      62, color::RED,     "A likely very dangerous operation"),
 

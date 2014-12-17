@@ -7,10 +7,10 @@ use mm::page;
 use startup::{gdt, tsd};
 use libc::{c_void, uintptr_t};
 use interrupt;
-use core::mem::{transmute, transmute_copy, drop};
+use core::mem::{transmute, transmute_copy};
 use collections::RingBuf;
 use core::ptr::*;
-use core::option::*;
+use core::prelude::*;
 use alloc::rc::*;
 use pcell::*;
 

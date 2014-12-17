@@ -5,22 +5,21 @@ use core::fmt;
 use core::cell::*;
 use core::ptr::*;
 use core::prelude::*;
-use util::cacheable::*;
+//use util::cacheable::*;
 use base::errno::*;
 use pframe;
 use alloc::rc::*;
 use util::pinnable_cache::*;
 use alloc::boxed::*;
 use base::devices::*;
-use traits::VNode;
 
 // Cheating to get a uuid by just incrementing a counter. This is not really good in general but we
 // have 48 bits, which means we will probably never really run out...
 // There has got to be a better way but this is just easier for now.
 #[deriving(Copy, Eq, PartialEq, Show)]
 pub struct MMObjId(DeviceId, u32);
-const FAKE_DEVICE : DeviceId = DeviceId_static!(0xFF,0x00);
-static mut NEXT_ID : MMObjId = MMObjId(FAKE_DEVICE,0);
+//const FAKE_DEVICE : DeviceId = DeviceId_static!(0xFF,0x00);
+//static mut NEXT_ID : MMObjId = MMObjId(FAKE_DEVICE,0);
 
 impl MMObjId {
     pub fn new(dev: DeviceId, n: u32) -> MMObjId { MMObjId(dev, n) }
@@ -93,7 +92,7 @@ pub trait MMObj {
      */
     // TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
     // better. Using this stuff is annoying.
-    fn lookup_page(this: Rc<T>, pagenum: uint, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
+    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: uint, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
         pframe::PFrame::get(this, pagenum)
     }
 

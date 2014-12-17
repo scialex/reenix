@@ -71,10 +71,10 @@ impl Drop for KStack {
     }
 }
 
-#[deriving(Show)]
+#[deriving(Show, Copy)]
 pub enum Mode { USER, KERNEL }
 
-#[deriving(Show, Eq, PartialEq)]
+#[deriving(Show, Eq, PartialEq, Copy)]
 pub enum State { NOSTATE, RUN, SLEEP, SLEEPCANCELLABLE, EXITED }
 
 pub struct KThread {

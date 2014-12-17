@@ -81,7 +81,7 @@ struct CSlabAllocator {
 }
 
 #[allow(raw_pointer_deriving)]
-#[deriving(Eq,Clone,PartialEq)]
+#[deriving(Eq,Clone,PartialEq, Copy)]
 pub struct SlabAllocator(*mut CSlabAllocator);
 
 extern "C" {
