@@ -20,7 +20,7 @@
 
 #define PAGE_ALIGNED(x) (0 == ((uintptr_t)(x)) % PAGE_SIZE)
 
-#define PAGE_NSIZES  8
+#define PAGE_NSIZES  16
 
 #define PAGE_SAME(addr1, addr2) (PAGE_ALIGN_DOWN(addr1) == PAGE_ALIGN_DOWN(addr2))
 
