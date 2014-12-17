@@ -24,7 +24,7 @@ nyi:
 todo:
 	@ echo "  Not yet done:"
 	@ echo
-	@ git grep --heading -C 3 --break -Epnh "((\/\/|\/?\*) TODO( [^C][^o][^p][^y][^r][^i][^g][^h][^t]|.{1,9}$$)|^ *\*t )" \
+	@ git grep --heading -C 3 --break -Epnh "((\/\/|\/?\*) TODO($$| [^C][^o][^p][^y][^r][^i][^g][^h][^t]|.{1,9}$$)|^ *\*t )" \
 | sed -E "s/^\t?[0-9]+=/  /"                                        \
 | sed -E "s/^(\t?[0-9]+)-/\1:/"                                     \
 | sed -E "/^  .*;$$/d"                                              \
