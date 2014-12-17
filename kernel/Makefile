@@ -114,11 +114,14 @@ all:  $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 docs: $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 
 # We need to tell liballoc to use our memory manager.
-LIBALLOC_FLAGS := -A dead_code --cfg external_crate --extern external=$(call lib-name,mm) \
-                  --opt-level=$(DEFAULT_CRATE_OPT)
-LIBARENA_FLAGS := --extern std=$(call lib-name,basic) --opt-level=$(DEFAULT_CRATE_OPT)
+LIBALLOC_RSFLAGS := -A dead_code --cfg external_crate --extern external=$(call lib-name,mm) \
+                    --opt-level=$(DEFAULT_CRATE_OPT)
+LIBALLOC_RDFLAGS := --cfg external_crate --extern external=$(call lib-name,mm)
+LIBARENA_RSFLAGS := --extern std=$(call lib-name,basic) --opt-level=$(DEFAULT_CRATE_OPT)
+LIBARENA_RDFLAGS := --extern std=$(call lib-name,basic)
 # TODO For some reason LLVM doesn't like -O2 in drivers.
-DRIVERS_FLAGS  := --opt-level=1
+DRIVERS_RSFLAGS  := --opt-level=1
+DRIVERS_RDFLAGS  :=
 
 # Plugins
 $(eval $(call plugin-rule, bassert,))
@@ -136,18 +139,18 @@ $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
 $(eval $(call crate-rule,      base,        bassert enabled core libc))
 $(eval $(call crate-rule,      mm,          $(HOST_CRATES) core libc base))
-$(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_FLAGS)))
+$(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
 # basic is a libstd mock with core, alloc and collections.
 $(eval $(call crate-rule,      basic,       core alloc collections))
-$(eval $(call long-crate-rule, arena,       basic,                       $(LIBARENA_FLAGS)))
+$(eval $(call long-crate-rule, arena,       basic,                       $(LIBARENA_RSFLAGS), $(LIBARENA_RDFLAGS)))
 $(eval $(call crate-rule,      startup,     $(BASIC_REQS)))
 $(eval $(call crate-rule,      util,        $(BASIC_REQS)))
 $(eval $(call crate-rule,      procs,       $(BASIC_REQS) util startup))
 $(eval $(call crate-rule,      umem,        $(BASIC_REQS) procs util startup))
 #$(eval $(call crate-rule,      pageoutd,    $(BASIC_REQS) util procs))
 $(eval $(call crate-rule,      fs,          $(BASIC_REQS) umem procs))
-$(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem,    $(DRIVERS_FLAGS)))
+$(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem,    $(DRIVERS_RSFLAGS), $(DRIVERS_RDFLAGS)))
 $(eval $(call crate-rule,      main,        $(MAIN_REQS)))
 
 # Make the target for libm

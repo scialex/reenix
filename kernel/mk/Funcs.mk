@@ -2,7 +2,7 @@
 
 # Get an doc name from the crate name
 # $(1) is the name of the crate
-define doc-name
+define base-doc-name
 $(DOC_DIR)/$(1)/index.html
 endef
 
@@ -39,6 +39,7 @@ else
 endif
 $(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) $$(TMP_SBCN_FLAG) --print-file-name $(strip $(2))/lib.rs 2>/dev/null))
 $(strip $(1))_DIR  := $(strip $(2))
+$(strip $(1))_DOC  := $$(call base-doc-name,$(strip $(1)))
 $(call local-var-destroy,TMP_SBCN_FLAG)
 endef
 
@@ -71,10 +72,17 @@ endef
 define dir-name
 $(foreach l,$(1),$($(l)_DIR))
 endef
+
 # Get the file name of a crate name
 # $(1) is the name of the crate
 define lib-name
 $(foreach l,$(1),$($(l)_LIB))
+endef
+
+# Get the file name of documentation for a crate
+# $(1) is the name of the crate
+define doc-name
+$(foreach l,$(1),$($(l)_DOC))
 endef
 
 # Get the compiled object's name.
@@ -199,7 +207,7 @@ $(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(call lib-name,$(2))
 		                    $(3) $$(call dir-name,$(1))/lib.rs                         \
 						   	--out-dir $$(dir $(call lib-name,$(1)))
 
-$(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $$(call lib-name,$(2))
+$(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $$(call lib-name,$(2)) | $$(call doc-name,$(2))
 	@ echo "[RDOC] Documenting \"kernel/$$(call dir-name,$(1))\"..."
 	$$(HIDE_SIGIL) $$(RUSTDOC) $$(foreach l,$(2),--extern $$(l)=$$(call lib-name,$$(l))) \
 	                           $(4)                                                      \
@@ -214,8 +222,9 @@ endef
 # $(1) is the name of the crate
 # $(2) is the list of dependencies
 # $(3) is a list of custom rust flags
+# $(4) is a list of custom rustdoc flags
 define long-crate-rule
-$(eval $(call base-crate-rule,$(strip $(1)),$(2) ,$(3) $$(RSFLAGS),$$(RDFLAGS),$$(TARGET_FILENAME)))
+$(eval $(call base-crate-rule,$(strip $(1)),$(2) ,$(3) $$(RSFLAGS),$(4) $$(RDFLAGS),$$(TARGET_FILENAME)))
 endef
 
 # A Crate
