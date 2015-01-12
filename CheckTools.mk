@@ -9,11 +9,11 @@ RUST_PATCH := $(word 3,$(RUST_NUMBER))
 ifneq ($(RUST_NAME),rustc)
 $(error Found $(RUST_NAME) but expected rustc)
 else
-ifneq ($(RUST_MAJOR),0)
-$(error Found version $(RUST_MAJOR) expected 0)
+ifneq ($(RUST_MAJOR),1)
+$(warning Found version $(RUST_MAJOR) expected 0)
 else
-ifneq ($(RUST_MINOR),13)
-$(error Found $(RUST) version $(RUST_MINOR) expected 13)
+ifneq ($(RUST_MINOR),0)
+$(warning Found $(RUST) version $(RUST_MINOR) expected 13)
 else
 #$(info Using $(RUST) version '$(RUST_VERSION)')
 endif

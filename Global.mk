@@ -20,12 +20,16 @@ ASFLAGS   := -D__ASSEMBLY__
 include ../Config.mk
 include ../CheckTools.mk
 
-RSFLAGS   += $(foreach bool,$(COMPILE_CONFIG_BOOLS),$(if $(findstring 1,$($(bool))),--cfg $(bool),))
-RDFLAGS   += $(foreach bool,$(COMPILE_CONFIG_BOOLS),$(if $(findstring 1,$($(bool))),--cfg $(bool),))
-RSFLAGS   += $(foreach r,$(REMOVE_DBG), --cfg NDEBUG_$(r) )
-RDFLAGS   += $(foreach r,$(REMOVE_DBG), --cfg NDEBUG_$(r) )
-RSFLAGS   += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
-RDFLAGS   += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
+RSFLAGS += $(foreach lint,$(ALLOW_LINTS),--allow $(lint))
+RSFLAGS += $(foreach lint,$(WARN_LINTS),--warn $(lint))
+RSFLAGS += $(foreach lint,$(DENY_LINTS),--deny $(lint))
+RSFLAGS += $(foreach lint,$(FORBID_LINTS),--forbid $(lint))
+RSFLAGS += $(foreach bool,$(COMPILE_CONFIG_BOOLS),$(if $(findstring 1,$($(bool))),--cfg $(bool),))
+RDFLAGS += $(foreach bool,$(COMPILE_CONFIG_BOOLS),$(if $(findstring 1,$($(bool))),--cfg $(bool),))
+RSFLAGS += $(foreach r,$(REMOVE_DBG), --cfg NDEBUG_$(r) )
+RDFLAGS += $(foreach r,$(REMOVE_DBG), --cfg NDEBUG_$(r) )
+RSFLAGS += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
+RDFLAGS += $(foreach r,$(ADDITIONAL_CFGS),--cfg $(r) )
 
 ifneq ($(USE_STACK_CHECK),"true")
     RSFLAGS += -C no-stack-check --cfg NSTACK_CHECK

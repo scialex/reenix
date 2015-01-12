@@ -1,6 +1,7 @@
 
 //! An LRU cache where we can 'pin' items.
 
+use core::ops::Deref;
 use core::mem::size_of;
 use core::cell::*;
 use collections::*;
@@ -8,6 +9,7 @@ use base::make::*;
 use base::errno::Errno;
 use core::atomic::*;
 use core::prelude::*;
+use core::ops;
 use lru_cache::*;
 use key_ref::*;
 use alloc::boxed::*;
@@ -37,13 +39,13 @@ impl<K: Ord, V: Cacheable> CacheItem<K, V> {
     }
     /// increment the pincount
     pub fn pin(&self) {
-        let old_val = self.pcnt.fetch_add(1, SeqCst);
+        let old_val = self.pcnt.fetch_add(1, Ordering::SeqCst);
         assert!(old_val != -1);
     }
 
     /// decrement the pincount and notify the cache if nessecary.
     pub fn unpin(&self, owner: &PinnableCache<K, V>) {
-        let old_val = self.pcnt.fetch_sub(1, SeqCst);
+        let old_val = self.pcnt.fetch_sub(1, Ordering::SeqCst);
         assert!(old_val != 0, "Unpin called on an already unpinned value!");
         if old_val == 1 {
             owner.notify_unpinned(self);
@@ -57,15 +59,16 @@ impl<K: Ord, V: Cacheable> CacheItem<K, V> {
 
     /// Gets the pin count of this item.
     #[inline]
-    pub fn pin_count(&self) -> uint { self.pcnt.load(SeqCst) }
+    pub fn pin_count(&self) -> uint { self.pcnt.load(Ordering::SeqCst) }
     // TODO
 }
 
 impl<K: fmt::Show, V: fmt::Show> fmt::Show for CacheItem<K, V> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{{ pinned: {}, val: {} }}", self.pcnt.load(SeqCst), self.val) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{{ pinned: {}, val: {:?} }}", self.pcnt.load(Ordering::SeqCst), self.val) }
 }
 
-impl<K, V> Deref<(K, V)> for CacheItem<K, V> {
+impl<K, V> ops::Deref for CacheItem<K, V> {
+    type Target = (K, V);
     fn deref<'a>(&'a self) -> &'a (K, V) { &self.val }
 }
 
@@ -75,7 +78,7 @@ impl<K: Ord, V:Cacheable> Cacheable for CacheItem<K, V> {
 }
 
 /// The states a value in the cache can have.
-#[deriving(Eq, PartialEq, Copy)]
+#[derive(Eq, PartialEq, Copy)]
 pub enum State {
     Pinned(uint),
     Unpinned,
@@ -83,7 +86,7 @@ pub enum State {
 }
 
 /// The errors that can happen when we try to insert a value into the cache.
-#[deriving(Show, Copy)]
+#[derive(Show, Copy)]
 pub enum InsertError {
     /// There is already a key with that value in the cache.
     KeyPresent,
@@ -112,14 +115,14 @@ pub struct PinnableCache<K: Ord, V> {
     /// The map of unpinned values, which are eligible for deletion if we start to run out of space.
     unpinned : UnsafeCell<LruCache<KeyRef<K>, Box<CacheItem<K, V>>>>,
     /// The map of pinned values that may not be deleted.
-    pinned   : UnsafeCell<TreeMap <KeyRef<K>, Box<CacheItem<K, V>>>>,
+    pinned   : UnsafeCell<BTreeMap <KeyRef<K>, Box<CacheItem<K, V>>>>,
 }
 
 impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
     pub fn new() -> Allocation<PinnableCache<K, V>> {
         Ok(PinnableCache {
             unpinned : UnsafeCell::new(try!(LruCache::new())),
-            pinned   : UnsafeCell::new(TreeMap::new()),
+            pinned   : UnsafeCell::new(BTreeMap::new()),
         })
     }
 
@@ -195,8 +198,8 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
         }
     }
 
-    fn pinned_mut(&self) -> &mut TreeMap<KeyRef<K>, Box<CacheItem<K, V>>> { unsafe { transmute(self.pinned.get()) } }
-    fn pinned(&self) -> &TreeMap<KeyRef<K>, Box<CacheItem<K, V>>> { unsafe { transmute(self.pinned.get()) } }
+    fn pinned_mut(&self) -> &mut BTreeMap<KeyRef<K>, Box<CacheItem<K, V>>> { unsafe { transmute(self.pinned.get()) } }
+    fn pinned(&self) -> &BTreeMap<KeyRef<K>, Box<CacheItem<K, V>>> { unsafe { transmute(self.pinned.get()) } }
 
     fn unpinned_mut(&self) -> &mut LruCache<KeyRef<K>, Box<CacheItem<K, V>>> { unsafe { transmute(self.unpinned.get()) } }
     fn unpinned(&self) -> &LruCache<KeyRef<K>, Box<CacheItem<K, V>>> { unsafe { transmute(self.unpinned.get()) } }

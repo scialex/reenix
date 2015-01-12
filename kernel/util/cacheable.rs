@@ -21,20 +21,20 @@ impl<T> Cacheable for Rc<T> {
     fn is_still_useful(&self) -> bool { strong_count(self) != 1 }
 }
 
-macro_rules! base_deriving(
+macro_rules! base_deriving {
     ($v:ty) => (impl Cacheable for $v { fn is_still_useful(&self) -> bool { true } })
-)
+}
 
-base_deriving!(u8)
-base_deriving!(i8)
-base_deriving!(u16)
-base_deriving!(i16)
-base_deriving!(u32)
-base_deriving!(i32)
-base_deriving!(u64)
-base_deriving!(i64)
-base_deriving!(uint)
-base_deriving!(int)
+base_deriving!(u8);
+base_deriving!(i8);
+base_deriving!(u16);
+base_deriving!(i16);
+base_deriving!(u32);
+base_deriving!(i32);
+base_deriving!(u64);
+base_deriving!(i64);
+base_deriving!(uint);
+base_deriving!(int);
 
 impl<T> Cacheable for UnsafeCell<T> where T: Cacheable {
     fn is_still_useful(&self) -> bool { unsafe { self.get().as_ref().expect("cannot be null").is_still_useful() } }

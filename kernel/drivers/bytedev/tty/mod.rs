@@ -2,7 +2,6 @@
 
 //! The Reenix tty support module.
 
-use core::ptr::*;
 use core::cell::*;
 use core::prelude::*;
 use alloc::boxed::Box;
@@ -72,7 +71,7 @@ pub trait TTYDriver {
 const TTY_MAJOR : u8 = 2;
 const NUM_TTYS : u8 = 3;
 static mut CUR_TTY_ID : u8 = 0;
-static mut TTYS : [*mut TTY, ..(NUM_TTYS as uint)] = [0 as *mut TTY, ..(NUM_TTYS as uint)];
+static mut TTYS : [*mut TTY; (NUM_TTYS as uint)] = [0 as *mut TTY; (NUM_TTYS as uint)];
 fn create_ttys() {
     for i in range(0, NUM_TTYS) {
         let t = box UnsafeCell::new(TTY::create(box virtterm::VirtualTerminal::create(), box ldisc::LineDiscipline::create()));

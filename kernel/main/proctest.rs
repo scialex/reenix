@@ -4,8 +4,6 @@ use procs::kproc;
 use alloc::boxed::*;
 use libc::c_void;
 use core::prelude::*;
-use core::ptr::*;
-use collections::string;
 use procs::kthread;
 use core::mem::transmute_copy;
 use core::intrinsics::transmute;
@@ -14,6 +12,7 @@ use procs::interrupt;
 use procs::sync::*;
 use procs::args::ProcArgs;
 use alloc::rc::*;
+use collections::string::ToString;
 
 const GOOD : *mut c_void = 1 as *mut c_void;
 const BAD  : *mut c_void = 0 as *mut c_void;
@@ -22,12 +21,12 @@ const BAD  : *mut c_void = 0 as *mut c_void;
 pub fn start() {
     use base::debug;
     let (pass, total) = do_run(true);
-    dbg!(debug::TEST, "passed {} of {} tests", pass, total);
+    dbg!(debug::TEST, "passed {:?} of {:?} tests", pass, total);
 
     if cfg!(all(not(TEST_LOW_MEMORY), TEST_KILL_ALL)) {
         debug::remove_mode(debug::TEST);
         for i in range::<i32>(0, 10) {
-            kproc::KProc::new(string::String::from_str("fork fn"), fork_some, i, 0 as *mut c_void);
+            kproc::KProc::new("fork fn".to_string(), fork_some, i, 0 as *mut c_void);
             kthread::kyield();
         }
         for _ in range::<uint>(0, 10) {
@@ -46,22 +45,22 @@ fn do_run(single: bool) -> (uint, uint) {
     // TODO Embarrassing. This is not thread safe...
     let mut total : uint = 0;
     let mut pass : uint = 0;
-    macro_rules! basic_test(
+    macro_rules! basic_test{
         ($name:expr, $v:expr) => ({
             total += 1;
-            match kproc::KProc::new(string::String::from_str(stringify!($name)), $name, $v, 0 as *mut c_void) {
+            match kproc::KProc::new(stringify!($name).to_string(), $name, $v, 0 as *mut c_void) {
                 Ok(cnt1) => {
                     match kproc::KProc::waitpid(kproc::Pid(cnt1), 0) {
                         Ok((_, status)) => {
                             if status == GOOD as kproc::ProcStatus {
-                                dbg!(debug::TESTPASS, "Test {} {} passes", total, stringify!($name));
+                                dbg!(debug::TESTPASS, "Test {:?} {:?} passes", total, stringify!($name));
                                 pass += 1;
                             } else {
-                                dbg!(debug::TESTFAIL, "Test {} {} failed with {}", total, stringify!($name), status);
+                                dbg!(debug::TESTFAIL, "Test {:?} {:?} failed with {:?}", total, stringify!($name), status);
                             }
                         },
                         Err(errno) => {
-                            dbg!(debug::TESTFAIL, "test {} {} failed with errno {}", total, stringify!($name), errno);
+                            dbg!(debug::TESTFAIL, "test {:?} {:?} failed with errno {:?}", total, stringify!($name), errno);
                         }
                     }
                 },
@@ -69,7 +68,7 @@ fn do_run(single: bool) -> (uint, uint) {
             }
         });
         ($name:expr) => (basic_test!($name, 0))
-    )
+    }
     basic_test!(normal_fork);
     basic_test!(kill_self);
     basic_test!(kill_other, 0);
@@ -95,7 +94,7 @@ fn do_run(single: bool) -> (uint, uint) {
 }
 
 extern "Rust" fn regular_intr_handler(r: &mut interrupt::Registers) {
-    dbg!(debug::TEST, "entered intr handler! {}", r);
+    dbg!(debug::TEST, "entered intr handler! {:?}", r);
 }
 
 extern "C" fn test_handle_intr(_: i32, _: *mut c_void) -> *mut c_void {
@@ -117,15 +116,15 @@ extern "C" fn test_modify_intr_regs(_: i32, _: *mut c_void) -> *mut c_void {
 }
 
 extern "Rust" fn return_intr(r: &mut interrupt::Registers) {
-    dbg!(debug::TEST, "entered intr handler! Initial registers {}", r);
-    dbg!(debug::TEST, "returning value {}", GOOD);
+    dbg!(debug::TEST, "entered intr handler! Initial registers {:?}", r);
+    dbg!(debug::TEST, "returning value {:?}", GOOD);
     r.eax = GOOD as u32;
 }
 
 #[allow(unused_must_use)]
 extern "C" fn orphan_procs(n: i32, _:*mut c_void) -> *mut c_void {
     for i in range(0, n) {
-        kproc::KProc::new(string::String::from_str("ignored"), orphan_procs, i, 0 as *mut c_void);
+        kproc::KProc::new("ignored".to_string(), orphan_procs, i, 0 as *mut c_void);
     }
     kthread::kyield();
     GOOD
@@ -151,18 +150,18 @@ extern "C" fn fork_some(n: i32, _: *mut c_void) -> *mut c_void {
             if (current_thread!()).cancelled {
                 (current_thread!()).exit((current_thread!()).retval);
             } else {
-                kproc::KProc::new(string::String::from_str("target fn"), fork_some, i, 0 as *mut c_void);
+                kproc::KProc::new("target fn".to_string(), fork_some, i, 0 as *mut c_void);
                 kthread::kyield();
             }
         }
     }
-    dbg!(debug::TEST, "thread {} going to sleep.", n);
+    dbg!(debug::TEST, "thread {:?} going to sleep.", n);
     loop {
         kthread::kyield();
         if (current_thread!()).cancelled {
             (current_thread!()).exit((current_thread!()).retval);
         }
-        dbg!(debug::TEST, "{} {} not yet dead", current_proc!(), current_thread!());
+        dbg!(debug::TEST, "{:?} {:?} not yet dead", current_proc!(), current_thread!());
     }
 }
 
@@ -182,28 +181,28 @@ extern "C" fn to_kill(n: i32, p: *mut c_void) -> *mut c_void {
         kthread::kyield();
     }
     let pid : Box<ProcId> = unsafe { transmute(p) };
-    KProc::get_proc(&*pid).expect("there is no process of that pid").deref().borrow_mut().kill(GOOD as ProcStatus);
+    (*KProc::get_proc(&*pid).expect("there is no process of that pid")).borrow_mut().kill(GOOD as ProcStatus);
     dbg!(debug::TEST, "to_die thread killed");
     GOOD
 }
 
 extern "C" fn kill_other(n: i32, _: *mut c_void) -> *mut c_void {
-    let target = match kproc::KProc::new(string::String::from_str("target fn"), to_die, 0, 0 as *mut c_void) {
+    let target = match kproc::KProc::new("target fn".to_string(), to_die, 0, 0 as *mut c_void) {
         Ok(p) => p,
         _ => { return BAD; },
     };
     let rtarget = box target.clone();
-    let sniper = match kproc::KProc::new(string::String::from_str("sniper fn"), to_kill, n, unsafe { transmute(rtarget) }) {
+    let sniper = match kproc::KProc::new("sniper fn".to_string(), to_kill, n, unsafe { transmute(rtarget) }) {
         Ok(p) => p,
         _ => { return BAD; },
     };
     let (_, sv) = match KProc::waitpid(kproc::Pid(sniper), 0) {
         Ok(e) => e,
-        Err(e) => { dbg!(debug::TESTFAIL, "Waitpid returned {}", e); return BAD; }
+        Err(e) => { dbg!(debug::TESTFAIL, "Waitpid returned {:?}", e); return BAD; }
     };
     let (_, tv) = match KProc::waitpid(kproc::Pid(target), 0) {
         Ok(e) => e,
-        Err(e) => { dbg!(debug::TESTFAIL, "Waitpid returned {}", e); return BAD; }
+        Err(e) => { dbg!(debug::TESTFAIL, "Waitpid returned {:?}", e); return BAD; }
     };
     if sv == (GOOD as ProcStatus) && tv == (GOOD as ProcStatus) {
         return GOOD;
@@ -245,7 +244,7 @@ extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 
     for _ in range(0, n) {
         // TODO How to make this say which number they are?
-        kproc::KProc::new(string::String::from_str("counter n"), counter, high, 0 as *mut c_void);
+        kproc::KProc::new("counter n".to_string(), counter, high, 0 as *mut c_void);
     }
 
     let mut tot : i32 = 0;
@@ -254,14 +253,14 @@ extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
             Ok(e) => e,
             Err(_) => { return BAD; },
         };
-        dbg!(debug::TEST, "pid {} returned {}", p, v);
+        dbg!(debug::TEST, "pid {:?} returned {:?}", p, v);
         tot += v as i32;
     }
     let ret = if tot == unsafe { cnt } {
-        dbg!(debug::TESTPASS, "successfully counted to {} with {} counters", tot, n);
+        dbg!(debug::TESTPASS, "successfully counted to {:?} with {:?} counters", tot, n);
         GOOD
     } else {
-        dbg!(debug::TESTFAIL, "failed counted to {} with {} counters, got {}", high, n, tot);
+        dbg!(debug::TESTFAIL, "failed counted to {:?} with {:?} counters, got {:?}", high, n, tot);
         BAD
     };
     unsafe { cnt = 0; c_mutex = 0 as *mut KMutex; }
@@ -277,7 +276,7 @@ extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 
     for _ in range(0, n) {
         // TODO How to make this say which number they are?
-        kproc::KProc::new(string::String::from_str("better counter n"), better_counter, high, unsafe { ProcArgs::new(x.clone()).unwrap().to_arg() });
+        kproc::KProc::new("better counter n".to_string(), better_counter, high, unsafe { ProcArgs::new(x.clone()).unwrap().to_arg() });
     }
 
     let mut tot : i32 = 0;
@@ -286,14 +285,14 @@ extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
             Ok(e) => e,
             Err(_) => { return BAD; },
         };
-        dbg!(debug::TEST, "pid {} returned {}", p, v);
+        dbg!(debug::TEST, "pid {:?} returned {:?}", p, v);
         tot += v as i32;
     }
     let ret = if tot == (*x).lock().and_then(|g| { Ok(*g) }).unwrap_or(0) {
-        dbg!(debug::TESTPASS, "successfully counted to {} with {} counters, using Mutex", tot, n);
+        dbg!(debug::TESTPASS, "successfully counted to {:?} with {:?} counters, using Mutex", tot, n);
         GOOD
     } else {
-        dbg!(debug::TESTFAIL, "failed counted to {} with {} counters, got {}, using Mutex", high, n, tot);
+        dbg!(debug::TESTFAIL, "failed counted to {:?} with {:?} counters, got {:?}, using Mutex", high, n, tot);
         BAD
     };
     assert!(is_unique(&x));
@@ -313,7 +312,7 @@ extern "C" fn better_counter(h: i32, v : *mut c_void) -> *mut c_void {
         if *v == h {
             return c as *mut c_void;
         } else {
-            *(v.deref_mut()) += 1;
+            *(&mut *v) += 1;
             c += 1;
             if c % 5 == 0 {
                 kthread::kyield();

@@ -2,7 +2,7 @@
 #![crate_name="startup"]
 #![crate_type="rlib"]
 #![no_std]
-#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics)]
+#![feature(asm, concat_idents, lang_items, intrinsics)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
@@ -15,8 +15,8 @@
 // TODO This should be placed before base in initialization and we should
 // remove the pci stuff to drivers.
 
-#[phase(plugin, link)] extern crate core;
-#[phase(plugin, link)] extern crate base;
+#[macro_use] extern crate core;
+#[macro_use] extern crate base;
 extern crate mm;
 extern crate collections;
 extern crate alloc;
@@ -89,7 +89,7 @@ pub mod tsd {
     #[cfg(target_arch="x86")]
     #[repr(C, packed)]
     pub struct TSDInfo {
-        vlow : [u8, ..0x30],
+        vlow : [u8; 0x30],
         stack_high : u32, // At offset 0x30
         data : VecMap<Box<Any>>,
     }
@@ -99,7 +99,7 @@ pub mod tsd {
     impl TSDInfo {
         #[cfg(target_arch="x86")]
         pub fn new(high: u32) -> TSDInfo {
-            TSDInfo{vlow: [0, ..0x30], stack_high: high, data : VecMap::with_capacity(4) }
+            TSDInfo{vlow: [0; 0x30], stack_high: high, data : VecMap::with_capacity(4) }
         }
 
         pub fn set_slot(&mut self, i: uint, v: Box<Any>) { self.data.insert(i, v); }
@@ -126,10 +126,10 @@ pub mod tsd {
         }
     }
 
-    #[deriving(Copy)]
+    #[derive(Copy)]
     #[repr(C, packed)]
-    pub struct InitialTSDInfo { vlow : [u8, ..0x30], stack_high : u32}
-    pub static INITIAL_TSD : InitialTSDInfo = InitialTSDInfo { vlow: [0, ..0x30], stack_high: 0};
+    pub struct InitialTSDInfo { vlow : [u8; 0x30], stack_high : u32}
+    pub static INITIAL_TSD : InitialTSDInfo = InitialTSDInfo { vlow: [0; 0x30], stack_high: 0};
 }
 
 // TODO I should move this to rust.
@@ -190,7 +190,8 @@ pub mod gdt {
 }
 
 
+#[doc(hidden)]
 mod std {
-    pub use core::kinds;
+    pub use core::marker;
     pub use core::fmt;
 }

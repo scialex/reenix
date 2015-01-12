@@ -114,13 +114,13 @@ all:  $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 docs: $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 
 # We need to tell liballoc to use our memory manager.
-LIBALLOC_RSFLAGS := -A dead_code --cfg external_crate --extern external=$(call lib-name,mm) \
-                    --opt-level=$(DEFAULT_CRATE_OPT)
+LIBALLOC_RSFLAGS := -A dead_code --cfg feature=\"external_crate\" --extern external=$(call lib-name,mm) \
+                    -C opt-level=$(DEFAULT_CRATE_OPT)
 LIBALLOC_RDFLAGS := --cfg external_crate --extern external=$(call lib-name,mm)
-LIBARENA_RSFLAGS := --extern std=$(call lib-name,basic) --opt-level=$(DEFAULT_CRATE_OPT)
+LIBARENA_RSFLAGS := --extern std=$(call lib-name,basic) -C opt-level=$(DEFAULT_CRATE_OPT)
 LIBARENA_RDFLAGS := --extern std=$(call lib-name,basic)
 # TODO For some reason LLVM doesn't like -O2 in drivers.
-DRIVERS_RSFLAGS  := --opt-level=1
+DRIVERS_RSFLAGS  := -C opt-level=1
 DRIVERS_RDFLAGS  :=
 
 # Plugins
@@ -149,7 +149,7 @@ $(eval $(call crate-rule,      util,        $(BASIC_REQS)))
 $(eval $(call crate-rule,      procs,       $(BASIC_REQS) util startup))
 $(eval $(call crate-rule,      umem,        $(BASIC_REQS) procs util startup))
 #$(eval $(call crate-rule,      pageoutd,    $(BASIC_REQS) util procs))
-$(eval $(call crate-rule,      fs,          $(BASIC_REQS) umem procs))
+#$(eval $(call crate-rule,      fs,          $(BASIC_REQS) umem procs))
 $(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem,    $(DRIVERS_RSFLAGS), $(DRIVERS_RDFLAGS)))
 $(eval $(call crate-rule,      main,        $(MAIN_REQS)))
 

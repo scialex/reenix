@@ -1,7 +1,8 @@
 use core::prelude::*;
 use core::atomic::*;
+use core::atomic::Ordering::SeqCst;
 use core::cell::UnsafeCell;
-use core::ptr::*;
+use core::ops::{DerefMut, Deref};
 
 pub use kmutex::KMutex;
 pub use kqueue::WQueue;
@@ -47,7 +48,7 @@ impl SMutex {
     fn unlock(&self) { self.inner.unlock(); }
     fn wait(&self) -> Result<(),()> {
         block_interrupts!({
-            dbg!(debug::SCHED, "{} going to sleep on mutex {} with queue {}", current_proc!(), self.inner, self.wqueue);
+            dbg!(debug::SCHED, "{:?} going to sleep on mutex {:?} with queue {:?}", current_proc!(), self.inner, self.wqueue);
             self.unlock();
             let res = self.wqueue.wait();
             // Even if we failed this lock still needs to be valid.
@@ -78,7 +79,7 @@ impl SMutex {
 }
 
 impl Wakeup for SMutex {
-    fn signal(&self) { dbg!(debug::SCHED, "sending wakeup on {} with {}", self.inner, self.wqueue); self.wqueue.signal(); }
+    fn signal(&self) { dbg!(debug::SCHED, "sending wakeup on {:?} with {:?}", self.inner, self.wqueue); self.wqueue.signal(); }
 }
 
 #[unsafe_destructor]
@@ -140,11 +141,12 @@ impl<T> Wakeup for Mutex<T> {
     fn signal(&self) { self._lock.signal(); }
 }
 
-impl<'a, T> Deref<T> for MGuard<'a, T> {
+impl<'a, T> Deref for MGuard<'a, T> {
+    type Target = T;
     fn deref<'b>(&'b self) -> &'b T { &*self._data }
 }
 
-impl<'a, T> DerefMut<T> for MGuard<'a, T> {
+impl<'a, T> DerefMut for MGuard<'a, T> {
     fn deref_mut<'b>(&'b mut self) -> &'b mut T { &mut *self._data }
 }
 
@@ -184,11 +186,12 @@ impl<'a, T> Wait<(),()> for CGuard<'a, T> {
     }
 }
 
-impl<'a, T> Deref<T> for CGuard<'a, T> {
+impl<'a, T> Deref for CGuard<'a, T> {
+    type Target = T;
     fn deref<'b>(&'b self) -> &'b T { self._lock.deref() }
 }
 
-impl<'a, T> DerefMut<T> for CGuard<'a, T> {
+impl<'a, T> DerefMut for CGuard<'a, T> {
     fn deref_mut<'b>(&'b mut self) -> &'b mut T { self._lock.deref_mut() }
 }
 
@@ -336,10 +339,11 @@ impl<T> SpinMutex<T> {
     }
 }
 
-impl<'a, T> Deref<T> for SMGuard<'a, T> {
+impl<'a, T> Deref for SMGuard<'a, T> {
+    type Target = T;
     fn deref<'b>(&'b self) -> &'b T { &*self._data }
 }
 
-impl<'a, T> DerefMut<T> for SMGuard<'a, T> {
+impl<'a, T> DerefMut for SMGuard<'a, T> {
     fn deref_mut<'b>(&'b mut self) -> &'b mut T { &mut *self._data }
 }

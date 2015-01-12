@@ -3,14 +3,13 @@
 //! more about drivers.
 
 use core::cell::*;
-use core::ptr::*;
-use core::fmt::{mod, Show, Formatter};
+use core::fmt::{self, Show, Formatter};
 use core::prelude::*;
 use errno::KResult;
 
 /// The ID number of a device, it consists of a pair of 8 bit numbers that together identify the
 /// device uniquely.
-#[deriving(Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy)]
 pub struct DeviceId(pub u16);
 impl DeviceId {
     /// Create a DeviceId with the given major and minor Id numbers.
@@ -35,9 +34,9 @@ impl Show for DeviceId {
 
 /// Create a device ID in a static manner.
 #[macro_export]
-macro_rules! DeviceId_static(
+macro_rules! DeviceId_static {
     ($h:expr, $l:expr) => ( DeviceId((($h as u16) << 8) | ($l as u16)) )
-)
+}
 
 /// A device capable of reading in units of `T`.
 pub trait RDevice<T> {
@@ -85,6 +84,6 @@ impl<T, D> WDevice<T> for UnsafeCell<D> where D: WDeviceMut<T> {
 }
 
 /// A Device that can both read and write.
-pub trait Device<T> : WDevice<T> + RDevice<T> + 'static + Sized {}
+pub trait Device<T> : WDevice<T> + RDevice<T> + 'static {}
 
-impl<T,D> Device<T> for UnsafeCell<D> where D: RDeviceMut<T> + WDeviceMut<T> + 'static + Sized {}
+impl<T,D> Device<T> for UnsafeCell<D> where D: RDeviceMut<T> + WDeviceMut<T> + 'static {}

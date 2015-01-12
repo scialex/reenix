@@ -2,18 +2,16 @@
 
 //! The flags for dbg!.
 
-use core::prelude::*;
-use core::fmt::*;
 use core::fmt;
 
-macro_rules! dbg_modes (
+macro_rules! dbg_modes {
     ($(($n:ident, $v:expr, $c:expr, $ex:expr)),+) => (
         bitmask_create!(
             #[doc="The different debugging modes"]
             flags DbgMode : u64 {
             #[doc = "no error"] default NONE,
             $(#[doc = $ex ] $n = $v),+
-        })
+        });
         #[doc="All the errors at once"]
         pub const ALL : DbgMode = DbgMode(-1);
         impl DbgMode {
@@ -35,12 +33,12 @@ macro_rules! dbg_modes (
             }
         }
     )
-)
+}
 
 #[cfg(TEST_LOW_MEMORY)] pub const BACKUP_MM : DbgMode = MM;
 #[cfg(not(TEST_LOW_MEMORY))] pub const BACKUP_MM : DbgMode = DANGER;
 
-dbg_modes!(
+dbg_modes!{
     (CORE,        0,  color::GREEN,   "core boot code"),
     (MM,          1,  color::RED,     "memory management"),
     (INIT,        2,  color::NORMAL,  "boot/init code"),
@@ -83,7 +81,7 @@ dbg_modes!(
 
     // This one should always be last.
     (PANIC,       63, color::RED,     "PANIC!")
-)
+}
 
 /// The colors we can have
 pub mod color {

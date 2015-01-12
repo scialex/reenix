@@ -6,14 +6,13 @@ use core::prelude::*;
 use util::Cacheable;
 use DeviceId;
 use core::cell::*;
-use core::ptr::*;
 use base::{io, kernel};
 use blockdev::disk::dma;
 use procs::interrupt;
 use procs::sync::*;
-use base::errno::{KResult, mod};
+use base::errno::{KResult, self};
 use libc::c_void;
-use core::fmt::{mod, Formatter, Show};
+use core::fmt::{self, Formatter, Show};
 use umem::mmobj::{MMObjId, MMObjMut};
 use umem::pframe::PFrame;
 use RDeviceMut;
@@ -139,7 +138,7 @@ mod command {
 
 const IDENT_MAX_LBA : uint = 30;
 
-#[deriving(Show, Clone)]
+#[derive(Show, Clone)]
 struct Channel {
     cmd : u16,
     ctrl: u16,
@@ -200,7 +199,7 @@ pub fn init_stage2() {
 
             // If status register is 0x00 drive does not exist.
             if 0 == c.inb(register::STATUS) {
-                dbg!(debug::DISK | debug::CORE, "Drive {} does not exist! status is 0b{:08b}", c, c.inb(register::STATUS));
+                dbg!(debug::DISK | debug::CORE, "Drive {:?} does not exist! status is 0b{:08b}", c, c.inb(register::STATUS));
                 continue;
             }
             // Poll until the bsy bit clears.
@@ -213,7 +212,7 @@ pub fn init_stage2() {
             loop {
                 let cur_status = c.inb(register::STATUS);
                 if cur_status & status::ERR != 0 {
-                    kpanic!("Error setting up ATA drive {}, status is 0b{:08b}", c, cur_status);
+                    kpanic!("Error setting up ATA drive {:?}, status is 0b{:08b}", c, cur_status);
                 }
                 if cur_status & status::DRQ != 0 { break; } else { c.pause(); }
             }
@@ -221,7 +220,7 @@ pub fn init_stage2() {
             // Now clear the command register
             io::outb(ports::PRIMARY_CTRL + (register::CONTROL as u16), 0x00);
 
-            let mut id_buf : [u32, ..IDENT_BUFSIZE] = [0, ..IDENT_BUFSIZE];
+            let mut id_buf : [u32; IDENT_BUFSIZE] = [0; IDENT_BUFSIZE];
             // Get the meta data of the disk.
             for i in id_buf.iter_mut() {
                 *i = c.inl(register::DATA);
@@ -243,14 +242,14 @@ pub fn init_stage2() {
             // TODO to TTY in interrupt handler.
             DISKS[rd.channel.get_channel_num() as uint] = disk.get();
             interrupt::register(rd.channel.intr, ata_intr_handler);
-            dbg!(debug::DISK, "Registering disk {}", rd);
+            dbg!(debug::DISK, "Registering disk {:?}", rd);
             ::blockdev::register(rd.channel.dev, disk);
         }
     }
 }
 
-static mut DISKS : [*mut ATADisk, ..NDISKS] = [0 as *mut ATADisk, ..NDISKS];
-const DEFAULT_CHANNELS : [Channel, ..NUM_CHANNELS] = [Channel { cmd : ports::PRIMARY_CMD,
+static mut DISKS : [*mut ATADisk; NDISKS] = [0 as *mut ATADisk; NDISKS];
+const DEFAULT_CHANNELS : [Channel; NUM_CHANNELS] = [Channel { cmd : ports::PRIMARY_CMD,
                                                                 ctrl: ports::PRIMARY_CTRL,
                                                                 intr: interrupt::DISK_PRIMARY,
                                                                 dev : DeviceId_static!(DISK_MAJOR, 0),
@@ -273,7 +272,7 @@ pub struct ATADisk {
 
 impl Show for ATADisk {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(f, "{}-ATADisk {{ channel: {}, size: {}k }}",
+        write!(f, "{}-ATADisk {{ channel: {:?}, size: {}k }}",
                if self.is_master { "master" } else {"slave"}, self.channel, ((self.size/self.sectors_per_block)*BLOCK_SIZE)/1024)
     }
 }
@@ -289,7 +288,7 @@ impl ATADisk {
             sectors_per_block : sectors_per_block,
             mutex : SMutex::new("ATA disk mutex"),
             queue : WQueue::new(),
-            prd   : dma::Prd { addr: 0, count: 0, last : 0, buf: [0, ..128] },
+            prd   : dma::Prd { addr: 0, count: 0, last : 0, buf: [0; 128] },
         }
     }
 
@@ -348,7 +347,7 @@ impl ATADisk {
         }
     }
 
-    fn write_single(&mut self, block: uint, buf: &[u8, ..page::SIZE]) -> KResult<uint> {
+    fn write_single(&mut self, block: uint, buf: &[u8; page::SIZE]) -> KResult<uint> {
         if !page::aligned(buf.as_ptr()) {
             kpanic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
             // TODO I might want to just copy it if we get this, OTOH It is unlikely to be much of
@@ -360,7 +359,7 @@ impl ATADisk {
     /// Read a single block from the device. This requires that buf be page aligned (although due
     /// to the way weenix handles memory this should almost always be true anyway) and then reads
     /// the block.
-    fn read_single(&mut self, block: uint, buf: &mut [u8, ..page::SIZE]) -> KResult<uint> {
+    fn read_single(&mut self, block: uint, buf: &mut [u8; page::SIZE]) -> KResult<uint> {
         if !page::aligned(buf.as_ptr()) {
             kpanic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
             // TODO I might want to just copy it if we get this, OTOH It is unlikely to be much of
@@ -370,10 +369,10 @@ impl ATADisk {
     }
 }
 
-impl RDeviceMut<[u8, ..page::SIZE]> for ATADisk {
+impl RDeviceMut<[u8; page::SIZE]> for ATADisk {
     /// Read buf.len() objects from the device starting at offset. Returns the number of objects
     /// read from the stream, or errno if it fails.
-    fn read_from(&mut self, offset: uint, buf: &mut [[u8, ..page::SIZE]]) -> KResult<uint> {
+    fn read_from(&mut self, offset: uint, buf: &mut [[u8; page::SIZE]]) -> KResult<uint> {
         for i in range(0, buf.len()) {
             try!(self.read_single(offset + i, &mut buf[i]));
         }
@@ -381,10 +380,10 @@ impl RDeviceMut<[u8, ..page::SIZE]> for ATADisk {
     }
 }
 
-impl WDeviceMut<[u8, ..page::SIZE]> for ATADisk {
+impl WDeviceMut<[u8; page::SIZE]> for ATADisk {
     /// Write the buffer to the device, starting at the given offset from the start of the device.
     /// Returns the number of bytes written or errno if an error happens.
-    fn write_to(&mut self, offset: uint, buf: &[[u8, ..page::SIZE]]) -> KResult<uint> {
+    fn write_to(&mut self, offset: uint, buf: &[[u8; page::SIZE]]) -> KResult<uint> {
         for i in range(0, buf.len()) {
             dbg!(debug::DISK, "starting write of page {} to block {}", i, offset + i);
             try!(self.write_single(offset + i, &buf[i]));
@@ -423,7 +422,7 @@ impl MMObjMut for ATADisk {
         self.write_to(pgnum, ref_slice(pf.get_page())).map(|_| ())
     }
 
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{}", self) }
+    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{:?}", self) }
 }
 
 impl Cacheable for ATADisk { fn is_still_useful(&self) -> bool { true } }

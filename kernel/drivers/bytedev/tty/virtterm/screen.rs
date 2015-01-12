@@ -1,11 +1,11 @@
 
 //! The Reenix screen writing code.
 
+use core::ptr::write;
 use core::prelude::*;
 use base::io::outb;
 use mm::pagetable;
 use libc::uintptr_t;
-use core::ptr::*;
 
 pub fn init_stage1() {}
 pub fn init_stage2() {
@@ -59,7 +59,7 @@ impl Screen {
     }
 
     #[allow(dead_code)]
-    pub unsafe fn put_buf(&self, buf: &[[u8, ..UINT_DISPLAY_WIDTH], ..UINT_DISPLAY_HEIGHT]) {
+    pub unsafe fn put_buf(&self, buf: &[[u8; UINT_DISPLAY_WIDTH]; UINT_DISPLAY_HEIGHT]) {
         for y in range(0, DISPLAY_HEIGHT) {
             for x in range(0, DISPLAY_WIDTH) {
                 self.put_char(buf[y as uint][x as uint], x, y);
@@ -67,14 +67,14 @@ impl Screen {
         }
     }
 
-    pub unsafe fn put_line(&self, l: &[u8, ..UINT_DISPLAY_WIDTH], off: u8) {
+    pub unsafe fn put_line(&self, l: &[u8; UINT_DISPLAY_WIDTH], off: u8) {
         assert!(off < DISPLAY_HEIGHT);
         for x in range(0, DISPLAY_WIDTH) {
             self.put_char(l[x as uint], x, off);
         }
     }
 
-    pub unsafe fn put_lines<'a>(&self, lines: &[[u8, ..UINT_DISPLAY_WIDTH]], mut start: u8) {
+    pub unsafe fn put_lines<'a>(&self, lines: &[[u8; UINT_DISPLAY_WIDTH]], mut start: u8) {
         for l in lines.iter() {
             self.put_line(l, start);
             start += 1;

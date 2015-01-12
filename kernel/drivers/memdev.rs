@@ -5,7 +5,7 @@ use core::prelude::*;
 use util::Cacheable;
 use DeviceId;
 use base::errno::{Errno, KResult};
-use core::fmt::{mod, Formatter};
+use core::fmt::{self, Formatter};
 use umem::mmobj::{MMObjId, MMObj};
 use umem::pframe::PFrame;
 use RDevice;

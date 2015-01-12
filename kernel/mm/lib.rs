@@ -6,17 +6,17 @@
 
 #![crate_name="mm"]
 #![crate_type="rlib"]
-#![allow(non_camel_case_types)]
+#![allow(non_camel_case_types, staged_experimental, staged_unstable)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(phase, globs, macro_rules, asm)]
+#![feature(plugin, asm)]
 #![no_std]
 
-#[phase(plugin)] extern crate hoare;
-#[phase(plugin)] extern crate bassert;
-#[phase(plugin)] extern crate enabled;
-#[phase(link, plugin)] extern crate core;
-#[phase(link, plugin)] extern crate base;
+#[plugin] #[no_link] extern crate hoare;
+#[plugin] #[no_link] #[macro_use] extern crate bassert;
+#[plugin] #[no_link] #[macro_use] extern crate enabled;
+#[macro_use] extern crate core;
+#[macro_use] extern crate base;
 extern crate libc;
 
 use libc::{c_void, size_t};
@@ -128,7 +128,6 @@ pub mod page {
     use core::intrinsics::transmute;
     use libc::{uintptr_t, c_void};
     use core::prelude::*;
-    use core::ptr::*;
     extern "C" {
         #[link_name = "page_add_range"]
         pub fn c_add_range(start: uintptr_t, end: uintptr_t);
@@ -219,7 +218,7 @@ pub mod page {
 
 #[doc(hidden)]
 mod std {
-    pub use core::kinds;
+    pub use core::marker;
     pub use core::cmp;
     pub use core::fmt;
     pub use core::option;

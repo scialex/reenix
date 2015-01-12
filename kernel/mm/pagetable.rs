@@ -30,8 +30,8 @@ type pde = uint;
 
 #[repr(C, packed)]
 pub struct PageDir {
-    pd_physical : [pde, .. ENTRY_COUNT],
-    pd_virtual  : [*mut pte, .. ENTRY_COUNT],
+    pd_physical : [pde; ENTRY_COUNT],
+    pd_virtual  : [*mut pte; ENTRY_COUNT],
 }
 
 impl PageDir {

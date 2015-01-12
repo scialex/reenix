@@ -2,11 +2,13 @@
 
 //! All the debug stuff.
 
-#![macro_escape]
-
 /// Reexport flags.
 pub use self::flags::*;
+use core::prelude::*;
 use core::fmt;
+
+#[macro_use]
+mod macros;
 
 pub mod printing;
 mod flags;
@@ -27,29 +29,47 @@ pub fn setup() {
 
 /// Sets a mode as one that should not be printed.
 pub fn remove_mode(m: DbgMode) {
+    dbg!(debug::CORE, "removing mode {}", m);
     unsafe { DBG_ACTIVE = DBG_ACTIVE - m; }
 }
 
 /// Sets a mode as being one that should be printed
 pub fn add_mode(m: DbgMode) {
+    dbg!(debug::CORE, "adding mode {}", m);
     unsafe { DBG_ACTIVE = DBG_ACTIVE + m; }
 }
 
-mod macros;
-
+#[allow(improper_ctypes)]
 extern "C" {
     /// A function which can be used to get the current pid number to aid in debuging.
-    fn get_dbg_pid() -> &'static fmt::Show;
+    fn get_dbg_pid() -> Option<::pid::ProcId>;
 }
+
+#[inline]
+#[no_stack_check]
 #[doc(hidden)]
-pub fn dbg_pid() -> &'static (fmt::Show + 'static) {
-    unsafe { get_dbg_pid() }
+pub fn dbg_pid() -> MaybePid {
+    unsafe { MaybePid(get_dbg_pid()) }
+}
+
+#[doc(hidden)]
+#[derive(Copy)]
+pub struct MaybePid(Option<::pid::ProcId>);
+
+impl fmt::Show for MaybePid {
+    #[no_stack_check]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.0 {
+            Some(v) => { write!(f, "{:?}", v) }
+            None => { write!(f, "\x08") }
+        }
+    }
 }
 
 #[no_stack_check]
 #[doc(hidden)]
 #[inline(never)]
-pub fn dbg_print(msg: &fmt::Arguments) {
+pub fn dbg_print(msg: fmt::Arguments) {
     use core::result::Result::Err;
     use debug::printing::DBG_WRITER;
     match fmt::write(unsafe { &mut DBG_WRITER }, msg) {

@@ -4,7 +4,6 @@
 use alloc::boxed::Box;
 use alloc::rc::*;
 use core::prelude::*;
-use core::ptr::*;
 use mm::page;
 use super::{DeviceId, Device};
 use collections::*;
@@ -17,22 +16,22 @@ pub fn init_stage2() {
 }
 pub fn init_stage3() {}
 
-pub trait BlockDevice : Device<[u8, ..page::SIZE]> + MMObj {}
+pub trait BlockDevice : Device<[u8; page::SIZE]> + MMObj {}
 
 /// What we give out to those who want block devices.
 pub type ExternBlockDevice = Rc<Box<BlockDevice>>;
 
-static mut DEVICES : *mut TreeMap<DeviceId, ExternBlockDevice> = 0 as *mut TreeMap<DeviceId, ExternBlockDevice>;
+static mut DEVICES : *mut BTreeMap<DeviceId, ExternBlockDevice> = 0 as *mut BTreeMap<DeviceId, ExternBlockDevice>;
 fn init_device_tree() {
     use core::mem::transmute;
     unsafe {
         assert!(DEVICES.is_null());
-        let d = box TreeMap::<DeviceId, ExternBlockDevice>::new();
+        let d = box BTreeMap::<DeviceId, ExternBlockDevice>::new();
         DEVICES = transmute(d);
     }
 }
 
-fn get_device_tree() -> &'static mut TreeMap<DeviceId, ExternBlockDevice> {
+fn get_device_tree() -> &'static mut BTreeMap<DeviceId, ExternBlockDevice> {
     unsafe { DEVICES.as_mut().expect("Device tree is null!") }
 }
 

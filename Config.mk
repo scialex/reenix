@@ -127,3 +127,9 @@ DEFAULT_CRATE_OPT := 2
 # XXX MEMORY=32 is hardcoded in ./weenix right now -- this line here is
 #     currently ignored
         MEMORY=256
+
+# The rust lints to use
+ ALLOW_LINTS = unstable
+  WARN_LINTS =
+  DENY_LINTS =
+FORBID_LINTS =

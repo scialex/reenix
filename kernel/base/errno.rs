@@ -4,17 +4,15 @@
 
 use core::default::Default;
 use core::result::Result;
-use describe::*;
-use core::fmt;
 
 pub use errno::Errno::*;
 /// A KResult is a common type of return value for a kernel operation, where it either succeeds or
 /// returns an errno appropriate to the failure.
 pub type KResult<T> = Result<T, Errno>;
 
-macro_rules! errnos (
+macro_rules! errnos {
     ($(($n:ident, $v:expr, $ex:expr)),+) => (
-        #[deriving(PartialEq, Eq, Show, FromPrimitive, Clone, Copy)]
+        #[derive(PartialEq, Eq, Show, FromPrimitive, Clone, Copy)]
         #[repr(i32)]
         #[doc = "The standard errno definition."]
         pub enum Errno {
@@ -25,21 +23,16 @@ macro_rules! errnos (
 
         impl Errno {
             /// Get the explanation of what the given `errno` represents.
-            pub fn to_explanation(e: Errno) -> &'static str {
-                match e {
-                   $($n => $ex,)*
+            pub fn to_explanation(&self) -> &'static str {
+                match self {
+                   $(&$n => $ex,)*
                 }
             }
         }
-        impl Describeable for Errno {
-            fn describe(&self, f: &mut fmt::Formatter) -> fmt::Result {
-                write!(f, "{}", Errno::to_explanation(*self))
-            }
-        }
     )
-)
+}
 
-errnos!(
+errnos!{
     (EOK,               0, "No error occured!"),
     (EPERM,             1, "Operation not permitted"),
     (ENOENT,            2, "No such file or directory"),
@@ -174,7 +167,7 @@ errnos!(
     (ENOTRECOVERABLE, 131, "State not recoverable"),
 
     (EUNKNOWN,        180, "Uknown error occured")
-)
+}
 
 impl Default for Errno {
     #[inline] fn default() -> Errno { EOK }

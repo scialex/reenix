@@ -4,15 +4,15 @@
 #![crate_type="rlib"]
 
 #![no_std]
-#![feature(phase, globs, macro_rules, asm, default_type_params, unsafe_destructor)]
+#![feature(asm, unsafe_destructor, plugin, box_syntax)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
-#[phase(plugin)] extern crate hoare;
-#[phase(link, plugin)] extern crate core;
-#[phase(link, plugin)] extern crate base;
-#[phase(link, plugin)] extern crate collections;
-#[phase(link, plugin)] extern crate mm;
+#[plugin] #[no_link] extern crate hoare;
+#[macro_use] extern crate core;
+#[macro_use] extern crate base;
+#[macro_use] extern crate collections;
+#[macro_use] extern crate mm;
 extern crate alloc;
 extern crate libc;
 
@@ -33,8 +33,9 @@ mod list_node;
 /// A module containing a key_ref, an unsafe reference to a value, used so we can have maps where
 /// the key is recoverable. This is very unsafe.
 mod key_ref {
-    use core::mem::transmute;
     use core::prelude::*;
+    use core::mem::transmute;
+    use core::cmp::Ordering;
 
     /// A struct used as the key for our map so we can get the key back out without trouble.
     /// Does not require lifetime bounds because the checker wouldn't be able to verify it since it
@@ -61,10 +62,10 @@ mod key_ref {
 #[doc(hidden)]
 mod std {
     pub use core::clone;
-    pub use core::kinds;
+    pub use core::marker;
     pub use core::cmp;
     pub use core::fmt;
     pub use core::num;
     pub use core::option;
-    pub use collections::hash;
+    pub use core::hash;
 }

@@ -5,17 +5,17 @@
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![no_std]
-#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics)]
+#![feature(asm, concat_idents, lang_items, plugin, intrinsics, box_syntax)]
 
 //! # The Reenix drivers stuff.
 ///
 /// This is all the drivers code in reenix.
 
-#[phase(plugin)] extern crate bassert;
-#[phase(plugin, link)] extern crate core;
-#[phase(plugin, link)] extern crate base;
-#[phase(plugin, link)] extern crate mm;
-#[phase(plugin, link)] extern crate procs;
+#[macro_use] #[plugin] #[no_link] extern crate bassert;
+#[macro_use] extern crate core;
+#[macro_use] extern crate base;
+#[macro_use] extern crate mm;
+#[macro_use] extern crate procs;
 extern crate umem;
 extern crate util;
 extern crate startup;
@@ -55,5 +55,5 @@ mod std {
     pub use core::fmt;
     pub use core::num;
     pub use core::option;
-    pub use collections::hash;
+    pub use core::hash;
 }

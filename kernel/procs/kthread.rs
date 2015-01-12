@@ -6,25 +6,24 @@ use mm::alloc;
 use alloc::boxed::*;
 use mm::page;
 use libc::c_void;
-use core::any::*;
 use base::errno;
 use core::ptr;
 use core::fmt;
 use context;
 use core::num;
 use core::mem::{size_of, transmute_copy};
-use core::ptr::*;
+use core::ptr::copy_nonoverlapping_memory;
 use core::cmp;
 use kqueue::KQueue;
 use context::{Context, ContextFunc};
-use collections::hash;
+use core::hash;
 use mm::pagetable::PageDir;
 use mm::AllocError;
 
 pub static CUR_THREAD_SLOT : uint = 0;
 pub static DEFAULT_STACK_PAGES : uint = 16;
 
-#[allow(raw_pointer_deriving)] #[deriving(Hash, Eq, PartialEq)]
+#[allow(raw_pointer_derive)] #[derive(Hash, Eq, PartialEq)]
 pub struct KStack(uint, *mut u8);
 
 impl KStack {
@@ -37,14 +36,14 @@ impl KStack {
     }
 
     pub fn copy(&mut self) -> Result<KStack, AllocError> {
-        let &KStack(size, _) = self;
+        let &mut KStack(size, _) = self;
         let mut new = try!(KStack::with_size(size));
         new.copy_from(self);
         Ok(new)
     }
 
     pub fn copy_from(&mut self, other: &KStack) {
-        let &KStack(msize, mptr) = self;
+        let &mut KStack(msize, mptr) = self;
         let &KStack(osize, optr) = other;
         let size = cmp::min(msize, osize);
         unsafe { copy_nonoverlapping_memory(mptr, optr as *const u8, size); }
@@ -63,7 +62,7 @@ impl KStack {
 
 impl Drop for KStack {
     fn drop(&mut self) {
-        let &KStack(size, s) = self;
+        let &mut KStack(size, s) = self;
         if size != 0 {
             unsafe { page::free_n(s as *mut c_void, size as u32); }
         }
@@ -71,10 +70,10 @@ impl Drop for KStack {
     }
 }
 
-#[deriving(Show, Copy)]
+#[derive(Show, Copy)]
 pub enum Mode { USER, KERNEL }
 
-#[deriving(Show, Eq, PartialEq, Copy)]
+#[derive(Show, Eq, PartialEq, Copy)]
 pub enum State { NOSTATE, RUN, SLEEP, SLEEPCANCELLABLE, EXITED }
 
 pub struct KThread {
@@ -96,7 +95,7 @@ pub fn kyield() {
     ct.ctx.kyield();
 }
 
-impl<S: hash::Writer> hash::Hash<S> for KThread {
+impl<S: hash::Writer + hash::Hasher> hash::Hash<S> for KThread {
     fn hash(&self, state: &mut S) {
         self.kstack.hash(state)
     }
@@ -162,7 +161,7 @@ impl KThread {
         // TODO Add this check back in.
         //assert!(transmute(self) == gdt::get_tsd().cur_thr);
         assert!(self.state == State::RUN);
-        dbg!(debug::THR, "Thread {} of process {} ended with a status of 0x{:x} ({})",
+        dbg!(debug::THR, "Thread {:?} of process {:?} ended with a status of 0x{:x} ({:?})",
              self, current_proc!(), v as uint, num::from_uint::<errno::Errno>(v as uint));
         (current_proc_mut!()).thread_exited(v);
         self.state = State::EXITED;
@@ -172,7 +171,7 @@ impl KThread {
 
 impl fmt::Show for KThread {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "KThread {{ cancelled: {}, state: {}, errno: {} }}",
+        write!(f, "KThread {{ cancelled: {}, state: {:?}, errno: {:?} }}",
                self.cancelled, self.state, self.errno)
     }
 }

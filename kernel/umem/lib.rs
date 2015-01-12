@@ -5,20 +5,20 @@
 #![no_std]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics, unsafe_destructor)]
+#![feature(asm, concat_idents, lang_items, plugin, intrinsics, unsafe_destructor, box_syntax)]
 
 // TODO I should maybe rename this...
 //! The Reenix User memory stuff.
 ///
 /// It has things like the pframe
 
-#[phase(plugin)] extern crate bassert;
+#[macro_use] #[plugin] #[no_link] extern crate bassert;
 
-#[phase(plugin, link)] extern crate procs;
-#[phase(plugin, link)] extern crate base;
-#[phase(plugin, link)] extern crate core;
-#[phase(plugin, link)] extern crate util;
-#[phase(plugin, link)] extern crate mm;
+#[macro_use] extern crate procs;
+#[macro_use] extern crate base;
+#[macro_use] extern crate core;
+#[macro_use] extern crate util;
+#[macro_use] extern crate mm;
 extern crate startup;
 extern crate collections;
 extern crate alloc;
@@ -45,7 +45,7 @@ pub fn init_stage3() {
 
 #[doc(hidden)]
 mod std {
-    pub use core::kinds;
+    pub use core::marker;
     pub use core::cmp;
     pub use core::fmt;
     pub use core::option;

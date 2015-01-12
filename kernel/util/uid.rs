@@ -2,6 +2,7 @@
 //! A thing that can generate unique Identifiers that can be retired.
 
 use core::prelude::*;
+use core::ops::{Add, Deref};
 use core::cell::*;
 use core::num::Int;
 use mm::Allocation;
@@ -25,8 +26,8 @@ pub trait Id : Clone + Ord + Eq {
     fn successor(&mut self);
 }
 
-impl<T> Id for T where T: Int {
-    #[inline] fn successor(&mut self) { *self = self.add(Int::one()) }
+impl<T> Id for T where T: Clone + Ord + Eq + Add<uint, Output = T> {
+    #[inline] fn successor(&mut self) { *self = self.clone().add(Int::one()) }
 }
 
 // TODO Make it use this.
@@ -88,7 +89,10 @@ pub struct UUID<'a, T: Id + 'a> {
     source: &'a UUIDSource<T>,
 }
 
-impl<'a, T: Id> Deref<T> for UUID<'a, T> { fn deref(&self) -> &T { &self.id } }
+impl<'a, T: Id> Deref for UUID<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &T { &self.id }
+}
 
 #[unsafe_destructor]
 impl<'a, T: Id> Drop for UUID<'a, T> {

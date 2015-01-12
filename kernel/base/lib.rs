@@ -4,23 +4,26 @@
 
 #![crate_name="base"]
 #![crate_type="rlib"]
+#![allow(staged_unstable, staged_experimental)]
 #![no_std]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(asm, macro_rules, globs, concat_idents,lang_items, trace_macros, phase)]
+#![feature(asm, concat_idents, lang_items, plugin, unboxed_closures)]
 
-#[phase(plugin)] extern crate bassert;
-#[phase(plugin)] extern crate enabled;
-#[phase(plugin, link)] extern crate core;
+#[plugin] #[no_link] #[macro_use] extern crate bassert;
+#[plugin] #[no_link] #[macro_use] extern crate enabled;
+#[macro_use] extern crate core;
 extern crate libc;
 
 //pub use errno::*;
 
 // NOTE Needs to go first so everything else can get the macro's defined in it.
-mod bitflags;
-mod macros;
+#[macro_use] mod bitflags;
+#[macro_use] mod macros;
+#[macro_use] pub mod debug;
 
 pub mod make;
+
 pub mod devices;
 
 pub mod gdb;
@@ -28,34 +31,11 @@ pub mod gdb;
 pub mod errno;
 
 pub mod io;
-pub mod debug;
+
 pub mod kernel;
 pub mod sync;
 
-/// Another, more in-depth information to print.
-pub mod describe {
-    use core::fmt;
-    use core::prelude::*;
-    pub trait Describeable {
-        fn describe(&self, &mut fmt::Formatter) -> fmt::Result;
-    }
-    pub struct Describer<T: Describeable>(pub T);
-    impl<T: Describeable> Describeable for Describer<T> {
-        fn describe(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let &Describer(ref x) = self;
-            try!(write!(f, "Describe("));
-            try!(x.describe(f));
-            write!(f, ")")
-        }
-    }
-    impl<T: Describeable> fmt::Show for Describer<T> {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            let &Describer(ref x) = self;
-            x.describe(f)
-        }
-    }
-}
-
+pub mod pid;
 pub fn init_stage1() { debug::setup(); }
 pub fn init_stage2() {}
 
@@ -68,14 +48,6 @@ mod std {
     pub use core::num;
     pub use core::default;
     pub use core::clone;
-    pub use core::kinds;
+    pub use core::marker;
 }
-
-// This lets us use the macro's exported from here locally.
-#[doc(hidden)]
-mod base {
-    pub use super::kernel;
-    pub mod debug {
-        pub use super::super::debug::*;
-    }
-}
+mod base { pub use debug; pub use kernel; }

@@ -80,8 +80,8 @@ struct CSlabAllocator {
         nobjs    : c_int,               /* number of objs per slab */
 }
 
-#[allow(raw_pointer_deriving)]
-#[deriving(Eq,Clone,PartialEq, Copy)]
+#[allow(raw_pointer_derive)]
+#[derive(Eq,Clone,PartialEq, Copy)]
 pub struct SlabAllocator(*mut CSlabAllocator);
 
 extern "C" {
@@ -205,9 +205,9 @@ pub fn request_slab_allocator(name: &'static str, size: size_t) {
 impl fmt::Show for Allocator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(writeln!(f, "Weenix allocator"));
-        try!(writeln!(f, "{}", self.slabs));
-        try!(writeln!(f, "free pages: {}", unsafe { page::free_count()} ));
-        writeln!(f, "{}", self.backup)
+        try!(writeln!(f, "{:?}", self.slabs));
+        try!(writeln!(f, "free pages: {:?}", unsafe { page::free_count()} ));
+        writeln!(f, "{:?}", self.backup)
     }
 }
 
@@ -223,7 +223,7 @@ impl Allocator {
             Some(sa) => {
                 // NOTE Rust strings not being (gaurenteed to be) null terminated is extreemly annoying
                 //let r = unsafe { sa.as_ref().expect("Found a null slab allocator") };
-                dbg!(debug::MM, "Request to make allocator '{}' for {} bytes already fullfilled by {}",
+                dbg!(debug::MM, "Request to make allocator '{:?}' for {:?} bytes already fullfilled by {:?}",
                     name, size as uint, sa);
                 return;
             }
@@ -251,11 +251,11 @@ impl Allocator {
         }
         let new_slab = SlabAllocator(sa);
         if new_slab.get_size() > (MAX_SLAB_SIZE as u32) + 1 {
-            dbg!(debug::MM, "kmalloc object {} was larger than largest size we will use slab objs for", new_slab);
+            dbg!(debug::MM, "kmalloc object {:?} was larger than largest size we will use slab objs for", new_slab);
             false
         } else {
             self.slabs.add(new_slab);
-            dbg!(debug::MM, "Added kmalloc object {} {}", i, new_slab);
+            dbg!(debug::MM, "Added kmalloc object {:?} {:?}", i, new_slab);
             true
         }
     }
@@ -299,11 +299,11 @@ impl Allocator {
                 kpanic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
             },
             Some(sa) => {
-                dbg!(debug::MM, "Allocating {} from {}", size, sa);
-                bassert!(sa.get_size() as uint >= size, "allocator's size {} was less then required size {}", sa.get_size(), size);
+                dbg!(debug::MM, "Allocating {:?} from {:?}", size, sa);
+                bassert!(sa.get_size() as uint >= size, "allocator's size {:?} was less then required size {:?}", sa.get_size(), size);
                 let res = sa.allocate();
                 if res.is_null() {
-                    dbg!(debug::MM, "Allocation from slab {} failed for request of {} bytes. Reclaiming memory and retrying.", sa, size);
+                    dbg!(debug::MM, "Allocation from slab {:?} failed for request of {:?} bytes. Reclaiming memory and retrying.", sa, size);
                     reclaim_memory();
                     return sa.allocate();
                 } else {
@@ -327,7 +327,7 @@ impl Allocator {
                 copy_nonoverlapping_memory(new_ptr, ptr as *const u8, min(size, old_size));
                 self.deallocate(ptr, old_size, align);
             } else {
-                dbg!(debug::MM, "Unable to allocate memory for realloc of {} from {} to {} bytes", ptr, old_size, size);
+                dbg!(debug::MM, "Unable to allocate memory for realloc of {:p} from {} to {} bytes", ptr, old_size, size);
                 return 0 as *mut u8;
             }
             new_ptr
@@ -354,7 +354,7 @@ impl Allocator {
             let new_alloc = self.slabs.find_smallest(size).expect("Unable to find slab allocator that was used.");
             let old_alloc = self.slabs.find_smallest(old_size).expect("Unable to find slab allocator that was used.");
             if new_alloc != old_alloc {
-                dbg!(debug::MM, "posibly reallocating from {} (size {}) to {} (size {})", old_alloc, old_size, new_alloc, size);
+                dbg!(debug::MM, "posibly reallocating from {:?} (size {}) to {:?} (size {})", old_alloc, old_size, new_alloc, size);
             }
             new_alloc == old_alloc
         }
@@ -381,7 +381,7 @@ impl Allocator {
                 kpanic!("Unable to find a large enough slab for something that is smaller than a page in length at {} bytes!", size);
             },
             Some(sa) => {
-                dbg!(debug::MM, "deallocating {:p} with {} bytes from {}", ptr, size, sa);
+                dbg!(debug::MM, "deallocating {:p} with {} bytes from {:?}", ptr, size, sa);
                 sa.deallocate(ptr);
             }
         }
@@ -457,7 +457,7 @@ pub fn usable_size(size: uint, _align: uint) -> uint {
 
 #[precond = "requests_closed()"]
 pub fn stats_print() {
-    dbg!(debug::MM|debug::CORE, "{}", get_stats());
+    dbg!(debug::MM|debug::CORE, "{:?}", unsafe { &BASE_ALLOCATOR });
 }
 
 #[precond = "requests_closed()"]

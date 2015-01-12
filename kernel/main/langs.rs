@@ -11,8 +11,7 @@ pub extern fn rust_begin_unwind(msg: &core::fmt::Arguments,
                                 file: &'static str,
                                 line: uint) -> ! {
     use base::kernel;
-    dbg!(debug::PANIC, "Failed at {:}:{:} -> {}",file, line, msg);
-    //unsafe { core::fmt::write(&mut DBG_WRITER, msg); }
+    dbg!(debug::PANIC, "Failed at {}:{} -> {}", file, line, *msg);
     kernel::halt();
 }
 
@@ -30,6 +29,6 @@ pub extern fn eh_personality() {
 pub extern fn stack_exhausted(fmt: &core::fmt::Arguments,
                               file: &'static str,
                               line: uint) -> ! {
-    unsafe { core::fmt::write(&mut DBG_WRITER, fmt); }
-    kpanic!("Stack Exhausted at {:}:{:}",file, line);
+    //unsafe { core::fmt::write(&mut DBG_WRITER, *fmt); }
+    kpanic!("Stack Exhausted at {}:{} -> {}",file, line, fmt);
 }

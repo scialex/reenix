@@ -14,6 +14,7 @@
 #![crate_name="hoare"]
 #![feature(plugin_registrar)]
 #![feature(quote)]
+#![feature(box_syntax)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
@@ -202,7 +203,7 @@ fn debug_invariant(cx: &mut ExtCtxt,
 }
 
 // Executes f if we are compiling in debug mode, returns item otherwise.
-fn if_debug(cx: &mut ExtCtxt, f: |&mut ExtCtxt| -> P<Item>, item: P<Item>) -> P<Item> {
+fn if_debug<F>(cx: &mut ExtCtxt, f: F, item: P<Item>) -> P<Item> where F: Fn(&mut ExtCtxt) -> P<Item>{
     if !cx.cfg().iter().any(
         |item| item.node == ast::MetaWord(token::get_name(token::intern("ndebug")))) {
         f(cx)
@@ -277,7 +278,7 @@ fn is_sane_pattern(pat: &ast::Pat) -> bool {
         &ast::PatIdent(..) => false,
         &ast::PatEnum(_, Some(ref ps)) | &ast::PatTup(ref ps) => ps.iter().all(|p| is_sane_pattern(&**p)),
         &ast::PatEnum(..) => false,
-        &ast::PatBox(ref p) | &ast::PatRegion(ref p) => is_sane_pattern(&**p)
+        &ast::PatBox(ref p) | &ast::PatRegion(ref p, _) => is_sane_pattern(&**p)
     }
 }
 

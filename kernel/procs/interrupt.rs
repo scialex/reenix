@@ -12,7 +12,7 @@ use super::apic;
 /// the source of the interrupt.
 #[allow(missing_copy_implementations)]
 #[repr(C)]
-#[deriving(Clone, Show)]
+#[derive(Clone, Show)]
 pub struct Registers {
     pub es   : u32, pub ds  : u32, pub gs  : u32,                                     /* Pushed manually */
     pub edi  : u32, pub esi : u32, pub ebp : u32, pub esp : u32,                      /* pushed by pusha */
@@ -111,7 +111,7 @@ impl Drop for IPLWatchdog { fn drop(&mut self) { dbg!(debug::INTR, "reseting ipl
 
 #[unsafe_no_drop_flag]
 #[repr(C, packed)]
-#[deriving(Copy)]
+#[derive(Copy)]
 struct InterruptDescription {
     baselo   : u16,
     selector : u16,
@@ -146,26 +146,26 @@ pub type InterruptHandler = extern "Rust" fn(&mut Registers);
 #[allow(unused_unsafe)]
 #[no_stack_check]
 pub extern "Rust" fn unhandled_intr(r: &mut Registers) {
-    kpanic!("Unhandled interrupt 0x{:X}.\nRegisters were {}\nProcess was {}\nThread was {}",
+    kpanic!("Unhandled interrupt 0x{:X}.\nRegisters were {:?}\nProcess was {:?}\nThread was {:?}",
            r.intr, r, current_proc!(), current_thread!());
 }
 
 static mut IDT : InterruptState<'static> = InterruptState {
-    table    : [InterruptDescription { baselo : 0, selector: 0, zero: 0, attr: 0, basehi: 0 }, ..MAX_INTERRUPTS as uint],
-    handlers : [unhandled_intr, ..MAX_INTERRUPTS as uint],
-    mappings : [None, ..MAX_INTERRUPTS as uint],
+    table    : [InterruptDescription { baselo : 0, selector: 0, zero: 0, attr: 0, basehi: 0 }; MAX_INTERRUPTS as uint],
+    handlers : [unhandled_intr; MAX_INTERRUPTS as uint],
+    mappings : [None; MAX_INTERRUPTS as uint],
     data     : InterruptInfo { size: 0, base : 0 as *const InterruptDescription }
 };
 
 pub struct InterruptState<'a> {
-    table    : [InterruptDescription, ..MAX_INTERRUPTS as uint],
-    handlers : [InterruptHandler, ..MAX_INTERRUPTS as uint],
-    mappings : [Option<u16>, ..MAX_INTERRUPTS as uint],
+    table    : [InterruptDescription; MAX_INTERRUPTS as uint],
+    handlers : [InterruptHandler; MAX_INTERRUPTS as uint],
+    mappings : [Option<u16>; MAX_INTERRUPTS as uint],
     data     : InterruptInfo,
 }
 
 /// This just makes a handler which kpanics with a custom message.
-macro_rules! make_panic_handler(
+macro_rules! make_panic_handler{
     ($int:ident) => ({
         #[allow(unused_unsafe)]
         #[no_stack_check]
@@ -174,7 +174,7 @@ macro_rules! make_panic_handler(
         }
         register($int, die);
     })
-)
+}
 
 /// Set the given entry in the IDT.
 unsafe fn set_entry(isr: u8, addr: u32, seg: u16, flags: u8) {
@@ -231,7 +231,7 @@ pub fn map(irq: u16, intr: u8) -> Option<u16> {
     }
 }
 
-macro_rules! make_noerr_handlers (
+macro_rules! make_noerr_handlers {
     ($(($num:expr, $seg:expr, $flag:expr)),*) => ({
         #[cfg(target_arch = "x86")]
         #[no_stack_check] #[inline(never)] #[no_mangle]
@@ -293,9 +293,9 @@ macro_rules! make_noerr_handlers (
             set_entry($num, x, $seg, $flag);
          })*
     })
-)
+}
 
-macro_rules! make_err_handlers (
+macro_rules! make_err_handlers {
     ($(($num:expr, $seg:expr, $flag:expr)),*) => ({
         #[no_stack_check]
         #[inline(never)]
@@ -331,7 +331,7 @@ macro_rules! make_err_handlers (
             set_entry($num, x, $seg, $flag);
          })*
     })
-)
+}
 
 #[inline(never)]
 pub fn init_stage1() {
@@ -616,7 +616,7 @@ pub fn init_stage1() {
 pub fn init_stage2() {}
 
 extern "Rust" fn spurious_intr(regs: &mut Registers) {
-    dbg!(debug::INTR, "Ignoring spurious interrupt. Registers were {}. Process was {}. Thread was {}",
+    dbg!(debug::INTR, "Ignoring spurious interrupt. Registers were {:?}. Process was {:?}. Thread was {:?}",
          regs, current_proc!(), current_thread!());
 }
 

@@ -29,7 +29,7 @@ pub const HISTORY_LINES: uint = screen::UINT_DISPLAY_HEIGHT * 6;
 pub struct VirtualTerminal {
     // TODO This should really just hold a reference to it's screen and not use a static function
     // to get it.
-    buf       : [[u8, .. screen::UINT_DISPLAY_WIDTH], ..HISTORY_LINES],
+    buf       : [[u8; screen::UINT_DISPLAY_WIDTH]; HISTORY_LINES],
     cur_line  : uint,
     cur_char  : uint,
     view_line : uint,
@@ -39,7 +39,7 @@ pub struct VirtualTerminal {
 impl VirtualTerminal {
     pub fn create() -> VirtualTerminal {
         VirtualTerminal {
-            buf       : [[screen::DEFAULT_CHAR, ..screen::UINT_DISPLAY_WIDTH], ..HISTORY_LINES],
+            buf       : [[screen::DEFAULT_CHAR; screen::UINT_DISPLAY_WIDTH]; HISTORY_LINES],
             cur_line  : 0,
             cur_char  : 0,
             view_line : 0,
@@ -53,7 +53,7 @@ impl VirtualTerminal {
             self.view_line = (self.view_line + 1) % HISTORY_LINES;
         }
         self.cur_line = (self.cur_line + 1) % HISTORY_LINES;
-        self.buf[(self.cur_line + screen::UINT_DISPLAY_HEIGHT) % HISTORY_LINES] = [screen::DEFAULT_CHAR, ..screen::UINT_DISPLAY_WIDTH];
+        self.buf[(self.cur_line + screen::UINT_DISPLAY_HEIGHT) % HISTORY_LINES] = [screen::DEFAULT_CHAR; screen::UINT_DISPLAY_WIDTH];
         return redraw;
     }
 

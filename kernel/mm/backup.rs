@@ -2,12 +2,11 @@
 
 //! A last ditch allocator.
 
-use core::ptr::*;
-use core::mem::*;
-use super::page;
 use core::prelude::*;
+use super::page;
 use core::cmp;
-use core;
+use core::mem::{size_of, transmute};
+use core::ptr::{set_memory, zero_memory, write};
 use core::fmt;
 
 const FREE_FILL : u8 = 0xF7;
@@ -78,7 +77,7 @@ impl Tag {
         // mem is CTAG........[:::::::::::::::::::::::::::::::::::::CTAG]         => BAD
         //                    ^ ----------- Page Boundarys -------------^
         // How many bytes do we need.
-        let nbytes = unsafe { page::num_to_addr::<u8>(requested_pages).to_uint() };
+        let nbytes = unsafe { page::num_to_addr::<u8>(requested_pages) as uint };
         // minimum bytes between start of tagged region and start of page region.
         let pre_bytes = (page::SIZE - page::offset::<u8>(self.get_start() as *const u8)) & page::MASK;
 
@@ -92,7 +91,7 @@ impl Tag {
             // in the front. Transitivity says this is okay.
             let end = unsafe { page::align_down(self.next()) };
             let start = unsafe { page::num_to_addr::<Tag>(page::addr_to_num(end as *const Tag) - requested_pages).offset(-1) };
-            bassert!(start.to_uint() >= self.get_tag_ptr().to_uint());
+            bassert!(start as uint >= self.get_tag_ptr() as uint);
             assert!(page::aligned(unsafe {  (start as *const Tag).offset(1) }));
             Some((start, end))
         }
@@ -162,7 +161,7 @@ impl BackupAllocator {
                     // might as well avoid them on principle.
                     cur.set_allocated();
                     return cur.get_start();
-                } else if best.clone().map(|t| { unsafe { t.as_mut().expect("not null").size() } }).unwrap_or(core::uint::MAX) > req {
+                } else if best.clone().map(|t| { unsafe { t.as_mut().expect("not null").size() } }).unwrap_or(::core::uint::MAX) > req {
                     best = Some(cur as *mut Tag);
                 }
             }
@@ -205,10 +204,10 @@ impl BackupAllocator {
                 t.set_allocated();
                 t.get_start()
             } else {
-                let new_start_size = (split_low.to_uint()) - t.get_start().to_uint();
+                let new_start_size = (split_low as uint) - t.get_start() as uint;
                 assert!(new_start_size % 4 == 0, "start size {} is not 4 byte aligned", new_start_size);
-                if split_hi.to_uint() != t.next().to_uint() {
-                    let new_end_size = t.next().to_uint() - (split_hi.to_uint() + size_of::<Tag>());
+                if split_hi as uint != t.next() as uint {
+                    let new_end_size = t.next() as uint - (split_hi as uint + size_of::<Tag>());
                     if let Some(end) = self.read_tag(split_hi) {
                         end.set_size(new_end_size);
                         end.set_free();
@@ -217,7 +216,7 @@ impl BackupAllocator {
                 t.set_size(new_start_size);
                 t.set_free();
                 let start = self.read_tag(split_low).expect("should never be null");
-                start.set_size(unsafe { page::num_to_addr::<u8>(pgs).to_uint() });
+                start.set_size(unsafe { page::num_to_addr::<u8>(pgs) as uint });
                 start.set_allocated();
                 start.get_start()
             }
@@ -252,13 +251,13 @@ impl BackupAllocator {
 
     fn deallocate_pages(&self, ptr: *mut u8, pgs: uint) {
         assert!(page::aligned(ptr as *const u8));
-        self.deallocate_small(ptr, unsafe { page::num_to_addr::<u8>(pgs).to_uint() });
+        self.deallocate_small(ptr, unsafe { page::num_to_addr::<u8>(pgs) as uint });
     }
 
     /// Returns true if this ptr needs to be deallocated from the backup
     pub fn contains(&self, ptr: *mut u8) -> bool {
-        let v = ptr.to_uint();
-        self.buf.to_uint() <= v && v < unsafe { self.buf.offset(self.byte_len()).to_uint() }
+        let v = ptr as uint;
+        self.buf as uint <= v && v < unsafe { self.buf.offset(self.byte_len()) as uint }
     }
 
     pub fn setup(&mut self) {
@@ -272,9 +271,9 @@ impl BackupAllocator {
 
     pub fn read_tag<'a>(&'a self, t: *mut Tag) -> Option<&'a mut Tag> {
         unsafe {
-            let st = self.buf.to_uint();
-            let nd = self.buf.offset(self.byte_len()).to_uint();
-            let v = t.to_uint();
+            let st = self.buf as uint;
+            let nd = self.buf.offset(self.byte_len()) as uint;
+            let v = t as uint;
             if st <= v && v < nd { Some(&mut *t) } else { None }
         }
     }

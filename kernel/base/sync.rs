@@ -3,7 +3,8 @@
 /// caution and are only here to allow some stdlib provided initialization code.
 
 use core::prelude::*;
-use core::atomic::{SeqCst, AtomicUint, INIT_ATOMIC_UINT};
+use core::atomic::{AtomicUint, ATOMIC_UINT_INIT};
+use core::atomic::Ordering::*;
 
 /// We have never been called yet.
 const UNUSED       : uint = 0;
@@ -20,7 +21,7 @@ pub struct SpinOnce {
 }
 
 pub const SPIN_ONCE_INIT : SpinOnce = SpinOnce {
-    state: INIT_ATOMIC_UINT,
+    state: ATOMIC_UINT_INIT,
 };
 
 impl SpinOnce {
@@ -31,7 +32,7 @@ impl SpinOnce {
     /// This method will spin until at least one initialization routine has been completed.
     ///
     /// Returns true if the function given was executed, false otherwise.
-    pub fn try_it(&self, f: ||) -> bool {
+    pub fn try_it<F>(&self, f: F) -> bool where F: Fn() {
         if self.state.load(SeqCst) == INITIALIZED {
             false
         } else if self.state.compare_and_swap(UNUSED, INITIALIZING, SeqCst) == UNUSED {
@@ -66,5 +67,5 @@ impl SpinOnce {
     /// When this function returns, it is guaranteed that some initialization has run and completed
     /// (it may not be the closure specified).
     #[inline]
-    pub fn doit(&self, f: ||) { self.try_it(f); }
+    pub fn doit<F>(&self, f: F) where F: Fn() { self.try_it(f); }
 }

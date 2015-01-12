@@ -2,7 +2,6 @@
 //! Stuff to make a Linked List.
 use core::prelude::*;
 use alloc::boxed::*;
-use core::ptr::*;
 use core::cell::*;
 use core::mem::{transmute, transmute_copy};
 

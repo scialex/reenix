@@ -34,7 +34,7 @@ impl KMutex {
     /// Obtain the lock, waiting until it is freed. Note that there are no ordering/fairness
     /// gaurentees on who gets a lock when it is contested.
     pub fn lock_nocancel(&self) {
-        dbg!(debug::SCHED, "locking {} for {} of {}", self, current_thread!(), current_proc!());
+        dbg!(debug::SCHED, "locking {:?} for {:?} of {:?}", self, current_thread!(), current_proc!());
         while self.held.compare_and_swap(false, true, Ordering::SeqCst) != false {
             unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait_on(false) };
         }
@@ -44,7 +44,7 @@ impl KMutex {
     /// Returns true if we got the lock, False if we didn't because of being canceled.
     #[warn(unused_results)]
     pub fn lock(&self) -> bool {
-        dbg!(debug::SCHED, "cancelable locking {} for {} of {}", self, current_thread!(), current_proc!());
+        dbg!(debug::SCHED, "cancelable locking {:?} for {:?} of {:?}", self, current_thread!(), current_proc!());
         while self.held.compare_and_swap(false, true, Ordering::SeqCst) != false {
             if unsafe { !self.queue.get().as_mut().expect("Kmutex queue cannot be null").wait_on(true) } {
                 return false;
@@ -56,17 +56,17 @@ impl KMutex {
     /// Returns true if we get the lock. False, without sleeping, if we did not.
     pub fn try_lock(&self) -> bool {
         if !self.held.compare_and_swap(false, true, Ordering::SeqCst) {
-            dbg!(debug::SCHED, "locking {} for {} of {}", self, current_thread!(), current_proc!());
+            dbg!(debug::SCHED, "locking {:?} for {:?} of {:?}", self, current_thread!(), current_proc!());
             true
         } else {
-            dbg!(debug::SCHED, "locking {} for {} of {} failed", self, current_thread!(), current_proc!());
+            dbg!(debug::SCHED, "locking {:?} for {:?} of {:?} failed", self, current_thread!(), current_proc!());
             false
         }
     }
 
     /// Unlocks the lock. This should only be called by the thread that originally locked it.
     pub fn unlock(&self) {
-        dbg!(debug::SCHED, "unlocking {} for {} of {}", self, current_thread!(), current_proc!());
+        dbg!(debug::SCHED, "unlocking {:?} for {:?} of {:?}", self, current_thread!(), current_proc!());
         assert!(self.held.load(Ordering::SeqCst));
         self.held.store(false, Ordering::SeqCst);
         unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null")}.signal();

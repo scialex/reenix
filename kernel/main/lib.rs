@@ -6,14 +6,14 @@
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
-#![feature(globs, phase, macro_rules, asm, unsafe_destructor,lang_items)]
+#![feature(plugin, asm, unsafe_destructor, lang_items, box_syntax)]
 
 
-#[phase(plugin)] extern crate bassert;
-#[phase(plugin, link)] extern crate core;
-#[phase(plugin, link)] extern crate base;
-#[phase(plugin, link)] extern crate procs;
-#[phase(plugin, link)] extern crate mm;
+#[macro_use] #[plugin] #[no_link] extern crate bassert;
+#[macro_use] extern crate core;
+#[macro_use] extern crate base;
+#[macro_use] extern crate procs;
+#[macro_use] extern crate mm;
 extern crate alloc;
 extern crate startup;
 extern crate libc;
@@ -30,9 +30,8 @@ use procs::kproc::{KProc, Pid, ProcId};
 use libc::c_void;
 use mm::pagetable;
 use core::prelude::*;
-use collections::String;
+use collections::string::ToString;
 use procs::interrupt;
-use core::fmt;
 
 mod proctest;
 mod kshell;
@@ -129,39 +128,45 @@ fn finish_init() {
 
 extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     cleanup_bootstrap_function();
-    dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
+    dbg!(debug::CORE, "got into process {:?} and thread {:?}", current_proc!(), current_thread!());
     finish_init();
-    bassert!(KProc::new(String::from_str("Init Proc"), init_proc_run, 0, 0 as *mut c_void) == Ok(ProcId(1)),
-            "Unable to create init proc");
-    let pageoutd_id = KProc::new(String::from_str("PageOutD"), umem::pageoutd_run, 0, 0 as *mut c_void).unwrap();
-    dbg!(debug::CORE, "pageoutd is {}", pageoutd_id);
+    match KProc::new("Init Proc".to_string(), init_proc_run, 0, 0 as *mut c_void) {
+        Ok(ProcId(1)) => {},
+        Ok(v) => { kpanic!("Unable to create init proc at {:?}, got one at {:?} instead", ProcId(1), v); },
+        x => { kpanic!("Unable to create init proc {:?}", x); }
+    }
+    let pageoutd_id = match KProc::new("PageOutD".to_string(), umem::pageoutd_run, 0, 0 as *mut c_void) {
+        Ok(v) => v,
+        Err(_) => { kpanic!("Unable to make pageoutd!"); }
+    };
+    dbg!(debug::CORE, "pageoutd is {:?}", pageoutd_id);
 
     match KProc::waitpid(Pid(ProcId(1)), 0) {
-        Ok((pid, pst)) => { dbg!(debug::CORE, "init Returned {}, 0x{:x}", pid, pst); },
-        Err(errno) => {dbg!(debug::CORE, "init returned errno {}", errno);}
+        Ok((pid, pst)) => { dbg!(debug::CORE, "init Returned {:?}, 0x{:x}", pid, pst); },
+        Err(errno) => {dbg!(debug::CORE, "init returned errno {:?}", errno);}
     }
 
     let pgd = KProc::get_proc(&pageoutd_id).expect("Pageoutd was reaped!?");
     pgd.borrow_mut().kill(0);
     drop(pgd);
     match KProc::waitpid(Pid(pageoutd_id), 0) {
-        Ok((pid, pst)) => { dbg!(debug::CORE, "pagetoutd Returned {}, 0x{:x}", pid, pst); },
-        Err(errno) => {kpanic!("pageoutd returned errno {}", errno); }
+        Ok((pid, pst)) => { dbg!(debug::CORE, "pagetoutd Returned {:?}, 0x{:x}", pid, pst); },
+        Err(errno) => {kpanic!("pageoutd returned errno {:?}", errno); }
     }
     shutdown();
 }
 
 extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     interrupt::enable();
-    dbg!(debug::CORE, "got into process {} and thread {}", current_proc!(), current_thread!());
+    dbg!(debug::CORE, "got into process {:?} and thread {:?}", current_proc!(), current_thread!());
 
     kshell::start(0);
     loop {
         let x = KProc::waitpid(kproc::Any, 0);
         match x {
-            Ok((pid, pst)) => { dbg!(debug::CORE, "{} Returned {} (0x{:x})", pid, pst, pst); },
+            Ok((pid, pst)) => { dbg!(debug::CORE, "{:?} Returned {:?} (0x{:x})", pid, pst, pst); },
             Err(errno) => {
-                dbg!(debug::CORE, "returned errno {}", errno);
+                dbg!(debug::CORE, "returned errno {:?}", errno);
                 if errno == errno::ECHILD {
                     break;
                 }
@@ -171,21 +176,25 @@ extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     return 0 as *mut c_void;
 }
 
-#[doc(hidden)]
-struct Estr;
-impl fmt::Show for Estr { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "\x08") } }
-#[doc(hidden)]
-static EMPTY_STR : Estr = Estr;
+//#[doc(hidden)]
+//struct Estr;
+//impl fmt::Show for Estr { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "\x08") } }
+//#[doc(hidden)]
+//static EMPTY_STR : Estr = Estr;
+
 
 #[no_mangle]
 #[no_stack_check]
-pub extern "C" fn get_dbg_pid() -> &'static (fmt::Show + 'static) {
-    if unsafe { !IS_PROCS_UP } { &EMPTY_STR as &'static fmt::Show } else { ((current_pid!()) as &'static fmt::Show) }
+#[doc(hidden)]
+#[allow(improper_ctypes)]
+pub extern "C" fn get_dbg_pid() -> Option<ProcId> {
+    if unsafe { !IS_PROCS_UP } { None } else { Some(current_pid!()) }
 }
 
 
 #[doc(hidden)]
 mod std {
     pub use core::fmt;
+    pub use core::marker;
     pub use core::clone;
 }

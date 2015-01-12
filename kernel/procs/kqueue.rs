@@ -6,15 +6,15 @@ use collections::*;
 use core::mem::{transmute, transmute_copy};
 use core::prelude::*;
 use core::cell::*;
+use core::cmp::Ordering::{self, Equal};
 use core::ptr;
-use core::ptr::*;
 use kthread::KThread;
 use kthread;
 use sync;
 use core::fmt;
 
 pub struct QueuedThread(*mut KThread);
-pub struct KQueue(RefCell<TreeSet<QueuedThread>>);
+pub struct KQueue(RefCell<BTreeSet<QueuedThread>>);
 
 pub fn init_stage1() {}
 pub fn init_stage2() {}
@@ -23,7 +23,7 @@ impl Ord for QueuedThread {
     fn cmp(&self, other: &QueuedThread) -> Ordering {
         let &QueuedThread(me) = self;
         let &QueuedThread(o) = other;
-        me.to_uint().cmp(&o.to_uint())
+        (me as uint).cmp(&(o as uint))
     }
 }
 
@@ -51,12 +51,12 @@ impl KQueue {
         assert!((self as *mut KQueue) == t.queue, "Attempting to cancel on incorrect queue.");
         t.queue = ptr::null_mut();
         let k : *mut KThread = unsafe { transmute(t) };
-        let &KQueue(ref s) = self;
+        let &mut KQueue(ref s) = self;
         assert!((*s.borrow_mut()).remove(&QueuedThread(k)));
     }
 
     fn add(&mut self, t: &mut KThread) {
-        let &KQueue(ref s) = self;
+        let &mut KQueue(ref s) = self;
         assert!((*s.borrow_mut()).insert(QueuedThread(unsafe { transmute(t) })));
     }
 
@@ -65,11 +65,11 @@ impl KQueue {
     pub fn wait_on(&mut self, cancelable: bool) -> bool {
         let t = current_thread!();
         if cancelable && t.cancelled {
-            dbg!(debug::SCHED, "Not waiting for cancelation because thread {} is already canceled", t);
+            dbg!(debug::SCHED, "Not waiting for cancelation because thread {:?} is already canceled", t);
             return false;
         }
         block_interrupts!({
-            dbg!(debug::SCHED, "{} begining wait", t);
+            dbg!(debug::SCHED, "{:?} begining wait", t);
             unsafe {
                 t.queue = transmute_copy(&self);
             }
@@ -85,12 +85,12 @@ impl KQueue {
             let x = t.as_mut().expect("Null thread being waited for!");
             x.queue = ptr::null_mut();
             x.make_runable();
-            dbg!(debug::SCHED, "Waking up {}", x);
+            dbg!(debug::SCHED, "Waking up {:?}", x);
         }
     }
 
     pub fn new() -> KQueue {
-        KQueue ( RefCell::new(TreeSet::new()) )
+        KQueue ( RefCell::new(BTreeSet::new()) )
     }
 }
 

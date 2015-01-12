@@ -12,7 +12,7 @@ use bytedev::tty::TTYLineDiscipline;
 pub const LINE_BUF_SIZE : uint = 256;
 
 // All the charecters as strings.
-const CHARS : [&'static str, ..128] = [
+const CHARS : [&'static str; 128] = [
     "",     "\x01", "\x02", "\x03", "\x04", "\x05", "\x06", "\x07", "\x08", "\x09", "\x0a", "\x0b", "\x0c", "\x0d", "\x0e", "\x0f",
     "\x10", "\x11", "\x12", "\x13", "\x14", "\x15", "\x16", "\x17", "\x18", "\x19", "\x1a", "\x1b", "\x1c", "\x1d", "\x1e", "\x1f",
     "\x20", "\x21", "\x22", "\x23", "\x24", "\x25", "\x26", "\x27", "\x28", "\x29", "\x2a", "\x2b", "\x2c", "\x2d", "\x2e", "\x2f",
@@ -24,7 +24,7 @@ const CHARS : [&'static str, ..128] = [
 ];
 
 // All the charecters as strings prepended by a backspace.
-const DELCHARS : [&'static str, ..128] = [
+const DELCHARS : [&'static str; 128] = [
     "",         "\x08\x01", "\x08\x02", "\x08\x03", "\x08\x04", "\x08\x05", "\x08\x06", "\x08\x07",
     "\x08\x08", "\x08\x09", "\x08\x0a", "\x08\x0b", "\x08\x0c", "\x08\x0d", "\x08\x0e", "\x08\x0f",
     "\x08\x10", "\x08\x11", "\x08\x12", "\x08\x13", "\x08\x14", "\x08\x15", "\x08\x16", "\x08\x17",
@@ -48,7 +48,7 @@ pub fn init_stage2() {}
 
 pub struct LineDiscipline {
     rlock : SMutex,
-    buf   : [u8, ..LINE_BUF_SIZE],
+    buf   : [u8; LINE_BUF_SIZE],
     rhead : uint,
     raw_tail : uint,
     ckd_tail : uint,
@@ -58,7 +58,7 @@ impl LineDiscipline {
     pub fn create() -> LineDiscipline {
         LineDiscipline {
             rlock : SMutex::new("Line discipline mutex"),
-            buf : [0, ..LINE_BUF_SIZE],
+            buf : [0; LINE_BUF_SIZE],
             rhead : 0,
             raw_tail : 0,
             ckd_tail : 0,

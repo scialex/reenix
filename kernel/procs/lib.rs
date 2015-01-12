@@ -12,13 +12,13 @@
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
 #![no_std]
-#![feature(phase, globs, macro_rules, asm, default_type_params, unsafe_destructor)]
+#![feature(asm, unsafe_destructor, plugin, box_syntax)]
 
-#[phase(plugin)] extern crate bassert;
-#[phase(link, plugin)] extern crate core;
-#[phase(link, plugin)] extern crate base;
-#[phase(link, plugin)] extern crate collections;
-#[phase(link, plugin)] extern crate mm;
+#[macro_use] #[plugin] #[no_link] extern crate bassert;
+#[macro_use] extern crate core;
+#[macro_use] extern crate base;
+#[macro_use] extern crate collections;
+#[macro_use] extern crate mm;
 extern crate startup;
 extern crate util;
 extern crate alloc;
@@ -59,6 +59,7 @@ mod procs {
     pub use super::pcell;
 }
 pub mod pcell;
+#[macro_use]
 mod macros;
 mod kqueue;
 mod context;
@@ -115,6 +116,6 @@ mod std {
     pub use core::fmt;
     pub use core::num;
     pub use core::option;
-    pub use collections::hash;
-    pub use core::kinds;
+    pub use core::hash;
+    pub use core::marker;
 }

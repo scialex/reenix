@@ -9,7 +9,7 @@ use libc::{c_void, uintptr_t};
 use interrupt;
 use core::mem::{transmute, transmute_copy};
 use collections::RingBuf;
-use core::ptr::*;
+use core::ptr::null_mut;
 use core::prelude::*;
 use alloc::rc::*;
 use pcell::*;
@@ -60,7 +60,7 @@ struct RunQueue(RingBuf<SleepingThread>);
 impl RunQueue {
     fn push(&mut self, ctx: &mut Context) {
         assert!(interrupt::get_ipl() == interrupt::HIGH);
-        let &RunQueue(ref mut b) = self;
+        let &mut RunQueue(ref mut b) = self;
         b.push_back(SleepingThread(unsafe { transmute(ctx) }));
         dbg!(debug::SCHED, "there are now {} threads waiting to be executed", b.len());
     }
@@ -70,7 +70,7 @@ impl RunQueue {
     /// NOTE This is the closest way I can say that a value is volatile...
     unsafe fn get_inner(&mut self) -> &mut RingBuf<SleepingThread> {
         use core::intrinsics::volatile_load;
-        let &RunQueue(ref mut b) = self;
+        let &mut RunQueue(ref mut b) = self;
         volatile_load::<&mut RingBuf<SleepingThread>>(&b as *const &mut RingBuf<SleepingThread>)
     }
 
@@ -264,8 +264,8 @@ impl Context {
 
     unsafe fn switch_to(&mut self, newc : &Context) {
         use kproc::{CUR_PROC_SLOT, KProc};
-        use core::any::*;
         use core::prelude::*;
+        use core::ops::Deref;
 
         let ipl = interrupt::get_ipl();
         interrupt::set_ipl(interrupt::HIGH);

@@ -1,7 +1,6 @@
 
 //! Pframes for Reenix.
 
-use core::ptr::*;
 use core::fmt;
 use core::cell::*;
 use procs::sync::*;
@@ -9,19 +8,18 @@ use util::cacheable::*;
 use alloc::rc::*;
 use alloc::boxed::*;
 use core::prelude::*;
-use core::cmp::*;
-use base::errno::{mod, KResult, Errno};
+use base::errno::{self, KResult, Errno};
 use base::make::*;
 use libc::c_void;
 use mm::{AllocError, page, tlb};
 use mmobj::*;
 
 pub use pframe::pfstate::PFState;
-use util::pinnable_cache::{mod, PinnableCache, InsertError, PinnedValue};
+use util::pinnable_cache::{self, PinnableCache, InsertError, PinnedValue};
 
 pub type PageNum = uint;
 
-#[deriving(PartialEq, Eq, PartialOrd, Ord, Show, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Show, Clone)]
 pub struct PFrameId { mmobj: Rc<Box<MMObj + 'static>>, page: PageNum, }
 impl PFrameId {
     /// Create a pframe id.
@@ -58,7 +56,6 @@ pub mod pageout {
     use libc::c_void;
     use procs::sync::*;
     use core::prelude::*;
-    use core::ptr::*;
     use super::get_cache;
     use alloc::boxed::*;
     use core::mem::transmute;
@@ -76,7 +73,7 @@ pub mod pageout {
     fn get_pageoutd() -> &'static PageOutD { unsafe { PAGEOUTD.as_ref().expect("pageoutd is null!") } }
 
     /// Wakeup the pageoutd.
-    pub fn pageoutd_wakeup() { dbg!(debug::PCACHE, "pageoutd being signaled by {}", current_thread!()); get_pageoutd().queue.signal(); }
+    pub fn pageoutd_wakeup() { dbg!(debug::PCACHE, "pageoutd being signaled by {:?}", current_thread!()); get_pageoutd().queue.signal(); }
     pub extern "C" fn pageoutd_run(_: i32, _: *mut c_void) -> *mut c_void {
         // TODO This might be totally bad.
         while !(current_thread!()).cancelled {
@@ -84,7 +81,7 @@ pub mod pageout {
             if (current_thread!()).cancelled { break; }
             dbg!(debug::PCACHE, "pageoutd woken up!");
             let removed = get_cache().clean_unpinned();
-            dbg!(debug::PCACHE, "Removed {} items from page cache", removed);
+            dbg!(debug::PCACHE, "Removed {:?} items from page cache", removed);
             if removed == 0 {
                 // TODO Should I do this?
                 get_cache().clear_unpinned();
@@ -115,7 +112,7 @@ pub mod pfstate {
             #[doc = "this pframe is still being initialized. No pframe should ever have this state after being returned."]
             INITING = 2
         }
-    )
+    );
 }
 
 /// A page frame structure used to manage memory in the kernel.
@@ -129,7 +126,7 @@ pub struct PFrame {
     pagenum : PageNum,
 
     /// The actual memory this pageframe holds.
-    page : *mut [u8, ..page::SIZE],
+    page : *mut [u8; page::SIZE],
 
     /// The current state of the pframe, holding whether we are dirty and other data.
     flags : Cell<PFState>,
@@ -138,7 +135,7 @@ pub struct PFrame {
     queue : WQueue,
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub enum PFError { Alloc(AllocError), Sys(errno::Errno), }
 impl PFrame {
     /**
@@ -153,8 +150,8 @@ impl PFrame {
         let key = &PFrameId::new(mmo.clone(), pagenum);
         get_cache().add_or_get(key.clone()).map_err(|e| {
             match e {
-                InsertError::MemoryError(_)     => { dbg!(debug::PFRAME, "Unable to add {} to cache, oom", key); errno::ENOMEM },
-                InsertError::SysError(Some(er)) => { dbg!(debug::PFRAME, "unable to add {} to cache because of {}", key, er); er },
+                InsertError::MemoryError(_)     => { dbg!(debug::PFRAME, "Unable to add {:?} to cache, oom", key); errno::ENOMEM },
+                InsertError::SysError(Some(er)) => { dbg!(debug::PFRAME, "unable to add {:?} to cache because of {:?}", key, er); er },
                 InsertError::KeyPresent         => { kpanic!("illegal state of pframe cache, concurrency error!"); },
                 _                               => { kpanic!("unknown SysError occured!"); }
             }
@@ -163,9 +160,9 @@ impl PFrame {
 
     /// Gets a mutable view of the page. This can ONLY be called from within an `MMObj`'s
     /// `fill_page` function since that is the only place where a mutable pframe can be obtained
-    pub fn get_page_mut(&mut self) -> &mut [u8, ..page::SIZE] { unsafe { self.page.as_mut().expect("cannot be null") } }
+    pub fn get_page_mut(&mut self) -> &mut [u8; page::SIZE] { unsafe { self.page.as_mut().expect("cannot be null") } }
     /// Gets a read only view of this page. Use `PFrame::dirty` to get a read-write view.
-    pub fn get_page(&self) -> &[u8, ..page::SIZE] { unsafe { self.page.as_ref().expect("cannot be null") } }
+    pub fn get_page(&self) -> &[u8; page::SIZE] { unsafe { self.page.as_ref().expect("cannot be null") } }
 
     // TODO pframe_migrate?
     /// Makes a new pframe, also makes sure to allocate memory space for it.
@@ -176,7 +173,7 @@ impl PFrame {
                 obj : mmo.downgrade(),
                 pagenum : page_num,
 
-                page : try!(unsafe { page::alloc::<[u8, ..page::SIZE]>().map_err(|v| Alloc(v)) }),
+                page : try!(unsafe { page::alloc::<[u8; page::SIZE]>().map_err(|v| Alloc(v)) }),
 
                 flags : Cell::new(pfstate::NORMAL | pfstate::INITING),
                 queue : WQueue::new(),
@@ -236,7 +233,7 @@ impl PFrame {
      *
      * This routine can block at the mmobj operation level.
      */
-    pub fn dirty(&self) -> Result<&mut [u8,..page::SIZE],errno::Errno> {
+    pub fn dirty(&self) -> Result<&mut [u8; page::SIZE],errno::Errno> {
         assert!(!self.is_busy());
         self.set_busy();
         match self.get_mmo().dirty_page(self) {
@@ -266,7 +263,7 @@ impl PFrame {
     pub fn clean(&self) -> Result<(), errno::Errno> {
         // TODO Not sure if this is enough
         assert!(self.is_dirty(), "attempt to clean a non-dirty page!");
-        dbg!(debug::PFRAME, "cleaning {}", self);
+        dbg!(debug::PFRAME, "cleaning {:?}", self);
 
         self.flags.set(self.flags.get() & !pfstate::DIRTY);
         /* Make sure a future write to the page will fault (and hence dirty it) */
@@ -305,8 +302,8 @@ impl TryMake<PFrameId, Errno> for PFrame {
         let PFrameId { mmobj, page } = a.clone();
         PFrame::create(mmobj, page).map_err(|e| {
             match e {
-                PFError::Alloc(_) => { dbg!(debug::PFRAME, "Unable to allocate memory for {}", a); Errno::ENOMEM },
-                PFError::Sys(e)   => { dbg!(debug::PFRAME, "unable to create {} because of {}", a, e); e },
+                PFError::Alloc(_) => { dbg!(debug::PFRAME, "Unable to allocate memory for {:?}", a); Errno::ENOMEM },
+                PFError::Sys(e)   => { dbg!(debug::PFRAME, "unable to create {:?} because of {:?}", a, e); e },
             }
         })
     }
@@ -328,7 +325,7 @@ impl Drop for PFrame {
     fn drop(&mut self) {
         assert!(!self.is_busy());
         // TODO Not sure if this is good enough.
-        dbg!(debug::PFRAME, "uncaching {}", self);
+        dbg!(debug::PFRAME, "uncaching {:?}", self);
         // We have already been removed from pagetables.
         unsafe { tlb::flush(self.page as *mut c_void) };
         unsafe { page::free(self.page as *mut c_void) };
@@ -337,7 +334,7 @@ impl Drop for PFrame {
 
 impl fmt::Show for PFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "PFrame {{ page: {}, flags: {}, obj: {} }}",
+        write!(f, "PFrame {{ page: {}, flags: {:?}, obj: {:?} }}",
                self.pagenum, self.flags.get(), self.get_mmo())
     }
 }

@@ -2,17 +2,16 @@
 
 //! A map which we can use before memory allocation is fully availible.
 
-use core::slice::*;
 use core::prelude::*;
-use core::option::*;
 use core::fmt;
+use core::cmp;
 use alloc::SlabAllocator;
 
 pub const NUM_ALLOCATORS : uint = 256;
-pub const DEFAULT_SLAB_MAP : SlabMap = SlabMap { vals: [None, .. NUM_ALLOCATORS], cnt: 0 };
+pub const DEFAULT_SLAB_MAP : SlabMap = SlabMap { vals: [None; NUM_ALLOCATORS], cnt: 0 };
 
 pub struct SlabMap {
-    vals: [Option<SlabAllocator>, .. NUM_ALLOCATORS],
+    vals: [Option<SlabAllocator>; NUM_ALLOCATORS],
     cnt : uint,
 }
 
@@ -20,9 +19,9 @@ impl fmt::Show for SlabMap {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(w, "SlabMap (size: {}) [", self.len()));
         if self.cnt != 0 {
-            try!(write!(w, "{}", self.vals[0].expect("shouldn't be null")));
+            try!(write!(w, "{:?}", self.vals[0].expect("shouldn't be null")));
             for &i in self.vals.slice(1, self.cnt).iter() {
-                try!(write!(w, ", {}", i.expect("shouldn't be null")));
+                try!(write!(w, ", {:?}", i.expect("shouldn't be null")));
             }
         }
         write!(w, "]")
@@ -62,17 +61,17 @@ impl SlabMap {
                 prev = size;
             }
         }
-        dbg!(debug::MM, "slab map is {}", self);
+        dbg!(debug::MM, "slab map is {:?}", self);
     }
 
     pub fn add(&mut self, v: SlabAllocator) {
         if self.cnt == NUM_ALLOCATORS {
-            dbg!(debug::MM | debug::CORE, "Ignoring {} because we already have too many!", v);
+            dbg!(debug::MM | debug::CORE, "Ignoring {:?} because we already have too many!", v);
         } else if !self.brute_check(v.get_size() as uint) {
             self.vals[self.cnt] = Some(v);
             self.cnt += 1;
         } else {
-            dbg!(debug::MM, "ignoring slab {} for already present one.", v);
+            dbg!(debug::MM, "ignoring slab {:?} for already present one.", v);
         }
     }
 
@@ -94,9 +93,9 @@ impl SlabMap {
     }
 
     pub fn find_smallest(&self, key: uint) -> Option<SlabAllocator> {
-        match self.vals.slice_to(self.cnt).binary_search(|v| -> Ordering { (v.expect("should have value").get_size() as uint).cmp(&key) }) {
-            BinarySearchResult::Found(v)    => Some(self.vals[v].expect("should have value")),
-            BinarySearchResult::NotFound(v) => if v == self.cnt { None } else { Some(self.vals[v].expect("should have value")) },
+        match self.vals.slice_to(self.cnt).binary_search_by(|&:v| -> cmp::Ordering { (v.expect("should have value").get_size() as uint).cmp(&key) }) {
+            Ok(v)  => Some(self.vals[v].expect("should have value")),
+            Err(v) => if v == self.cnt { None } else { Some(self.vals[v].expect("should have value")) },
         }
     }
 

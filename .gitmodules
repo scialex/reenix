@@ -8,3 +8,9 @@
 [submodule "external/openlibm"]
 	path = external/openlibm
 	url = https://github.com/JuliaLang/openlibm.git
+[submodule "external/bassert"]
+	path = external/bassert
+	url = git@github.com:scialex/bassert.git
+[submodule "external/enabled"]
+	path = external/enabled
+	url = git@github.com:scialex/enabled.git

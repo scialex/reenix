@@ -4,14 +4,15 @@ use core::num;
 use alloc::rc;
 use alloc::rc::{Rc,Weak};
 use alloc::boxed::Box;
-use base::{describe, errno};
-use collections::hash;
+use base::errno;
+use core::hash;
 use collections::string::String;
-use collections::tree_map::TreeMap;
+use collections::BTreeMap;
 use context::ContextFunc;
 use core::fmt;
-use core::ptr::*;
 use core::mem::{transmute, transmute_copy};
+use core::ptr::null_mut;
+use core::ops::Deref;
 use core::prelude::*;
 use libc::c_void;
 use kthread;
@@ -25,20 +26,10 @@ use mm::AllocError;
 use util::uid::*;
 
 pub use self::WaitProcId::*;
+pub use base::pid::*;
+
 pub const CUR_PROC_SLOT : uint = 1;
 pub const CUR_PID_SLOT  : uint = 2;
-
-#[cfg(not(SMALL_PID))] type PidInner = uint;
-#[cfg(SMALL_PID)]      type PidInner = u8;
-
-#[deriving(Eq, PartialEq, Show, PartialOrd, Ord, Clone, Copy)]
-pub struct ProcId(pub PidInner);
-impl Id for ProcId {
-    fn successor(&mut self) {
-        let &ProcId(n) = self;
-        *self = ProcId(n + 1)
-    }
-}
 
 static mut INIT_PROC : *mut Rc<ProcRefCell<KProc>> = 0 as *mut Rc<ProcRefCell<KProc>>;
 static INIT_PID : ProcId = ProcId(1);
@@ -55,15 +46,15 @@ fn get_pid() -> Option<ProcId> {
 /// Notify that we are done with a pid.
 fn drop_pid(i: &ProcId) { unsafe { &mut *PID_GEN }.destroy(i); }
 
-#[deriving(Show, Eq, PartialEq, Copy)]
+#[derive(Show, Eq, PartialEq, Copy)]
 pub enum ProcState { RUNNING, DEAD }
 pub type ProcStatus = int;
 
 pub struct KProc {
     pid      : ProcId,                      /* Our pid */
     command  : String,                      /* Process Name */
-    threads  : TreeMap<u64, Box<KThread>>,  /* Our threads */
-    children : TreeMap<ProcId, Rc<ProcRefCell<KProc>>>, /* Our children */
+    threads  : BTreeMap<u64, Box<KThread>>, /* Our threads */
+    children : BTreeMap<ProcId, Rc<ProcRefCell<KProc>>>, /* Our children */
     status   : ProcStatus,                  /* Our exit status */
     state    : ProcState,                   /* running/sleeping/etc. */
     parent   : Option<Weak<ProcRefCell<KProc>>>,/* Our parent */
@@ -90,19 +81,19 @@ pub fn init_stage1() {
 pub fn init_stage2() {
     use core::intrinsics::transmute;
     unsafe {
-        let y : Box<TreeMap<ProcId, Rc<ProcRefCell<KProc>>>> = box TreeMap::new();
+        let y : Box<BTreeMap<ProcId, Rc<ProcRefCell<KProc>>>> = box BTreeMap::new();
         PROC_LIST = transmute(y);
         let z : Box<UIDSource<ProcId>> = box UIDSource::new(ProcId(0)).unwrap();
         PID_GEN = transmute(z);
     }
 }
 
-static mut PROC_LIST : *mut TreeMap<ProcId, Weak<ProcRefCell<KProc>>> = 0 as *mut TreeMap<ProcId, Weak<ProcRefCell<KProc>>>;
-macro_rules! proc_list(
+static mut PROC_LIST : *mut BTreeMap<ProcId, Weak<ProcRefCell<KProc>>> = 0 as *mut BTreeMap<ProcId, Weak<ProcRefCell<KProc>>>;
+macro_rules! proc_list{
     () => ({
         unsafe { PROC_LIST.as_mut().expect("proc_list not yet initialized") }
     })
-)
+}
 
 static mut IDLE_STARTED : bool = false;
 
@@ -116,12 +107,12 @@ pub fn start_idle_proc(init_main : ContextFunc, arg1: i32, arg2: *mut c_void) ->
     let pid = KProc::new(String::from_str("IDLE PROCESS"), init_main, arg1, arg2).ok().expect("Unable to allocate idle proc!");
 
     assert!(pid == IDLE_PID);
-    dbg!(debug::CORE, "Starting idle process {} now!", pid);
+    dbg!(debug::CORE, "Starting idle process {:?} now!", pid);
 
     context::initial_ctx_switch();
 }
 
-#[deriving(Copy)]
+#[derive(Copy)]
 pub enum WaitProcId { Any, Pid(ProcId) }
 pub type WaitOps = u32;
 
@@ -137,7 +128,7 @@ impl KProc {
 
     /// Checks if this process is the one we are currently running in.
     pub fn is_current_process(&self) -> bool {
-        *(current_pid!()) == self.pid
+        (current_pid!()) == self.pid
     }
 
     /// Wait on a process.
@@ -193,12 +184,12 @@ impl KProc {
         // should have been reparented to init in KProc::cleanup. We will just ignore the init-proc
         // and allow it to leak some memory, since we will only get here for it if we are shutting
         // down.
-        assert!(rc::is_unique(&to_kill), "{} is not unique", (*to_kill).borrow());
+        assert!(rc::is_unique(&to_kill), "{:?} is not unique", (*to_kill).borrow());
 
         // Actually destroy the process.
         drop(to_kill);
 
-        dbg!(debug::PROC, "{} Successfully waited on process {} which exited with {} (0x{:X})", self, final_pid, result, result);
+        dbg!(debug::PROC, "{:?} Successfully waited on process {:?} which exited with {:?} (0x{:X})", self, final_pid, result, result);
         return Ok((final_pid, result));
     }
 
@@ -207,7 +198,7 @@ impl KProc {
         assert!(options == 0);
         loop {
             if self.children.is_empty() {
-                dbger!(debug::PROC, errno::ECHILD, "Process {} attempted to wait on any child when no children were availible.",
+                dbger!(debug::PROC, errno::ECHILD, "Process {:?} attempted to wait on any child when no children were availible.",
                        self);
                 return Err(errno::ECHILD);
             }
@@ -218,7 +209,7 @@ impl KProc {
                 return Ok((*kproc).clone());
             }
             if self.wait.wait().is_err() {
-                dbg!(debug::PROC, "Process {} interrupted while waiting for any children to exit", self);//describe!(self));
+                dbg!(debug::PROC, "Process {:?} interrupted while waiting for any children to exit", self);//describe!(self));
                 return Err(errno::ECANCELED);
             }
         }
@@ -238,7 +229,7 @@ impl KProc {
                         // else might want to look at it.
                         drop(b);
                         if self.wait.wait().is_err() {
-                            dbg!(debug::PROC, "Process {} interrupted while waiting for child {} to exit",self, pid); //describe!(self), pid);
+                            dbg!(debug::PROC, "Process {:?} interrupted while waiting for child {:?} to exit",self, pid); //describe!(self), pid);
                             return Err(errno::ECANCELED);
                         }
                     }
@@ -246,7 +237,7 @@ impl KProc {
                 Ok(pr)
             },
             None => {
-                dbger!(debug::PROC, errno::ECHILD, "Attempt by {} to wait on pid {} failed because it is not a child.", self, pid);
+                dbger!(debug::PROC, errno::ECHILD, "Attempt by {:?} to wait on pid {:?} failed because it is not a child.", self, pid);
                 Err(errno::ECHILD)
             },
         }
@@ -306,8 +297,8 @@ impl KProc {
             pid : try!(get_pid().ok_or_else(|| { dbg!(debug::PROC, "Unable to allocate PID!"); () })),
             command : name,
             // TODO Maybe I should just have this be a box for now.
-            threads : try!(alloc!(try TreeMap::new())),
-            children : try!(alloc!(try TreeMap::new())),
+            threads : try!(alloc!(try BTreeMap::new())),
+            children : try!(alloc!(try BTreeMap::new())),
             status : 0,
             state : ProcState::RUNNING,
             parent : None,
@@ -317,6 +308,7 @@ impl KProc {
     }
 
     pub fn new(name: String, init_main : ContextFunc, arg1: i32, arg2: *mut c_void) -> Result<ProcId, AllocError> {
+        dbg!(debug::PROC, "creating proc for {}", name);
         let is_idle = unsafe { IDLE_PROC == null_mut() };
         let is_init = unsafe { !is_idle && INIT_PROC == null_mut() };
 
@@ -331,7 +323,7 @@ impl KProc {
         };
 
 
-        let hash = hash::hash(&*init_thread);
+        let hash = hash::hash::<KThread, hash::SipHasher>(&*init_thread);
         let pid = (*rcp).borrow_mut().pid.clone();
         // TODO This should really actually use a Rc or something.
         try!(alloc!(try {
@@ -369,7 +361,7 @@ impl KProc {
             unsafe { INIT_PROC = transmute(tmp); }
         }
         rcp.borrow_mut().threads.get_mut(&hash).expect("thread must still be present").make_runable();
-        dbg!(debug::PROC, "created {}", pid);
+        dbg!(debug::PROC, "created {:?}", pid);
         return Ok(pid);
     }
 
@@ -381,7 +373,7 @@ impl KProc {
     ///
     /// This is called to have a process cancel all of its threads.
     pub fn kill(&mut self, status: ProcStatus) {
-        dbg!(debug::PROC, "proc::kill(status = {} {}) called on {}. Called by {}",
+        dbg!(debug::PROC, "proc::kill(status = {:?} {:?}) called on {:?}. Called by {:?}",
              status, num::from_int::<errno::Errno>(status), self, current_proc!());
         for (_, thr) in self.threads.iter_mut() {
             if !thr.is_current_thread() { thr.exit(status as *mut c_void); }
@@ -397,7 +389,7 @@ impl KProc {
     /// This is a callback by a thread when it exits. We need to record that it has exited and
     /// decide if we need to quit. If it is the last thread we clean up what we can then return.
     pub fn thread_exited(&mut self, exit: *mut c_void) {
-        assert!(self.threads.contains_key(&hash::hash(current_thread!())));
+        assert!(self.threads.contains_key(&hash::hash::<KThread, hash::SipHasher>(current_thread!())));
         if self.all_threads_dead() {
             self.cleanup(exit as ProcStatus);
         } else {
@@ -410,7 +402,7 @@ impl KProc {
         assert!(self.is_current_process());
         assert!(self.pid != IDLE_PID);
         let parent = self.parent.clone().expect("PARENT PROCESS UNSET").upgrade().expect("Parent process should not have been destroyed!");
-        dbg!(debug::PROC, "{} cleaning up. Sending wakeup to parent {}, exit status was 0x{:x}", self, parent.borrow(), status);
+        dbg!(debug::PROC, "{:?} cleaning up. Sending wakeup to parent {:?}, exit status was 0x{:x}", self, parent.borrow(), status);
         self.status = status;
         self.state = ProcState::DEAD;
         // TODO This is actually pretty bad WRT borrowing. If parent-proc is INIT we might try to
@@ -422,7 +414,7 @@ impl KProc {
             drop(pref);
             let init = init_proc!();
             for (pid, child) in self.children.iter() {
-                dbg!(debug::PROC, "moving {} to init proc", pid);
+                dbg!(debug::PROC, "moving {:?} to init proc", pid);
                 (**child).borrow_mut().parent = Some(init.clone().downgrade());
                 init.borrow_mut().children.insert(pid.clone(), child.clone());
             }
@@ -451,10 +443,10 @@ impl Drop for KProc {
 
 impl fmt::Show for KProc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "KProc {} ('{}' {:p})", self.pid, self.command, self)
+        write!(f, "KProc {:?} ({:?} {:p})", self.pid, self.command, self)
     }
 }
-
+/*
 impl describe::Describeable for KProc {
     fn describe(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(f, "{{ {} children are: [", self));
@@ -474,6 +466,7 @@ impl describe::Describeable for KProc {
         }
     }
 }
+*/
 
 impl PartialEq for KProc {
     fn eq(&self, other: &KProc) -> bool {

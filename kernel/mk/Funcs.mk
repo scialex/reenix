@@ -37,7 +37,7 @@ else ifneq (,$$(findstring $(1),$$(TARGET_CRATES)))
 else
     $$(error $(1) is not given any type of crate!)
 endif
-$(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) $$(TMP_SBCN_FLAG) --print-file-name $(strip $(2))/lib.rs 2>/dev/null))
+$(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) $$(TMP_SBCN_FLAG) --print file-names $(strip $(2))/lib.rs 2>/dev/null))
 $(strip $(1))_DIR  := $(strip $(2))
 $(strip $(1))_DOC  := $$(call base-doc-name,$(strip $(1)))
 $(call local-var-destroy,TMP_SBCN_FLAG)
@@ -198,10 +198,10 @@ endef
 # $(4) is any rustdoc flags you want.
 # $(5) is any addional files to depend on
 define base-crate-rule
-$(call local-var-init, TMP_BCR_RSFILES,$$(shell find $(call dir-name,$(1)) -type f -name "*.rs"))
+$(call local-var-init, TMP_BCR_RSFILES,$$(shell find $(call dir-name,$(1))/ -type f -name "*.rs"))
 $(call local-var-init, TMP_BCR_CRATES,)
 
-$(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(call lib-name,$(2))
+$(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $$(call lib-name,$(2))
 	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..."
 	$$(HIDE_SIGIL) $$(RUST) $$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))) \
 		                    $(3) $$(call dir-name,$(1))/lib.rs                         \
@@ -231,7 +231,7 @@ endef
 # $(1) is the name of the crate
 # $(2) is the list of dependencies
 define crate-rule
-$(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2)),--opt-level=$$(DEFAULT_CRATE_OPT)))
+$(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2)),-C opt-level=$$(DEFAULT_CRATE_OPT)))
 endef
 
 # A plugin

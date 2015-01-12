@@ -2,8 +2,6 @@
 
 //! Macro's for failable allocation
 
-#![macro_escape]
-
 /// Allocates a value. If it seems that we are likely to run out of memory we will return
 /// Err(AllocError), otherwise Ok(val). It is not nessecarially gaurenteed to work.
 ///
@@ -11,10 +9,10 @@
 /// normal method of detecting alloc failures (namely new_task that returns value or fails if it
 /// can't).
 #[macro_export]
-macro_rules! alloc(
+macro_rules! alloc {
     // TODO This is rather wordy and arbitrary.
     (try $f:expr) => ({
-        use mm::alloc;
+        use $crate::alloc;
         use core::mem;
         if alloc::is_memory_low() {
             Err(())
@@ -29,7 +27,7 @@ macro_rules! alloc(
         }
     });
     (try_box $e:expr) => ({
-        use mm::alloc;
+        use $crate::alloc;
         use core::mem;
         if alloc::is_memory_low() {
             Err(())
@@ -44,4 +42,4 @@ macro_rules! alloc(
             }
         }
     });
-)
+}

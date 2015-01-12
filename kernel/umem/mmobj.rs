@@ -2,8 +2,8 @@
 //! The mmobj definitions.
 
 use core::fmt;
+use core::cmp::Ordering;
 use core::cell::*;
-use core::ptr::*;
 use core::prelude::*;
 //use util::cacheable::*;
 use base::errno::*;
@@ -16,7 +16,7 @@ use base::devices::*;
 // Cheating to get a uuid by just incrementing a counter. This is not really good in general but we
 // have 48 bits, which means we will probably never really run out...
 // There has got to be a better way but this is just easier for now.
-#[deriving(Copy, Eq, PartialEq, Show)]
+#[derive(Copy, Eq, PartialEq, Show)]
 pub struct MMObjId(DeviceId, u32);
 //const FAKE_DEVICE : DeviceId = DeviceId_static!(0xFF,0x00);
 //static mut NEXT_ID : MMObjId = MMObjId(FAKE_DEVICE,0);
@@ -31,9 +31,9 @@ impl Ord for MMObjId {
         let &MMObjId(mdev, mpiece) = self;
         let &MMObjId(odev, opiece) = other;
         match mdev.cmp(&odev) {
-            Equal => mpiece.cmp(&opiece),
-            Less => Less,
-            Greater => Greater,
+            Ordering::Equal => mpiece.cmp(&opiece),
+            Ordering::Less => Ordering::Less,
+            Ordering::Greater => Ordering::Greater,
         }
     }
 }
@@ -69,32 +69,12 @@ pub trait MMObjMut {
      */
     fn clean_page(&mut self, pf: &pframe::PFrame) -> KResult<()>;
 
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "mmobj_mut for {}", self.get_id()) }
+    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "mmobj_mut for {:?}", self.get_id()) }
 }
 
 pub trait MMObj {
     /// Return an MMObjId for this object.
     fn get_id(&self) -> MMObjId;
-
-    /**
-     * Finds the correct page frame from a high-level perspective
-     * for performing the given operation on an area backed by
-     * the given pagenum of the given object. If "forwrite" is
-     * specified then the pframe should be suitable for writing;
-     * otherwise, it is permitted not to support writes. In
-     * either case, it must correctly support reads.
-     *
-     * Most objects will simply return a page from their
-     * own list of pages, but objects such as shadow objects
-     * may need to perform more complicated operations to find
-     * the appropriate page.
-     * This may block.
-     */
-    // TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
-    // better. Using this stuff is annoying.
-    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: uint, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
-        pframe::PFrame::get(this, pagenum)
-    }
 
     /**
      * Fill the given page frame with the data that should be in it.
@@ -121,8 +101,32 @@ pub trait MMObj {
      */
     fn clean_page(&self, pf: &pframe::PFrame) -> KResult<()>;
 
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "mmobj for {}", self.get_id()) }
+    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "mmobj for {:?}", self.get_id()) }
 }
+
+pub trait MMObjExt {
+    /**
+     * Finds the correct page frame from a high-level perspective
+     * for performing the given operation on an area backed by
+     * the given pagenum of the given object. If "forwrite" is
+     * specified then the pframe should be suitable for writing;
+     * otherwise, it is permitted not to support writes. In
+     * either case, it must correctly support reads.
+     *
+     * Most objects will simply return a page from their
+     * own list of pages, but objects such as shadow objects
+     * may need to perform more complicated operations to find
+     * the appropriate page.
+     * This may block.
+     */
+    // TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
+    // better. Using this stuff is annoying.
+    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: uint, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
+        pframe::PFrame::get(this, pagenum)
+    }
+}
+
+impl<T> MMObjExt for T where T: MMObj { }
 
 impl<'a> fmt::Show  for MMObj + 'a { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.show(f) } }
 impl<'a> PartialOrd for MMObj + 'a { fn partial_cmp(&self, o: &MMObj) -> Option<Ordering> { self.get_id().partial_cmp(&o.get_id()) } }

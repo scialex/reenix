@@ -1,8 +1,9 @@
 
 use core::cell::*;
-use core::kinds::marker;
+use core::marker;
 use core::prelude::*;
 use core::fmt;
+use core::ops::{Deref, DerefMut};
 
 type Borrowed = uint;
 const UNUSED : Borrowed = 0;
@@ -178,7 +179,8 @@ pub struct SilentProcRef<'b, T:'b> {
 }
 
 #[unstable = "waiting for `Deref` to become stable"]
-impl<'b, T> Deref<T> for SilentProcRef<'b, T> {
+impl<'b, T> Deref for SilentProcRef<'b, T> {
+    type Target = T;
     #[inline]
     fn deref<'a>(&'a self) -> &'a T {
         unsafe { &*self._parent.value.get() }
@@ -195,7 +197,8 @@ pub struct SilentProcRefMut<'b, T:'b> {
 
 
 #[unstable = "waiting for `Deref` to become stable"]
-impl<'b, T> Deref<T> for SilentProcRefMut<'b, T> {
+impl<'b, T> Deref for SilentProcRefMut<'b, T> {
+    type Target = T;
     #[inline]
     fn deref<'a>(&'a self) -> &'a T {
         unsafe { &*self._parent.value.get() }
@@ -203,7 +206,7 @@ impl<'b, T> Deref<T> for SilentProcRefMut<'b, T> {
 }
 
 #[unstable = "waiting for `DerefMut` to become stable"]
-impl<'b, T> DerefMut<T> for SilentProcRefMut<'b, T> {
+impl<'b, T> DerefMut for SilentProcRefMut<'b, T> {
     #[inline]
     fn deref_mut<'a>(&'a mut self) -> &'a mut T {
         unsafe { &mut *self._parent.value.get() }
@@ -241,7 +244,8 @@ impl<'b, T> Drop for ProcRef<'b, T> {
 }
 
 #[unstable = "waiting for `Deref` to become stable"]
-impl<'b, T> Deref<T> for ProcRef<'b, T> {
+impl<'b, T> Deref for ProcRef<'b, T> {
+    type Target = T;
     #[inline]
     fn deref<'a>(&'a self) -> &'a T {
         unsafe { &*self._parent.value.get() }
@@ -286,7 +290,8 @@ impl<'b, T> Drop for ProcRefMut<'b, T> {
 }
 
 #[unstable = "waiting for `Deref` to become stable"]
-impl<'b, T> Deref<T> for ProcRefMut<'b, T> {
+impl<'b, T> Deref for ProcRefMut<'b, T> {
+    type Target = T;
     #[inline]
     fn deref<'a>(&'a self) -> &'a T {
         unsafe { &*self._parent.value.get() }
@@ -294,7 +299,7 @@ impl<'b, T> Deref<T> for ProcRefMut<'b, T> {
 }
 
 #[unstable = "waiting for `DerefMut` to become stable"]
-impl<'b, T> DerefMut<T> for ProcRefMut<'b, T> {
+impl<'b, T> DerefMut for ProcRefMut<'b, T> {
     #[inline]
     fn deref_mut<'a>(&'a mut self) -> &'a mut T {
         unsafe { &mut *self._parent.value.get() }
