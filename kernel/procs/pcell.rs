@@ -5,7 +5,7 @@ use core::prelude::*;
 use core::fmt;
 use core::ops::{Deref, DerefMut};
 
-type Borrowed = uint;
+type Borrowed = usize;
 const UNUSED : Borrowed = 0;
 const WRITING : Borrowed = -1;
 /// A cell data structure that lets you borrow things 'silently'. This is used because the data in

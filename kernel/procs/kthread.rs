@@ -20,14 +20,14 @@ use core::hash;
 use mm::pagetable::PageDir;
 use mm::AllocError;
 
-pub static CUR_THREAD_SLOT : uint = 0;
-pub static DEFAULT_STACK_PAGES : uint = 16;
+pub static CUR_THREAD_SLOT : usize = 0;
+pub static DEFAULT_STACK_PAGES : usize = 16;
 
 #[allow(raw_pointer_derive)] #[derive(Hash, Eq, PartialEq)]
-pub struct KStack(uint, *mut u8);
+pub struct KStack(usize, *mut u8);
 
 impl KStack {
-    pub fn with_size(pages : uint) -> Result<KStack,()> {
+    pub fn with_size(pages : usize) -> Result<KStack,()> {
         Ok(KStack(pages, try!(unsafe { page::alloc_n::<u8>(pages) })))
     }
 
@@ -49,7 +49,7 @@ impl KStack {
         unsafe { copy_nonoverlapping_memory(mptr, optr as *const u8, size); }
     }
 
-    pub fn num_pages(&self) -> uint {
+    pub fn num_pages(&self) -> usize {
         let &KStack(size, _) = self;
         size
     }
@@ -106,7 +106,7 @@ impl KThread {
         let kstack = try!(KStack::new());
         Ok(KThread {
             ctx       : unsafe { Context::new(main, arg1, arg2, kstack.ptr() as *mut u8,
-                                              page::num_to_addr::<u8>(kstack.num_pages()) as uint,
+                                              page::num_to_addr::<u8>(kstack.num_pages()) as usize,
                                               transmute_copy(pdir)) },
             kstack    : kstack,
             retval    : ptr::null_mut(),
@@ -162,7 +162,7 @@ impl KThread {
         //assert!(transmute(self) == gdt::get_tsd().cur_thr);
         assert!(self.state == State::RUN);
         dbg!(debug::THR, "Thread {:?} of process {:?} ended with a status of 0x{:x} ({:?})",
-             self, current_proc!(), v as uint, num::from_uint::<errno::Errno>(v as uint));
+             self, current_proc!(), v as usize, num::from_uint::<errno::Errno>(v as usize));
         (current_proc_mut!()).thread_exited(v);
         self.state = State::EXITED;
         context::die();

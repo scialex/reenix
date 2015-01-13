@@ -144,12 +144,12 @@ impl<K: Ord, V> LruCache<K, V> {
 
     /// Remove items until we are at most 'len' items long. We will remove the least recently used
     /// items first.
-    pub fn trim_to(&mut self, len: uint) {
+    pub fn trim_to(&mut self, len: usize) {
         while self.len() > len { self.pop_lru(); }
     }
 
     /// Remove the 'cnt' least recently used items from this cache.
-    pub fn trim_off(&mut self, cnt: uint) {
+    pub fn trim_off(&mut self, cnt: usize) {
         for _ in range(0, cnt) { self.pop_lru(); }
     }
 
@@ -168,7 +168,7 @@ impl<K: Ord, V> LruCache<K, V> {
     }
 
     /// Return the number of elements in the map.
-    pub fn len(&self) -> uint { self.map.len() }
+    pub fn len(&self) -> usize { self.map.len() }
     /// Return true if the map contains no elements.
     pub fn is_empty(&self) -> bool { self.len() == 0 }
     /// Returns true if the map contains a value for the specified key.

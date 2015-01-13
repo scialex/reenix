@@ -151,16 +151,16 @@ pub extern "Rust" fn unhandled_intr(r: &mut Registers) {
 }
 
 static mut IDT : InterruptState<'static> = InterruptState {
-    table    : [InterruptDescription { baselo : 0, selector: 0, zero: 0, attr: 0, basehi: 0 }; MAX_INTERRUPTS as uint],
-    handlers : [unhandled_intr; MAX_INTERRUPTS as uint],
-    mappings : [None; MAX_INTERRUPTS as uint],
+    table    : [InterruptDescription { baselo : 0, selector: 0, zero: 0, attr: 0, basehi: 0 }; MAX_INTERRUPTS as usize],
+    handlers : [unhandled_intr; MAX_INTERRUPTS as usize],
+    mappings : [None; MAX_INTERRUPTS as usize],
     data     : InterruptInfo { size: 0, base : 0 as *const InterruptDescription }
 };
 
 pub struct InterruptState<'a> {
-    table    : [InterruptDescription; MAX_INTERRUPTS as uint],
-    handlers : [InterruptHandler; MAX_INTERRUPTS as uint],
-    mappings : [Option<u16>; MAX_INTERRUPTS as uint],
+    table    : [InterruptDescription; MAX_INTERRUPTS as usize],
+    handlers : [InterruptHandler; MAX_INTERRUPTS as usize],
+    mappings : [Option<u16>; MAX_INTERRUPTS as usize],
     data     : InterruptInfo,
 }
 
@@ -178,7 +178,7 @@ macro_rules! make_panic_handler{
 
 /// Set the given entry in the IDT.
 unsafe fn set_entry(isr: u8, addr: u32, seg: u16, flags: u8) {
-    IDT.table[isr as uint] = InterruptDescription {
+    IDT.table[isr as usize] = InterruptDescription {
         baselo   : (addr & 0xffff) as u16,
         basehi   : ((addr >> 16) & 0xFFFF) as u16,
         zero     : 0,
@@ -196,9 +196,9 @@ unsafe fn set_entry(isr: u8, addr: u32, seg: u16, flags: u8) {
 #[allow(dead_code)]
 pub unsafe extern "C" fn _rust_intr_handler(r: &mut Registers) {
     // TODO I might need to setup the %es stuff as early as here.
-    let h = IDT.handlers[r.intr as uint];
+    let h = IDT.handlers[r.intr as usize];
     h(r);
-    if IDT.mappings[r.intr as uint].is_some() {
+    if IDT.mappings[r.intr as usize].is_some() {
         apic::set_eoi();
     }
 }
@@ -213,8 +213,8 @@ pub unsafe extern "C" fn _rust_intr_handler(r: &mut Registers) {
 pub fn register(intr: u8, handler: InterruptHandler) -> Option<InterruptHandler> {
     use core::intrinsics::transmute;
     unsafe {
-        let old = IDT.handlers[intr as uint];
-        IDT.handlers[intr as uint] = handler;
+        let old = IDT.handlers[intr as usize];
+        IDT.handlers[intr as usize] = handler;
         let handled = transmute::<InterruptHandler, *const u8>(old) != transmute::<InterruptHandler, *const u8>(unhandled_intr);
         return if handled { Some(old) } else { None };
     }
@@ -224,8 +224,8 @@ pub fn register(intr: u8, handler: InterruptHandler) -> Option<InterruptHandler>
 pub fn map(irq: u16, intr: u8) -> Option<u16> {
     assert!(SPURIOUS != intr, "Should not redirect spurious interrupt");
     unsafe {
-        let old = IDT.mappings[intr as uint];
-        IDT.mappings[intr as uint] = Some(irq);
+        let old = IDT.mappings[intr as usize];
+        IDT.mappings[intr as usize] = Some(irq);
         apic::set_redirect(irq as u32, intr);
         return old;
     }

@@ -14,8 +14,8 @@ pub fn init_stage2() {
 
 pub const DEFAULT_CHAR: u8 = 0x20;
 // NOTE The const-expr propagator can't deal with casts!?
-pub const UINT_DISPLAY_HEIGHT : uint = 25;
-pub const UINT_DISPLAY_WIDTH  : uint = 80;
+pub const UINT_DISPLAY_HEIGHT : usize = 25;
+pub const UINT_DISPLAY_WIDTH  : usize = 80;
 pub const DISPLAY_HEIGHT : u8 = 25;
 pub const DISPLAY_WIDTH  : u8 = 80;
 const VIDEO_RAM : uintptr_t = 0xb8000;
@@ -55,14 +55,14 @@ impl Screen {
 
     #[inline]
     pub unsafe fn put_char_with_attr(&self, c: u8, x: u8, y: u8, attrib: u8) {
-        write(self.ram.offset(xy_to_offset(x,y) as int), (c as u16) | ((attrib as u16) << 8))
+        write(self.ram.offset(xy_to_offset(x,y) as isize), (c as u16) | ((attrib as u16) << 8))
     }
 
     #[allow(dead_code)]
     pub unsafe fn put_buf(&self, buf: &[[u8; UINT_DISPLAY_WIDTH]; UINT_DISPLAY_HEIGHT]) {
         for y in range(0, DISPLAY_HEIGHT) {
             for x in range(0, DISPLAY_WIDTH) {
-                self.put_char(buf[y as uint][x as uint], x, y);
+                self.put_char(buf[y as usize][x as usize], x, y);
             }
         }
     }
@@ -70,7 +70,7 @@ impl Screen {
     pub unsafe fn put_line(&self, l: &[u8; UINT_DISPLAY_WIDTH], off: u8) {
         assert!(off < DISPLAY_HEIGHT);
         for x in range(0, DISPLAY_WIDTH) {
-            self.put_char(l[x as uint], x, off);
+            self.put_char(l[x as usize], x, off);
         }
     }
 
@@ -92,5 +92,5 @@ impl Screen {
 }
 
 #[inline]
-fn xy_to_offset(x: u8, y: u8) -> uint { (y as uint) * (DISPLAY_WIDTH as uint) + (x as uint) }
+fn xy_to_offset(x: u8, y: u8) -> usize { (y as usize) * (DISPLAY_WIDTH as usize) + (x as usize) }
 

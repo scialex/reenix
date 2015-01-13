@@ -24,15 +24,15 @@ fn real_init_stage1() {}
 fn real_init_stage2() {
 }
 
-pub const HISTORY_LINES: uint = screen::UINT_DISPLAY_HEIGHT * 6;
+pub const HISTORY_LINES: usize = screen::UINT_DISPLAY_HEIGHT * 6;
 
 pub struct VirtualTerminal {
     // TODO This should really just hold a reference to it's screen and not use a static function
     // to get it.
     buf       : [[u8; screen::UINT_DISPLAY_WIDTH]; HISTORY_LINES],
-    cur_line  : uint,
-    cur_char  : uint,
-    view_line : uint,
+    cur_line  : usize,
+    cur_char  : usize,
+    view_line : usize,
     active    : bool
 }
 
@@ -57,7 +57,7 @@ impl VirtualTerminal {
         return redraw;
     }
 
-    fn get_line_y(&self) -> Option<uint> {
+    fn get_line_y(&self) -> Option<usize> {
         let yval = if self.cur_line < self.view_line {
             (self.cur_line + HISTORY_LINES) - self.view_line
         } else {
@@ -167,8 +167,8 @@ impl TTYDriver for VirtualTerminal {
     fn block_io(&self) -> Finalizer {
         let cipl = interrupt::get_ipl();
         interrupt::set_ipl(cmp::max(interrupt::KEYBOARD, cipl));
-        fn reset(d: uint) { interrupt::set_ipl(d as u8) }
-        Finalizer { data: cipl as uint, func: reset }
+        fn reset(d: usize) { interrupt::set_ipl(d as u8) }
+        Finalizer { data: cipl as usize, func: reset }
     }
 
     fn redraw(&self) {

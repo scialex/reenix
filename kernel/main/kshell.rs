@@ -238,7 +238,7 @@ fn do_echo(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
 }
 
 fn do_exit(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
-    let status : uint = if argv.len() < 2 {
+    let status : usize = if argv.len() < 2 {
         0
     } else if argv.len() > 2 {
         twriteln!(io, "usage: exit [number]");
@@ -380,7 +380,7 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
             return Ok(());
         }
     };
-    let blks : uint = match FromStr::from_str(argv[2]) {
+    let blks : usize = match FromStr::from_str(argv[2]) {
         Some(v) => v,
         None => {
             twriteln!(io, "Illegal reps number {:?}, Usage: write-blocks block_num reps text [...]", argv[2]);
@@ -433,7 +433,7 @@ extern "C" fn parallel_run(_: i32, v:*mut c_void) -> *mut c_void {
     let i: Instr = unsafe { ProcArgs::from_arg(v).unwrap() };
     match i.ksh.run_command(i.line) {
         Ok(_) => 0 as *mut c_void,
-        Err(e) => e as uint as *mut c_void,
+        Err(e) => e as usize as *mut c_void,
     }
 }
 

@@ -12,21 +12,21 @@ use core::ptr::{zero_memory,null,null_mut};
 use core::mem::uninitialized;
 
 // TODO Make this bitflags.
-pub const PRESENT        : uint = 0x001;
-pub const WRITE          : uint = 0x002;
-pub const USER           : uint = 0x004;
-pub const WRITE_THROUGH  : uint = 0x008;
-pub const CACHE_DISABLED : uint = 0x010;
-pub const ACCESSED       : uint = 0x020;
-pub const DIRTY          : uint = 0x040;
-pub const SIZE           : uint = 0x080;
-pub const GLOBAL         : uint = 0x100;
+pub const PRESENT        : usize = 0x001;
+pub const WRITE          : usize = 0x002;
+pub const USER           : usize = 0x004;
+pub const WRITE_THROUGH  : usize = 0x008;
+pub const CACHE_DISABLED : usize = 0x010;
+pub const ACCESSED       : usize = 0x020;
+pub const DIRTY          : usize = 0x040;
+pub const SIZE           : usize = 0x080;
+pub const GLOBAL         : usize = 0x100;
 
-pub const ENTRY_COUNT : uint = page::SIZE / u32::BYTES;
-pub const VADDR_SIZE  : uint = page::SIZE * ENTRY_COUNT;
+pub const ENTRY_COUNT : usize = page::SIZE / u32::BYTES;
+pub const VADDR_SIZE  : usize = page::SIZE * ENTRY_COUNT;
 
-type pte = uint;
-type pde = uint;
+type pte = usize;
+type pde = usize;
 
 #[repr(C, packed)]
 pub struct PageDir {
@@ -45,7 +45,7 @@ impl PageDir {
         }
     }
 
-    fn get_pagetable(&self, i: uint) -> Option<*mut uint> {
+    fn get_pagetable(&self, i: usize) -> Option<*mut usize> {
         if PRESENT & self.pd_physical[i] != 0 {
             let res = self.pd_virtual[i];
             assert!(res != null_mut());
@@ -59,7 +59,7 @@ impl PageDir {
         pt_set(self as *const PageDir);
     }
 
-    pub unsafe fn map(&mut self, vaddr: uint, paddr: uint, pdflags: uint, ptflags: uint) -> KResult<()> {
+    pub unsafe fn map(&mut self, vaddr: usize, paddr: usize, pdflags: usize, ptflags: usize) -> KResult<()> {
         assert!(page::aligned(vaddr as *const c_void));
         assert!(user::MEM_LOW <= vaddr && vaddr <= user::MEM_HIGH,
                 "{:#x} is not between {:#x} and {:#x}", vaddr, user::MEM_LOW, user::MEM_HIGH);
@@ -69,7 +69,7 @@ impl PageDir {
             None => {
                 let paget = try!(page::alloc().or_else(|_| { Err(errno::ENOMEM) }));
                 zero_memory(paget, ENTRY_COUNT);
-                self.pd_physical[index] = self.virt_to_phys(paget as uint) | pdflags;
+                self.pd_physical[index] = self.virt_to_phys(paget as usize) | pdflags;
                 self.pd_virtual[index] = paget;
                 paget
             },
@@ -80,19 +80,19 @@ impl PageDir {
         };
 
         let ptindex = vaddr_to_ptindex(vaddr);
-        *pt.offset(ptindex as int) = paddr | ptflags;
+        *pt.offset(ptindex as isize) = paddr | ptflags;
         return Ok(());
     }
 
-    pub unsafe fn unmap(&mut self, vaddr: uint) {
+    pub unsafe fn unmap(&mut self, vaddr: usize) {
         assert!(page::aligned(vaddr as *const c_void), "request to unmap not page-aligned value");
         assert!(user::MEM_LOW <= vaddr && vaddr <= user::MEM_HIGH, "Request to unmap memory {:#x} outside of allowable range", vaddr);
         if let Some(x) = self.get_pagetable(vaddr_to_pdindex(vaddr)) {
-            *x.offset(vaddr_to_ptindex(vaddr) as int) = 0;
+            *x.offset(vaddr_to_ptindex(vaddr) as isize) = 0;
         }
     }
 
-    pub unsafe fn unmap_range(&mut self, low: uint, high: uint) {
+    pub unsafe fn unmap_range(&mut self, low: usize, high: usize) {
         use core::ptr::zero_memory;
         let mut vhigh = high;
         let mut vlow = low;
@@ -105,7 +105,7 @@ impl PageDir {
             let index = vaddr_to_ptindex(vlow);
             if index != 0 {
                 let cnt = ENTRY_COUNT - index;
-                zero_memory(pt.offset(index as int), cnt);
+                zero_memory(pt.offset(index as isize), cnt);
                 vlow += page::SIZE * ((ENTRY_COUNT - index) % ENTRY_COUNT);
             }
         }
@@ -129,14 +129,14 @@ impl PageDir {
         }
     }
 
-    pub fn delete_page(&mut self, index: uint) {
+    pub fn delete_page(&mut self, index: usize) {
         self.pd_physical[index] = 0;
-        self.pd_virtual[index] = 0 as *mut uint;
+        self.pd_virtual[index] = 0 as *mut usize;
     }
 
-    pub fn virt_to_phys(&self, vaddr: uint) -> uint {
+    pub fn virt_to_phys(&self, vaddr: usize) -> usize {
         // TODO Rewrite this in rust.
-        unsafe { base_virt_to_phys(vaddr as u32) as uint }
+        unsafe { base_virt_to_phys(vaddr as u32) as usize }
         /*
         // TODO I am not sure if this is right.
         let table = vaddr_to_pdindex(vaddr);
@@ -160,9 +160,9 @@ impl PageDir {
     }
 }
 
-#[inline] pub fn vaddr_to_pdindex(vaddr: uint) -> uint { ((vaddr) >> page::SHIFT) / ENTRY_COUNT }
-#[inline] pub fn vaddr_to_ptindex(vaddr: uint) -> uint { ((vaddr) >> page::SHIFT) % ENTRY_COUNT }
-#[inline] pub fn vaddr_to_offset (vaddr: uint) -> uint { vaddr & page::MASK }
+#[inline] pub fn vaddr_to_pdindex(vaddr: usize) -> usize { ((vaddr) >> page::SHIFT) / ENTRY_COUNT }
+#[inline] pub fn vaddr_to_ptindex(vaddr: usize) -> usize { ((vaddr) >> page::SHIFT) % ENTRY_COUNT }
+#[inline] pub fn vaddr_to_offset (vaddr: usize) -> usize { vaddr & page::MASK }
 
 impl Drop for PageDir {
     fn drop(&mut self) {

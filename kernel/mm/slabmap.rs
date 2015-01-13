@@ -7,12 +7,12 @@ use core::fmt;
 use core::cmp;
 use alloc::SlabAllocator;
 
-pub const NUM_ALLOCATORS : uint = 256;
+pub const NUM_ALLOCATORS : usize = 256;
 pub const DEFAULT_SLAB_MAP : SlabMap = SlabMap { vals: [None; NUM_ALLOCATORS], cnt: 0 };
 
 pub struct SlabMap {
     vals: [Option<SlabAllocator>; NUM_ALLOCATORS],
-    cnt : uint,
+    cnt : usize,
 }
 
 impl fmt::Show for SlabMap {
@@ -29,7 +29,7 @@ impl fmt::Show for SlabMap {
 }
 
 /// Just a basic quick sort.
-fn sort(l: &mut [Option<SlabAllocator>], lo: uint, hi: uint) {
+fn sort(l: &mut [Option<SlabAllocator>], lo: usize, hi: usize) {
     if hi - lo < 2  || lo > hi {
         return;
     }
@@ -67,7 +67,7 @@ impl SlabMap {
     pub fn add(&mut self, v: SlabAllocator) {
         if self.cnt == NUM_ALLOCATORS {
             dbg!(debug::MM | debug::CORE, "Ignoring {:?} because we already have too many!", v);
-        } else if !self.brute_check(v.get_size() as uint) {
+        } else if !self.brute_check(v.get_size() as usize) {
             self.vals[self.cnt] = Some(v);
             self.cnt += 1;
         } else {
@@ -75,30 +75,30 @@ impl SlabMap {
         }
     }
 
-    fn brute_check(&self, k: uint) -> bool {
+    fn brute_check(&self, k: usize) -> bool {
         for i in range(0, self.cnt) {
             match self.vals[i] {
                 None => { kpanic!("Should not have nulls in allocated region"); },
-                Some(sa) => { if sa.get_size() as uint == k { return true; } },
+                Some(sa) => { if sa.get_size() as usize == k { return true; } },
             }
         }
         return false;
     }
 
-    pub fn find(&self, key: uint) -> Option<SlabAllocator> {
+    pub fn find(&self, key: usize) -> Option<SlabAllocator> {
         match self.find_smallest(key) {
             None => None,
-            Some(sa) => if sa.get_size() as uint == key { Some(sa) } else { None }
+            Some(sa) => if sa.get_size() as usize == key { Some(sa) } else { None }
         }
     }
 
-    pub fn find_smallest(&self, key: uint) -> Option<SlabAllocator> {
-        match self.vals.slice_to(self.cnt).binary_search_by(|&:v| -> cmp::Ordering { (v.expect("should have value").get_size() as uint).cmp(&key) }) {
+    pub fn find_smallest(&self, key: usize) -> Option<SlabAllocator> {
+        match self.vals.slice_to(self.cnt).binary_search_by(|&:v| -> cmp::Ordering { (v.expect("should have value").get_size() as usize).cmp(&key) }) {
             Ok(v)  => Some(self.vals[v].expect("should have value")),
             Err(v) => if v == self.cnt { None } else { Some(self.vals[v].expect("should have value")) },
         }
     }
 
     #[inline]
-    pub fn len(&self) -> uint { self.cnt }
+    pub fn len(&self) -> usize { self.cnt }
 }

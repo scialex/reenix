@@ -30,8 +30,8 @@ pub struct Context {
     pd  : *mut pagetable::PageDir, /* Pointer to this processes page directory */
     pub tsd : Box<tsd::TSDInfo>,
 
-    kstack : uint,
-    kstack_size : uint,
+    kstack : usize,
+    kstack_size : usize,
 }
 
 static mut BOOTSTRAP_FUNC_CTX : *mut Context = 0 as *mut Context;
@@ -209,13 +209,13 @@ impl Context {
     /// Switches away dieing. This function never returns. It does not update the context of the
     /// calling thread.
     pub unsafe fn new(f : ContextFunc, arg1 : i32, arg2 : *mut c_void,
-                      kstack : *mut u8, stack_size : uint,
+                      kstack : *mut u8, stack_size : usize,
                       pd: *mut pagetable::PageDir) -> Context {
         assert!(pd != null_mut());
         assert!(page::aligned(kstack as *const u8));
 
-        let shigh= kstack.offset(stack_size as int);
-        let esp : uint;
+        let shigh= kstack.offset(stack_size as isize);
+        let esp : usize;
         /* put the arguments for __contect_initial_func onto the
          * stack, leave room at the bottom of the stack for a phony
          * return address (we should never return from the lowest
@@ -241,7 +241,7 @@ impl Context {
                             ebp : esp as uintptr_t,
                             esp : esp as uintptr_t,
                           },
-            kstack      : kstack as uint,
+            kstack      : kstack as usize,
             kstack_size : stack_size,
             pd          : pd,
             tsd         : box temp_tsd,

@@ -33,8 +33,8 @@ base_deriving!(u32);
 base_deriving!(i32);
 base_deriving!(u64);
 base_deriving!(i64);
-base_deriving!(uint);
-base_deriving!(int);
+base_deriving!(usize);
+base_deriving!(isize);
 
 impl<T> Cacheable for UnsafeCell<T> where T: Cacheable {
     fn is_still_useful(&self) -> bool { unsafe { self.get().as_ref().expect("cannot be null").is_still_useful() } }

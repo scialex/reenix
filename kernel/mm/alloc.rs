@@ -57,7 +57,7 @@ pub type Allocation<T> = Result<T, AllocError>;
 pub static SLAB_REDZONE : u32 = 0xdeadbeef;
 
 /// What is the largest slab size we will allow. 1/2 of page size
-pub static MAX_SLAB_SIZE : uint = super::page::SIZE >> 1;
+pub static MAX_SLAB_SIZE : usize = super::page::SIZE >> 1;
 
 /// The slab from mm/slab.c
 #[repr(C)]
@@ -114,7 +114,7 @@ impl SlabAllocator {
 
     pub fn get_size(&self) -> size_t {
         let &SlabAllocator(csa) = self;
-        unsafe { ptr::read(csa as *const CSlabAllocator).objsize - (2 * mem::size_of::<uint>()) as u32 }
+        unsafe { ptr::read(csa as *const CSlabAllocator).objsize - (2 * mem::size_of::<usize>()) as u32 }
     }
 
     pub fn get_name(&self) -> &'static str {
@@ -132,14 +132,14 @@ impl SlabAllocator {
         if len == 0 {
             ""
         } else {
-            let s = Slice::<u8>{ data: name, len: len as uint };
+            let s = Slice::<u8>{ data: name, len: len as usize };
             from_utf8(unsafe{ transmute(s) }).unwrap_or("ILLEGAL_NAME")
         }
     }
 
-    pub fn num_allocated(&self) -> uint {
+    pub fn num_allocated(&self) -> usize {
         let &SlabAllocator(csa) = self;
-        unsafe { slab_obj_num_allocated(csa) as uint }
+        unsafe { slab_obj_num_allocated(csa) as usize }
     }
 
     pub fn new(name: &'static str, size: size_t) -> SlabAllocator {
@@ -217,14 +217,14 @@ impl Allocator {
         self.backup.finish();
     }
     pub fn request_slab_allocator(&mut self, name: &'static str, size: size_t) {
-        let cur = self.slabs.find(size as uint);
+        let cur = self.slabs.find(size as usize);
         match cur {
             None => {},
             Some(sa) => {
                 // NOTE Rust strings not being (gaurenteed to be) null terminated is extreemly annoying
                 //let r = unsafe { sa.as_ref().expect("Found a null slab allocator") };
                 dbg!(debug::MM, "Request to make allocator '{:?}' for {:?} bytes already fullfilled by {:?}",
-                    name, size as uint, sa);
+                    name, size as usize, sa);
                 return;
             }
         }
@@ -260,7 +260,7 @@ impl Allocator {
         }
     }
 
-    pub unsafe fn allocate(&self, size: uint, align: uint) -> *mut u8 {
+    pub unsafe fn allocate(&self, size: usize, align: usize) -> *mut u8 {
         let res = if is_enabled!(TEST -> LOW_MEMORY) { 0 as *mut u8 } else { self.do_allocate(size, align) };
         if res.is_null() {
             dbg!(debug::BACKUP_MM|debug::MM, "Unable to allocate from normal allocators. Trying to use backup");
@@ -278,7 +278,7 @@ impl Allocator {
     }
 
     #[inline]
-    unsafe fn do_allocate(&self, size: uint, _align: uint) -> *mut u8 {
+    unsafe fn do_allocate(&self, size: usize, _align: usize) -> *mut u8 {
         if size >= MAX_SLAB_SIZE {
             use super::page;
             let pages = page::addr_to_num(page::const_align_up(size as *const u8));
@@ -300,7 +300,7 @@ impl Allocator {
             },
             Some(sa) => {
                 dbg!(debug::MM, "Allocating {:?} from {:?}", size, sa);
-                bassert!(sa.get_size() as uint >= size, "allocator's size {:?} was less then required size {:?}", sa.get_size(), size);
+                bassert!(sa.get_size() as usize >= size, "allocator's size {:?} was less then required size {:?}", sa.get_size(), size);
                 let res = sa.allocate();
                 if res.is_null() {
                     dbg!(debug::MM, "Allocation from slab {:?} failed for request of {:?} bytes. Reclaiming memory and retrying.", sa, size);
@@ -315,7 +315,7 @@ impl Allocator {
 
     #[allow(unused_unsafe)]
     #[inline]
-    pub unsafe fn reallocate(&self, ptr: *mut u8, old_size: uint, size: uint, align: uint) -> *mut u8 {
+    pub unsafe fn reallocate(&self, ptr: *mut u8, old_size: usize, size: usize, align: usize) -> *mut u8 {
         use core::intrinsics::copy_nonoverlapping_memory;
         dbg!(debug::MM, "reallocating {:p} from size of {} to size {}", ptr, old_size, size);
         if self.can_reallocate_inplace(ptr, old_size, size, align) {
@@ -336,8 +336,8 @@ impl Allocator {
 
     #[allow(unused_unsafe)]
     #[inline]
-    pub unsafe fn can_reallocate_inplace(&self, ptr: *mut u8, old_size: uint, size : uint,
-                                        _align: uint) -> bool {
+    pub unsafe fn can_reallocate_inplace(&self, ptr: *mut u8, old_size: usize, size : usize,
+                                        _align: usize) -> bool {
         use super::page;
         if self.backup.contains(ptr) && old_size != size {
             false
@@ -362,7 +362,7 @@ impl Allocator {
 
     #[allow(unused_unsafe)]
     #[inline]
-    pub unsafe fn deallocate(&self, ptr: *mut u8, size: uint, _align: uint) {
+    pub unsafe fn deallocate(&self, ptr: *mut u8, size: usize, _align: usize) {
         if self.backup.contains(ptr) {
             self.backup.deallocate(ptr, size, _align);
             return;
@@ -388,7 +388,7 @@ impl Allocator {
     }
 
     #[inline]
-    pub fn usable_size(&self, size: uint, _align: uint) -> uint {
+    pub fn usable_size(&self, size: usize, _align: usize) -> usize {
         // TODO This depends on which allocator the pointer is in. Since we cannot know that just
         // from the size we need to say that there is no extra space. If they call realloc we might
         // not move them anyway.
@@ -409,7 +409,7 @@ impl Allocator {
 #[allow(unused_unsafe)]
 #[inline]
 #[precond = "requests_closed()"]
-pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
+pub unsafe fn allocate(size: usize, _align: usize) -> *mut u8 {
     if !requests_closed() {
         // TODO Decide what I should do here. Panicing might not be best.
         kpanic!("Attempt to call allocate before we have finished setting up the allocators.");
@@ -421,8 +421,8 @@ pub unsafe fn allocate(size: uint, _align: uint) -> *mut u8 {
 #[allow(unused_unsafe)]
 #[inline]
 #[precond = "requests_closed()"]
-pub unsafe fn reallocate(ptr: *mut u8, old_size: uint, size: uint,
-                             align: uint) -> *mut u8 {
+pub unsafe fn reallocate(ptr: *mut u8, old_size: usize, size: usize,
+                             align: usize) -> *mut u8 {
     let x = &BASE_ALLOCATOR;
     x.reallocate(ptr, old_size, size, align)
 }
@@ -430,8 +430,8 @@ pub unsafe fn reallocate(ptr: *mut u8, old_size: uint, size: uint,
 #[allow(unused_unsafe)]
 #[inline]
 #[precond = "requests_closed()"]
-pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: uint, size : uint,
-                                    _align: uint) -> uint {
+pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: usize, size : usize,
+                                    _align: usize) -> usize {
     let x = &BASE_ALLOCATOR;
     if x.can_reallocate_inplace(_ptr, old_size, size, _align) {
         size
@@ -443,14 +443,14 @@ pub unsafe fn reallocate_inplace(_ptr: *mut u8, old_size: uint, size : uint,
 #[allow(unused_unsafe)]
 #[inline]
 #[precond = "requests_closed()"]
-pub unsafe fn deallocate(ptr: *mut u8, size: uint, _align: uint) {
+pub unsafe fn deallocate(ptr: *mut u8, size: usize, _align: usize) {
     let x = &BASE_ALLOCATOR;
     x.deallocate(ptr, size, _align)
 }
 
 #[inline]
 #[precond = "requests_closed()"]
-pub fn usable_size(size: uint, _align: uint) -> uint {
+pub fn usable_size(size: usize, _align: usize) -> usize {
     let x = unsafe { &BASE_ALLOCATOR };
     x.usable_size(size, _align)
 }

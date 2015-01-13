@@ -59,7 +59,7 @@ impl<K: Ord, V: Cacheable> CacheItem<K, V> {
 
     /// Gets the pin count of this item.
     #[inline]
-    pub fn pin_count(&self) -> uint { self.pcnt.load(Ordering::SeqCst) }
+    pub fn pin_count(&self) -> usize { self.pcnt.load(Ordering::SeqCst) }
     // TODO
 }
 
@@ -80,7 +80,7 @@ impl<K: Ord, V:Cacheable> Cacheable for CacheItem<K, V> {
 /// The states a value in the cache can have.
 #[derive(Eq, PartialEq, Copy)]
 pub enum State {
-    Pinned(uint),
+    Pinned(usize),
     Unpinned,
     NotFound
 }
@@ -140,17 +140,17 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
 
     /// The number of items that are currently not pinned by any user.
     #[inline]
-    pub fn num_unpinned(&self) -> uint { self.unpinned().len() }
+    pub fn num_unpinned(&self) -> usize { self.unpinned().len() }
 
     /// The number of items that are currently pinned by some user.
     #[inline]
-    pub fn num_pinned(&self) -> uint { self.pinned().len() }
+    pub fn num_pinned(&self) -> usize { self.pinned().len() }
 
     /// the total number of pinned and unpinned items in the cache.
     ///
     /// NOTE Validity depends on operation not being interruptable.
     #[inline]
-    pub fn len(&self) -> uint { self.num_unpinned() + self.num_pinned() }
+    pub fn len(&self) -> usize { self.num_unpinned() + self.num_pinned() }
 
     pub fn get<'a>(&'a self, key: &K) -> Option<PinnedValue<'a, K, V>> {
         let kr = KeyRef::new(key);
@@ -213,7 +213,7 @@ impl<K: Ord, V: Cacheable> PinnableCache<K, V> {
 
     /// Remove all unpinned values that say they are not useful at this time. Returns the number of
     /// values removed from the cache.
-    pub fn clean_unpinned(&mut self) -> uint {
+    pub fn clean_unpinned(&mut self) -> usize {
         // TODO I might need to put some locks around this.
         let mut cnt = 0;
         for m in self.unpinned_mut().iter_modify_least() {

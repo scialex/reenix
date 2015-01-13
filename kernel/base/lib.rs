@@ -4,7 +4,6 @@
 
 #![crate_name="base"]
 #![crate_type="rlib"]
-#![allow(staged_unstable, staged_experimental)]
 #![no_std]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]

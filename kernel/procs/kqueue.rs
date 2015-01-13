@@ -23,7 +23,7 @@ impl Ord for QueuedThread {
     fn cmp(&self, other: &QueuedThread) -> Ordering {
         let &QueuedThread(me) = self;
         let &QueuedThread(o) = other;
-        (me as uint).cmp(&(o as uint))
+        (me as usize).cmp(&(o as usize))
     }
 }
 
@@ -41,7 +41,7 @@ impl PartialEq for QueuedThread {
 
 impl Eq for QueuedThread {}
 impl KQueue {
-    pub fn len(&self) -> uint {
+    pub fn len(&self) -> usize {
         let &KQueue(ref s) = self;
         (*s.borrow()).len()
     }
@@ -114,7 +114,7 @@ impl WQueue {
     pub fn new() -> WQueue { WQueue(UnsafeCell::new(KQueue::new())) }
     #[inline]
     fn get_inner<'a>(&'a self) -> &'a mut KQueue { let &WQueue(ref kq) = self; unsafe { transmute(kq.get()) } }
-    pub fn len(&self) -> uint { self.get_inner().len() }
+    pub fn len(&self) -> usize { self.get_inner().len() }
     pub fn force_wait(&self) -> Result<(),()> { if self.get_inner().wait_on(false) { Ok(()) } else { Err(()) } }
 }
 

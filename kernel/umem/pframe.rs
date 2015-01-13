@@ -17,7 +17,7 @@ use mmobj::*;
 pub use pframe::pfstate::PFState;
 use util::pinnable_cache::{self, PinnableCache, InsertError, PinnedValue};
 
-pub type PageNum = uint;
+pub type PageNum = usize;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Show, Clone)]
 pub struct PFrameId { mmobj: Rc<Box<MMObj + 'static>>, page: PageNum, }
@@ -142,11 +142,11 @@ impl PFrame {
      * Get a pframe for the given page in this mmobj if there is one already present. This should
      * never allocate one and should return None if we don't already have the pframe.
      */
-    pub fn get_resident(mmo: Rc<Box<MMObj + 'static>>, page_num: uint) -> Option<PinnedValue<'static, PFrameId, PFrame>> {
+    pub fn get_resident(mmo: Rc<Box<MMObj + 'static>>, page_num: usize) -> Option<PinnedValue<'static, PFrameId, PFrame>> {
         get_cache().get(&PFrameId::new(mmo.clone(), page_num))
     }
 
-    pub fn get(mmo: Rc<Box<MMObj + 'static>>, pagenum: uint) -> KResult<PinnedValue<'static, PFrameId, PFrame>> {
+    pub fn get(mmo: Rc<Box<MMObj + 'static>>, pagenum: usize) -> KResult<PinnedValue<'static, PFrameId, PFrame>> {
         let key = &PFrameId::new(mmo.clone(), pagenum);
         get_cache().add_or_get(key.clone()).map_err(|e| {
             match e {
@@ -166,7 +166,7 @@ impl PFrame {
 
     // TODO pframe_migrate?
     /// Makes a new pframe, also makes sure to allocate memory space for it.
-    fn create(mmo : Rc<Box<MMObj + 'static>>, page_num: uint) -> Result<PFrame,PFError> {
+    fn create(mmo : Rc<Box<MMObj + 'static>>, page_num: usize) -> Result<PFrame,PFError> {
         use pframe::PFError::*;
         Ok({
             let mut res = PFrame {

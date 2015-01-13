@@ -34,12 +34,12 @@ impl Cacheable for NullDev {
 
 impl WDevice<u8> for NullDev {
     /// Writes always succeed on the null device. It does nothing however.
-    fn write_to(&self, _: uint, buf: &[u8]) -> KResult<uint> { Ok(buf.len()) }
+    fn write_to(&self, _: usize, buf: &[u8]) -> KResult<usize> { Ok(buf.len()) }
 }
 
 impl RDevice<u8> for NullDev {
     /// Reads succeed but don't get anything on the null device.
-    fn read_from(&self, _: uint, _: &mut [u8]) -> KResult<uint> { Ok(0) }
+    fn read_from(&self, _: usize, _: &mut [u8]) -> KResult<usize> { Ok(0) }
 }
 
 impl MMObj for NullDev {
@@ -76,12 +76,12 @@ impl Cacheable for ZeroDev {
 
 impl WDevice<u8> for ZeroDev {
     /// Writes always succeed on the zero device. Don't do anything however.
-    fn write_to(&self, _: uint, buf: &[u8]) -> KResult<uint> { Ok(buf.len()) }
+    fn write_to(&self, _: usize, buf: &[u8]) -> KResult<usize> { Ok(buf.len()) }
 }
 
 impl RDevice<u8> for ZeroDev {
     /// Reads succeed and get all 0's
-    fn read_from(&self, _: uint, buf: &mut [u8]) -> KResult<uint> {
+    fn read_from(&self, _: usize, buf: &mut [u8]) -> KResult<usize> {
         for i in buf.iter_mut() { *i = 0; }
         Ok(buf.len())
     }

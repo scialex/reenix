@@ -102,11 +102,11 @@ pub mod tsd {
             TSDInfo{vlow: [0; 0x30], stack_high: high, data : VecMap::with_capacity(4) }
         }
 
-        pub fn set_slot(&mut self, i: uint, v: Box<Any>) { self.data.insert(i, v); }
-        pub fn get_slot(&self, i: uint) -> Option<&Box<Any>> { self.data.get(&i) }
-        pub fn get_slot_mut(&mut self, i: uint) -> Option<&mut Box<Any>> { self.data.get_mut(&i) }
+        pub fn set_slot(&mut self, i: usize, v: Box<Any>) { self.data.insert(i, v); }
+        pub fn get_slot(&self, i: usize) -> Option<&Box<Any>> { self.data.get(&i) }
+        pub fn get_slot_mut(&mut self, i: usize) -> Option<&mut Box<Any>> { self.data.get_mut(&i) }
 
-        pub fn set_open_slot(&mut self, v: Box<Any>) -> uint {
+        pub fn set_open_slot(&mut self, v: Box<Any>) -> usize {
             for i in range(0, self.data.len() + 1) {
                 if self.data.contains_key(&i) {
                     assert!(self.data.insert(i, v).is_none());
@@ -116,9 +116,9 @@ pub mod tsd {
             kpanic!("Somehow we couldn't add a new item");
         }
 
-        pub fn is_slot_used(&mut self, i : uint) -> bool { self.data.contains_key(&i) }
-        pub fn pop_slot(&mut self, i : uint) -> Option<Box<Any>> { self.data.remove(&i) }
-        pub fn remove_slot(&mut self, i : uint) -> bool { self.pop_slot(i).is_some() }
+        pub fn is_slot_used(&mut self, i : usize) -> bool { self.data.contains_key(&i) }
+        pub fn pop_slot(&mut self, i : usize) -> Option<Box<Any>> { self.data.remove(&i) }
+        pub fn remove_slot(&mut self, i : usize) -> bool { self.pop_slot(i).is_some() }
     }
     impl fmt::Show for TSDInfo {
         fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {

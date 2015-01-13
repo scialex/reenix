@@ -23,7 +23,7 @@ pub fn init_stage2() {
     // TODO TTY INIT
     keyboard::get_keyboard().set_handler(handle_keyboard_input);
     create_ttys();
-    unsafe { TTYS[CUR_TTY_ID as uint].as_mut().expect("One of the ttys is null").set_active(); }
+    unsafe { TTYS[CUR_TTY_ID as usize].as_mut().expect("One of the ttys is null").set_active(); }
 }
 
 #[allow(unused_must_use)]
@@ -45,7 +45,7 @@ pub trait TTYLineDiscipline: RDeviceMut<u8> {
     fn process_char(&self, chr: u8) -> &'static str;
 }
 
-struct Finalizer { data: uint, func: fn(uint), }
+struct Finalizer { data: usize, func: fn(usize), }
 impl Drop for Finalizer {
     fn drop(&mut self) {
         let f = self.func;
@@ -71,11 +71,11 @@ pub trait TTYDriver {
 const TTY_MAJOR : u8 = 2;
 const NUM_TTYS : u8 = 3;
 static mut CUR_TTY_ID : u8 = 0;
-static mut TTYS : [*mut TTY; (NUM_TTYS as uint)] = [0 as *mut TTY; (NUM_TTYS as uint)];
+static mut TTYS : [*mut TTY; (NUM_TTYS as usize)] = [0 as *mut TTY; (NUM_TTYS as usize)];
 fn create_ttys() {
     for i in range(0, NUM_TTYS) {
         let t = box UnsafeCell::new(TTY::create(box virtterm::VirtualTerminal::create(), box ldisc::LineDiscipline::create()));
-        unsafe { TTYS[i as uint] = t.get(); }
+        unsafe { TTYS[i as usize] = t.get(); }
         super::register(::DeviceId::create(TTY_MAJOR, i), t);
     }
 }
@@ -92,7 +92,7 @@ fn switch_tty(n: u8) {
 
 fn get_current_tty() -> &'static mut TTY {
     let n = unsafe { CUR_TTY_ID };
-    unsafe { TTYS[n as uint].as_mut().expect("One of the ttys is null") }
+    unsafe { TTYS[n as usize].as_mut().expect("One of the ttys is null") }
 }
 
 struct TTY {
@@ -121,7 +121,7 @@ impl TTY {
 
 impl RDeviceMut<u8> for TTY {
     #[allow(unused_variables)]
-    fn read_from(&mut self, offset : uint, buf: &mut [u8]) -> KResult<uint> {
+    fn read_from(&mut self, offset : usize, buf: &mut [u8]) -> KResult<usize> {
         let blocker = self.driver.block_io();
         let res = self.discipline.read_from(offset, buf);
         drop(blocker);
@@ -131,7 +131,7 @@ impl RDeviceMut<u8> for TTY {
 
 impl WDeviceMut<u8> for TTY {
     #[allow(unused_variables)]
-    fn write_to(&mut self, _: uint, buf: &[u8]) -> KResult<uint> {
+    fn write_to(&mut self, _: usize, buf: &[u8]) -> KResult<usize> {
         let blocker = self.driver.block_io();
         for _ in buf.iter().map(|&i| { self.driver.echo(self.discipline.process_char(i)); }) {}
         drop(blocker);

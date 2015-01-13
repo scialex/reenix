@@ -7,11 +7,11 @@ use core::atomic::{AtomicUint, ATOMIC_UINT_INIT};
 use core::atomic::Ordering::*;
 
 /// We have never been called yet.
-const UNUSED       : uint = 0;
+const UNUSED       : usize = 0;
 /// We are currently running some initialization function
-const INITIALIZING : uint = 1;
+const INITIALIZING : usize = 1;
 /// We have finished initializing.
-const INITIALIZED  : uint = 2;
+const INITIALIZED  : usize = 2;
 
 /// A once implementation that will have other threads spin when the initialization is being done.
 /// Use only with extreeme caution. Prefer procs::sync::Once if possible.

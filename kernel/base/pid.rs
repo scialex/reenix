@@ -10,9 +10,9 @@ use core::ops::Add;
 #[derive(Eq, PartialEq, Show, PartialOrd, Ord, Clone, Copy)] #[repr(C)]
 pub struct ProcId(pub PidInner);
 
-impl Add<uint> for ProcId {
+impl Add<usize> for ProcId {
     type Output = ProcId;
-    fn add(self, rhs: uint) -> ProcId {
+    fn add(self, rhs: usize) -> ProcId {
         let ProcId(v) = self;
         ProcId(v + (rhs as PidInner))
     }

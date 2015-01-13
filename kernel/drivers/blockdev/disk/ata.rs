@@ -23,10 +23,10 @@ mod irqs {
     pub const DISK_SECONDARY : u16 = 15;
 }
 
-const BLOCK_SIZE : uint = page::SIZE;
+const BLOCK_SIZE : usize = page::SIZE;
 pub const DISK_MAJOR : u8 = 1;
-pub const NDISKS : uint = 1;
-const IDENT_BUFSIZE : uint = 256;
+pub const NDISKS : usize = 1;
+const IDENT_BUFSIZE : usize = 256;
 
 #[repr(u8)]
 enum InterfaceType {
@@ -53,8 +53,8 @@ mod ports {
     pub const SECONDARY_CMD  : u16 = 0x170;
 }
 
-const NUM_CHANNELS : uint = 2;
-const SECTOR_SIZE : uint = 512;
+const NUM_CHANNELS : usize = 2;
+const SECTOR_SIZE : usize = 512;
 
 /** Drive/head values (for ATA_REG_DRIVEHEAD) and for CHS/LBA */
 mod drivehead {
@@ -136,7 +136,7 @@ mod command {
     pub const IDENTIFY         : u8 = 0xEC;
 }
 
-const IDENT_MAX_LBA : uint = 30;
+const IDENT_MAX_LBA : usize = 30;
 
 #[derive(Show, Clone)]
 struct Channel {
@@ -234,13 +234,13 @@ pub fn init_stage2() {
             c.busmaster = ata_setup_busmaster_simple(c.get_channel_num());
 
             // Allocate the new disk.
-            let disk = box UnsafeCell::new(ATADisk::create(c, true, (id_buf[IDENT_MAX_LBA] as uint),
+            let disk = box UnsafeCell::new(ATADisk::create(c, true, (id_buf[IDENT_MAX_LBA] as usize),
                                                            BLOCK_SIZE / SECTOR_SIZE));
             let rd = disk.get().as_ref().expect("should not be null");
             // TODO Doing this is somewhat bad but there is no way (At the moment) to remove disks
             // TODO so it is at least safe. Idealy we would not need this and just do dynamic_cast
             // TODO to TTY in interrupt handler.
-            DISKS[rd.channel.get_channel_num() as uint] = disk.get();
+            DISKS[rd.channel.get_channel_num() as usize] = disk.get();
             interrupt::register(rd.channel.intr, ata_intr_handler);
             dbg!(debug::DISK, "Registering disk {:?}", rd);
             ::blockdev::register(rd.channel.dev, disk);
@@ -263,8 +263,8 @@ const DEFAULT_CHANNELS : [Channel; NUM_CHANNELS] = [Channel { cmd : ports::PRIMA
 pub struct ATADisk {
     channel           : Channel, // The channel we are on.
     is_master         : bool,             // Master or slave. Currently must be master because no slave support.
-    size              : uint,             // Size of disk in sectors.
-    sectors_per_block : uint,
+    size              : usize,             // Size of disk in sectors.
+    sectors_per_block : usize,
     mutex             : SMutex,           // Only one proc can be using the disk at any time.
     queue             : WQueue,           // We need to sleep while holding the lock.
     prd               : dma::Prd,         // The dma information.
@@ -280,7 +280,7 @@ impl Show for ATADisk {
 impl ::blockdev::BlockDevice for UnsafeCell<ATADisk> {}
 
 impl ATADisk {
-    fn create(channel: Channel, is_master: bool, size: uint, sectors_per_block: uint) -> ATADisk {
+    fn create(channel: Channel, is_master: bool, size: usize, sectors_per_block: usize) -> ATADisk {
         ATADisk {
             channel : channel,
             is_master : is_master,
@@ -298,7 +298,7 @@ impl ATADisk {
     /// This is the function that actually handles all the reads and writes. Due to the fact that
     /// both ops are very similar this has been collapsed into a single function.
     #[allow(unused_variables, unused_must_use)]
-    unsafe fn unsafe_do_operation(&mut self, block: uint, buf: *mut u8, to_write: bool) -> KResult<()> {
+    unsafe fn unsafe_do_operation(&mut self, block: usize, buf: *mut u8, to_write: bool) -> KResult<()> {
         // RAII lock. It is freed at end of block and unlocks self.
         let lock = self.mutex.force_lock();
         let sec = block * self.sectors_per_block;
@@ -347,7 +347,7 @@ impl ATADisk {
         }
     }
 
-    fn write_single(&mut self, block: uint, buf: &[u8; page::SIZE]) -> KResult<uint> {
+    fn write_single(&mut self, block: usize, buf: &[u8; page::SIZE]) -> KResult<usize> {
         if !page::aligned(buf.as_ptr()) {
             kpanic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
             // TODO I might want to just copy it if we get this, OTOH It is unlikely to be much of
@@ -359,7 +359,7 @@ impl ATADisk {
     /// Read a single block from the device. This requires that buf be page aligned (although due
     /// to the way weenix handles memory this should almost always be true anyway) and then reads
     /// the block.
-    fn read_single(&mut self, block: uint, buf: &mut [u8; page::SIZE]) -> KResult<uint> {
+    fn read_single(&mut self, block: usize, buf: &mut [u8; page::SIZE]) -> KResult<usize> {
         if !page::aligned(buf.as_ptr()) {
             kpanic!("The given pointer of buf {:p} is not page aligned! This shouldn't be possible with our current memory strategy.");
             // TODO I might want to just copy it if we get this, OTOH It is unlikely to be much of
@@ -372,7 +372,7 @@ impl ATADisk {
 impl RDeviceMut<[u8; page::SIZE]> for ATADisk {
     /// Read buf.len() objects from the device starting at offset. Returns the number of objects
     /// read from the stream, or errno if it fails.
-    fn read_from(&mut self, offset: uint, buf: &mut [[u8; page::SIZE]]) -> KResult<uint> {
+    fn read_from(&mut self, offset: usize, buf: &mut [[u8; page::SIZE]]) -> KResult<usize> {
         for i in range(0, buf.len()) {
             try!(self.read_single(offset + i, &mut buf[i]));
         }
@@ -383,7 +383,7 @@ impl RDeviceMut<[u8; page::SIZE]> for ATADisk {
 impl WDeviceMut<[u8; page::SIZE]> for ATADisk {
     /// Write the buffer to the device, starting at the given offset from the start of the device.
     /// Returns the number of bytes written or errno if an error happens.
-    fn write_to(&mut self, offset: uint, buf: &[[u8; page::SIZE]]) -> KResult<uint> {
+    fn write_to(&mut self, offset: usize, buf: &[[u8; page::SIZE]]) -> KResult<usize> {
         for i in range(0, buf.len()) {
             dbg!(debug::DISK, "starting write of page {} to block {}", i, offset + i);
             try!(self.write_single(offset + i, &buf[i]));

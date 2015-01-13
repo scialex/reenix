@@ -29,7 +29,7 @@ pub fn start() {
             kproc::KProc::new("fork fn".to_string(), fork_some, i, 0 as *mut c_void);
             kthread::kyield();
         }
-        for _ in range::<uint>(0, 10) {
+        for _ in range::<usize>(0, 10) {
             kthread::kyield();
         }
         dbg!(debug::TEST | debug::CORE, "killing everything");
@@ -37,14 +37,14 @@ pub fn start() {
     }
 }
 
-pub fn run() -> (uint, uint) {
+pub fn run() -> (usize, usize) {
     do_run(false)
 }
 
-fn do_run(single: bool) -> (uint, uint) {
+fn do_run(single: bool) -> (usize, usize) {
     // TODO Embarrassing. This is not thread safe...
-    let mut total : uint = 0;
-    let mut pass : uint = 0;
+    let mut total : usize = 0;
+    let mut pass : usize = 0;
     macro_rules! basic_test{
         ($name:expr, $v:expr) => ({
             total += 1;
@@ -137,7 +137,7 @@ extern "C" fn send_ignored_intr(_: i32, _: *mut c_void) -> *mut c_void {
 }
 
 extern "C" fn kill_self(_: i32, _: *mut c_void) -> *mut c_void {
-    (current_proc_mut!()).kill(GOOD as int);
+    (current_proc_mut!()).kill(GOOD as isize);
     BAD
 }
 
@@ -301,7 +301,7 @@ extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 }
 
 extern "C" fn better_counter(h: i32, v : *mut c_void) -> *mut c_void {
-    let mut c : uint = 0;
+    let mut c : usize = 0;
     let x : Rc<Mutex<i32>> = unsafe { ProcArgs::from_arg(v).unwrap() };
     loop {
         kthread::kyield();
@@ -322,7 +322,7 @@ extern "C" fn better_counter(h: i32, v : *mut c_void) -> *mut c_void {
 }
 
 extern "C" fn counter(h: i32, _ : *mut c_void) -> *mut c_void {
-    let mut c : uint = 0;
+    let mut c : usize = 0;
     loop {
         if !get_c_mutex().lock() {
             return c as *mut c_void;

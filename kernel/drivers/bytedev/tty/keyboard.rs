@@ -139,7 +139,7 @@ impl Keyboard {
         } else if self.curmask & CTRL_MASK != 0 {
             /* Because of the way ASCII works, the control chars are based on the
              * values of the shifted chars produced without control */
-            let c = SHIFT_SCANCODES.as_bytes()[sc as uint];
+            let c = SHIFT_SCANCODES.as_bytes()[sc as usize];
             /* Range of chars that have corresponding control chars */
             if c >= 0x40 && c < 0x60 {
                 Event::Normal(c - 0x40)
@@ -147,9 +147,9 @@ impl Keyboard {
                 return;
             }
         } else if self.curmask & SHIFT_MASK != 0 {
-            Event::Normal(SHIFT_SCANCODES.as_bytes()[sc as uint])
+            Event::Normal(SHIFT_SCANCODES.as_bytes()[sc as usize])
         } else {
-            Event::Normal(NORMAL_SCANCODES.as_bytes()[sc as uint])
+            Event::Normal(NORMAL_SCANCODES.as_bytes()[sc as usize])
         };
         /* Give the key to the vt system, which passes it to the tty */
         let h = self.handler;

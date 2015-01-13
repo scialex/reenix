@@ -1,7 +1,6 @@
 //! all of the language items we need to define.
 
 use core;
-use base::debug::printing::DBG_WRITER;
 
 #[cold]
 #[no_mangle]
@@ -9,7 +8,7 @@ use base::debug::printing::DBG_WRITER;
 #[lang="panic_fmt"]
 pub extern fn rust_begin_unwind(msg: &core::fmt::Arguments,
                                 file: &'static str,
-                                line: uint) -> ! {
+                                line: usize) -> ! {
     use base::kernel;
     dbg!(debug::PANIC, "Failed at {}:{} -> {}", file, line, *msg);
     kernel::halt();
@@ -28,7 +27,7 @@ pub extern fn eh_personality() {
 #[allow(unused_must_use)]
 pub extern fn stack_exhausted(fmt: &core::fmt::Arguments,
                               file: &'static str,
-                              line: uint) -> ! {
+                              line: usize) -> ! {
     //unsafe { core::fmt::write(&mut DBG_WRITER, *fmt); }
     kpanic!("Stack Exhausted at {}:{} -> {}",file, line, fmt);
 }

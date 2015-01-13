@@ -28,8 +28,8 @@ use util::uid::*;
 pub use self::WaitProcId::*;
 pub use base::pid::*;
 
-pub const CUR_PROC_SLOT : uint = 1;
-pub const CUR_PID_SLOT  : uint = 2;
+pub const CUR_PROC_SLOT : usize = 1;
+pub const CUR_PID_SLOT  : usize = 2;
 
 static mut INIT_PROC : *mut Rc<ProcRefCell<KProc>> = 0 as *mut Rc<ProcRefCell<KProc>>;
 static INIT_PID : ProcId = ProcId(1);
@@ -48,7 +48,7 @@ fn drop_pid(i: &ProcId) { unsafe { &mut *PID_GEN }.destroy(i); }
 
 #[derive(Show, Eq, PartialEq, Copy)]
 pub enum ProcState { RUNNING, DEAD }
-pub type ProcStatus = int;
+pub type ProcStatus = isize;
 
 pub struct KProc {
     pid      : ProcId,                      /* Our pid */
@@ -67,8 +67,8 @@ pub struct KProc {
     // cwd   : RC<VNode>,
 
     // TODO For VM
-    // brk : uint,
-    // start_brk : uint,
+    // brk : usize,
+    // start_brk : usize,
     // vmmap : Vec<VMArea>,
 }
 

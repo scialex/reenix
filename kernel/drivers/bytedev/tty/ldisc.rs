@@ -9,7 +9,7 @@ use core::cmp;
 use RDeviceMut;
 use bytedev::tty::TTYLineDiscipline;
 
-pub const LINE_BUF_SIZE : uint = 256;
+pub const LINE_BUF_SIZE : usize = 256;
 
 // All the charecters as strings.
 const CHARS : [&'static str; 128] = [
@@ -49,9 +49,9 @@ pub fn init_stage2() {}
 pub struct LineDiscipline {
     rlock : SMutex,
     buf   : [u8; LINE_BUF_SIZE],
-    rhead : uint,
-    raw_tail : uint,
-    ckd_tail : uint,
+    rhead : usize,
+    raw_tail : usize,
+    ckd_tail : usize,
 }
 
 impl LineDiscipline {
@@ -81,7 +81,7 @@ impl LineDiscipline {
         }
     }
 
-    fn cbuf_next(&self) -> Option<uint> {
+    fn cbuf_next(&self) -> Option<usize> {
         let next = (self.raw_tail + 1) % LINE_BUF_SIZE;
         if next == self.rhead {
             None
@@ -89,7 +89,7 @@ impl LineDiscipline {
             Some(next)
         }
     }
-    fn cbuf_prev(&self) -> Option<uint> {
+    fn cbuf_prev(&self) -> Option<usize> {
         let prev = cmp::min(self.raw_tail - 1, LINE_BUF_SIZE - 1);
         if self.raw_tail == self.ckd_tail {
             None
@@ -100,7 +100,7 @@ impl LineDiscipline {
 }
 
 impl RDeviceMut<u8> for LineDiscipline {
-    fn read_from(&mut self, _: uint, b: &mut [u8]) -> KResult<uint> {
+    fn read_from(&mut self, _: usize, b: &mut [u8]) -> KResult<usize> {
         let t = try!(self.rlock.lock().or_else(|_| Err(errno::EINTR)));
         while self.rhead == self.ckd_tail {
             try!(t.wait().or_else(|_| Err(errno::EINTR)));
@@ -147,9 +147,9 @@ impl TTYLineDiscipline for LineDiscipline {
                 let res = self.push_char(chr);
                 self.ckd_tail = self.raw_tail;
                 self.rlock.signal();
-                if res { CHARS[chr as uint] } else { DELCHARS[chr as uint] }
+                if res { CHARS[chr as usize] } else { DELCHARS[chr as usize] }
             },
-            _ => { if self.push_char(chr) { CHARS[chr as uint] } else { DELCHARS[chr as uint] } },
+            _ => { if self.push_char(chr) { CHARS[chr as usize] } else { DELCHARS[chr as usize] } },
         }
     }
 
@@ -160,7 +160,7 @@ impl TTYLineDiscipline for LineDiscipline {
             '\r' => "\n",
             '\t' => "    ",
             '\x7f' | '\x08' => "\x08 \x08",
-            _ => CHARS[chr as uint],
+            _ => CHARS[chr as usize],
         }
     }
 }

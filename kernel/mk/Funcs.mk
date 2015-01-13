@@ -238,6 +238,6 @@ endef
 # $(1) is the name of the plugin
 # $(2) is the list of dependencies.
 define plugin-rule
-$(eval $(call base-crate-rule,$(strip $(1)),$(2),,,,))
+$(eval $(call base-crate-rule,$(strip $(1)),$(2),--allow unstable,,,))
 endef
 

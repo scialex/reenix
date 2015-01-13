@@ -42,14 +42,14 @@ macro_rules! DeviceId_static {
 pub trait RDevice<T> {
     /// Read buf.len() objects from the device starting at offset. Returns the number of objects
     /// read from the stream, or errno if it fails.
-    fn read_from(&self, offset: uint, buf: &mut [T]) -> KResult<uint>;
+    fn read_from(&self, offset: usize, buf: &mut [T]) -> KResult<usize>;
 }
 
 /// A device capable of writing in units of `T`.
 pub trait WDevice<T> {
     /// Write the buffer to the device, starting at the given offset from the start of the device.
     /// Returns the number of bytes written or errno if an error happens.
-    fn write_to(&self, offset: uint, buf: &[T]) -> KResult<uint>;
+    fn write_to(&self, offset: usize, buf: &[T]) -> KResult<usize>;
 }
 
 // NOTE Doing this feels really icky. It's basically due to a disconnect between the userland view
@@ -59,18 +59,18 @@ pub trait WDevice<T> {
 pub trait RDeviceMut<T> {
     /// Read buf.len() objects from the device starting at offset. Returns the number of objects
     /// read from the stream, or errno if it fails.
-    fn read_from(&mut self, offset: uint, buf: &mut [T]) -> KResult<uint>;
+    fn read_from(&mut self, offset: usize, buf: &mut [T]) -> KResult<usize>;
 }
 
 /// A device capable of writing in units of `T` when mutably held.
 pub trait WDeviceMut<T> {
     /// Write the buffer to the device, starting at the given offset from the start of the device.
     /// Returns the number of bytes written or errno if an error happens.
-    fn write_to(&mut self, offset: uint, buf: &[T]) -> KResult<uint>;
+    fn write_to(&mut self, offset: usize, buf: &[T]) -> KResult<usize>;
 }
 
 impl<T, D> RDevice<T> for UnsafeCell<D> where D: RDeviceMut<T> {
-    fn read_from(&self, offset: uint, buf: &mut [T]) -> KResult<uint> {
+    fn read_from(&self, offset: usize, buf: &mut [T]) -> KResult<usize> {
         // TODO I might want to replace this with a trait that just lets us do the deref, that
         // TODO would let us keep more safety.
         unsafe { self.get().as_mut() }.expect("illegal cell state").read_from(offset, buf)
@@ -78,7 +78,7 @@ impl<T, D> RDevice<T> for UnsafeCell<D> where D: RDeviceMut<T> {
 }
 
 impl<T, D> WDevice<T> for UnsafeCell<D> where D: WDeviceMut<T> {
-    fn write_to(&self, offset: uint, buf: &[T]) -> KResult<uint> {
+    fn write_to(&self, offset: usize, buf: &[T]) -> KResult<usize> {
         unsafe { self.get().as_mut() }.expect("illegal cell state").write_to(offset, buf)
     }
 }

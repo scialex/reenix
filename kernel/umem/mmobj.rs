@@ -121,7 +121,7 @@ pub trait MMObjExt {
      */
     // TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
     // better. Using this stuff is annoying.
-    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: uint, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
+    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: usize, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
         pframe::PFrame::get(this, pagenum)
     }
 }
