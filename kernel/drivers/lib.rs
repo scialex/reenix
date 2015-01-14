@@ -4,7 +4,6 @@
 #![crate_type="rlib"]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![no_std]
 #![feature(asm, concat_idents, lang_items, plugin, intrinsics, box_syntax)]
 
 //! # The Reenix drivers stuff.
@@ -12,15 +11,12 @@
 /// This is all the drivers code in reenix.
 
 #[macro_use] #[plugin] #[no_link] extern crate bassert;
-#[macro_use] extern crate core;
 #[macro_use] extern crate base;
 #[macro_use] extern crate mm;
 #[macro_use] extern crate procs;
 extern crate umem;
 extern crate util;
 extern crate startup;
-extern crate collections;
-extern crate alloc;
 extern crate libc;
 
 // Reexport base::devices;
@@ -48,12 +44,3 @@ pub mod memdev;
 pub mod bytedev;
 pub mod blockdev;
 
-#[doc(hidden)]
-mod std {
-    pub use core::clone;
-    pub use core::cmp;
-    pub use core::fmt;
-    pub use core::num;
-    pub use core::option;
-    pub use core::hash;
-}

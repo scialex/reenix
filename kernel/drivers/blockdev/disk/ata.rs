@@ -2,17 +2,16 @@
 //! The Reenix ATA support.
 #![allow(dead_code)]
 use mm::page;
-use core::prelude::*;
 use util::Cacheable;
 use DeviceId;
-use core::cell::*;
+use std::cell::*;
 use base::{io, kernel};
 use blockdev::disk::dma;
 use procs::interrupt;
 use procs::sync::*;
 use base::errno::{KResult, self};
 use libc::c_void;
-use core::fmt::{self, Formatter, Show};
+use std::fmt::{self, Formatter, Show};
 use umem::mmobj::{MMObjId, MMObjMut};
 use umem::pframe::PFrame;
 use RDeviceMut;
@@ -403,7 +402,7 @@ impl MMObjMut for ATADisk {
      * Fill the given page frame with the data that should be in it.
      */
     fn fill_page(&mut self, pf: &mut PFrame) -> KResult<()> {
-        use core::slice::mut_ref_slice;
+        use std::slice::mut_ref_slice;
         let pgnum = pf.get_pagenum();
         self.read_from(pgnum, mut_ref_slice(pf.get_page_mut())).map(|_| ())
     }
@@ -417,7 +416,7 @@ impl MMObjMut for ATADisk {
      * Write the contents of the page frame
      */
     fn clean_page(&mut self, pf: &PFrame) -> KResult<()> {
-        use core::slice::ref_slice;
+        use std::slice::ref_slice;
         let pgnum = pf.get_pagenum();
         self.write_to(pgnum, ref_slice(pf.get_page())).map(|_| ())
     }

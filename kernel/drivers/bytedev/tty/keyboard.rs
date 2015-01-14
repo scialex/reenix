@@ -2,7 +2,6 @@
 //! The Reenix keyboard support.
 #![allow(dead_code)]
 
-use core::prelude::*;
 use procs::interrupt;
 use base::io::inb;
 

@@ -227,11 +227,16 @@ define long-crate-rule
 $(eval $(call base-crate-rule,$(strip $(1)),$(2) ,$(3) $$(RSFLAGS),$(4) $$(RDFLAGS),$$(TARGET_FILENAME)))
 endef
 
-# A Crate
+# A Crate with std
 # $(1) is the name of the crate
 # $(2) is the list of dependencies
+# $(3) is the `std` crate
 define crate-rule
 $(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2)),-C opt-level=$$(DEFAULT_CRATE_OPT)))
+endef
+
+define std-crate-rule
+$(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2) $(3)),--extern std=$(call lib-name, $(3)) -C opt-level=$$(DEFAULT_CRATE_OPT),--extern std=$(call lib-name, $(3))))
 endef
 
 # A plugin

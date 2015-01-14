@@ -1,12 +1,11 @@
 
 //! A thing that can generate unique Identifiers that can be retired.
 
-use core::prelude::*;
-use core::ops::{Add, Deref};
-use core::cell::*;
-use core::num::Int;
+use std::ops::{Add, Deref};
+use std::cell::*;
+use std::num::Int;
+use std::collections::BTreeSet;
 use mm::Allocation;
-use collections::*;
 
 /// Everything needed to be an Id.
 pub trait Id : Clone + Ord + Eq {

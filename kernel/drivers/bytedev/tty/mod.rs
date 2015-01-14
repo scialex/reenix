@@ -2,9 +2,7 @@
 
 //! The Reenix tty support module.
 
-use core::cell::*;
-use core::prelude::*;
-use alloc::boxed::Box;
+use std::cell::*;
 use base::errno::KResult;
 use RDeviceMut;
 use WDeviceMut;

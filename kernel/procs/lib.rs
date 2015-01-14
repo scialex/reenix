@@ -11,17 +11,13 @@
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
-#![no_std]
 #![feature(asm, unsafe_destructor, plugin, box_syntax)]
 
 #[macro_use] #[plugin] #[no_link] extern crate bassert;
-#[macro_use] extern crate core;
 #[macro_use] extern crate base;
-#[macro_use] extern crate collections;
 #[macro_use] extern crate mm;
 extern crate startup;
 extern crate util;
-extern crate alloc;
 extern crate libc;
 
 pub use context::{enter_bootstrap_func, cleanup_bootstrap_function};
@@ -106,16 +102,4 @@ mod apic {
         #[link_name = "apic_eoi"]
         pub fn set_eoi();
     }
-}
-
-
-#[doc(hidden)]
-mod std {
-    pub use core::clone;
-    pub use core::cmp;
-    pub use core::fmt;
-    pub use core::num;
-    pub use core::option;
-    pub use core::hash;
-    pub use core::marker;
 }

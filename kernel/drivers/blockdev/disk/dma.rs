@@ -2,7 +2,6 @@
 //! The Reenix DMA stuff
 
 use libc::c_void;
-use core::prelude::*;
 use base::io;
 
 mod register {
@@ -30,7 +29,7 @@ impl Prd {
     }
 
     pub fn start(&mut self, busmaster_addr: u16, write: bool) {
-        use core::intrinsics::copy_nonoverlapping_memory;
+        use std::intrinsics::copy_nonoverlapping_memory;
         // Set the read/write bit.
         let cmd: u8 = if write { 0b101 } else { 0b001 };
         let pd = (current_proc!()).get_pagedir();

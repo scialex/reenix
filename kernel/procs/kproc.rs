@@ -1,19 +1,13 @@
 // TODO Copyright Header
 
-use core::num;
-use alloc::rc;
-use alloc::rc::{Rc,Weak};
-use alloc::boxed::Box;
+use std::{num, hash, fmt};
+use std::rc::{self, Rc, Weak};
 use base::errno;
-use core::hash;
-use collections::string::String;
-use collections::BTreeMap;
+use std::collections::BTreeMap;
 use context::ContextFunc;
-use core::fmt;
-use core::mem::{transmute, transmute_copy};
-use core::ptr::null_mut;
-use core::ops::Deref;
-use core::prelude::*;
+use std::mem::{transmute, transmute_copy};
+use std::ptr::null_mut;
+use std::ops::Deref;
 use libc::c_void;
 use kthread;
 use kthread::{KThread, CUR_THREAD_SLOT};
@@ -74,12 +68,12 @@ pub struct KProc {
 
 pub fn init_stage1() {
     use mm::alloc::request_slab_allocator;
-    use core::mem::size_of;
+    use std::mem::size_of;
     request_slab_allocator("ProcRefCell<KProc> allocator", size_of::<ProcRefCell<KProc>>() as u32 + 16);
 }
 
 pub fn init_stage2() {
-    use core::intrinsics::transmute;
+    use std::intrinsics::transmute;
     unsafe {
         let y : Box<BTreeMap<ProcId, Rc<ProcRefCell<KProc>>>> = box BTreeMap::new();
         PROC_LIST = transmute(y);

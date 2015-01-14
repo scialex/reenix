@@ -3,7 +3,7 @@ BUILD_DIR      := build
 DOC_DIR        := doc
 CFLAGS         := -ffreestanding
 RSFLAGS        := --sysroot=. -C no-redzone -Z gc
-RDFLAGS        := --no-defaults --passes collapse-docs --passes strip-hidden
+RDFLAGS        := --no-defaults --passes collapse-docs --passes strip-hidden --passes unindent-comments
 LDFLAGS        := -m elf_i386 -z nodefaultlib
 KERNEL_LDFLAGS := --strip-all
 
@@ -39,7 +39,7 @@ BUILTIN_CRATES := alloc arena core collections unicode rand
 PATCHED_CRATES := libc
 
 # Crates that are not really part of the stdlib or kernel. They are in rustlibs/<name>/
-OTHER_CRATES   := basic
+OTHER_CRATES   := basicstd
 
 # Plugins these are in plugins/<name>
 HOST_CRATES    := enabled hoare bassert
@@ -117,11 +117,9 @@ docs: $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 LIBALLOC_RSFLAGS := -A dead_code --cfg feature=\"external_crate\" --extern external=$(call lib-name,mm) \
                     -C opt-level=$(DEFAULT_CRATE_OPT)
 LIBALLOC_RDFLAGS := --cfg external_crate --extern external=$(call lib-name,mm)
-LIBARENA_RSFLAGS := --extern std=$(call lib-name,basic) -C opt-level=$(DEFAULT_CRATE_OPT)
-LIBARENA_RDFLAGS := --extern std=$(call lib-name,basic)
 # TODO For some reason LLVM doesn't like -O2 in drivers.
-DRIVERS_RSFLAGS  := -C opt-level=1
-DRIVERS_RDFLAGS  :=
+DRIVERS_RSFLAGS  := -C opt-level=1 --extern std=$(call lib-name,basicstd)
+DRIVERS_RDFLAGS  := --extern std=$(call lib-name,basicstd)
 
 # Plugins
 $(eval $(call plugin-rule, bassert,))
@@ -137,21 +135,22 @@ $(eval $(call crate-rule,      core,  ))
 $(eval $(call crate-rule,      libc,        core))
 $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
+# cstd is a libstd mock with core and rand.
 $(eval $(call crate-rule,      base,        bassert enabled core libc))
 $(eval $(call crate-rule,      mm,          $(HOST_CRATES) core libc base))
 $(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
-# basic is a libstd mock with core, alloc and collections.
-$(eval $(call crate-rule,      basic,       core alloc collections))
-$(eval $(call long-crate-rule, arena,       basic,                       $(LIBARENA_RSFLAGS), $(LIBARENA_RDFLAGS)))
+# basicstd is a libstd mock with core, rand, alloc and collections.
+$(eval $(call crate-rule,      basicstd,    core alloc collections rand))
 $(eval $(call crate-rule,      startup,     $(BASIC_REQS)))
-$(eval $(call crate-rule,      util,        $(BASIC_REQS)))
-$(eval $(call crate-rule,      procs,       $(BASIC_REQS) util startup))
-$(eval $(call crate-rule,      umem,        $(BASIC_REQS) procs util startup))
-#$(eval $(call crate-rule,      pageoutd,    $(BASIC_REQS) util procs))
-#$(eval $(call crate-rule,      fs,          $(BASIC_REQS) umem procs))
-$(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem,    $(DRIVERS_RSFLAGS), $(DRIVERS_RDFLAGS)))
-$(eval $(call crate-rule,      main,        $(MAIN_REQS)))
+$(eval $(call std-crate-rule,  arena,       $(BASIC_REQS),                    basicstd))
+$(eval $(call std-crate-rule,  util,        $(BASIC_REQS),                    basicstd))
+$(eval $(call std-crate-rule,  procs,       $(BASIC_REQS) util startup,       basicstd))
+$(eval $(call std-crate-rule,  umem,        $(BASIC_REQS) procs util startup, basicstd))
+#$(eval $(call std-crate-rule,  pageoutd,    $(BASIC_REQS) util procs,         basicstd))
+#$(eval $(call std-crate-rule,  fs,          $(BASIC_REQS) umem procs,         basicstd))
+$(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem basicstd,$(DRIVERS_RSFLAGS), $(DRIVERS_RDFLAGS)))
+$(eval $(call std-crate-rule,  main,        $(MAIN_REQS), basicstd))
 
 # Make the target for libm
 $(eval $(call external-targets, openlibm,                                           \

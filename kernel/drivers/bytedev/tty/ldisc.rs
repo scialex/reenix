@@ -2,10 +2,9 @@
 //! The line discipline
 
 use procs::sync::*;
-use core::prelude::*;
 use base::errno;
 use base::errno::KResult;
-use core::cmp;
+use std::cmp;
 use RDeviceMut;
 use bytedev::tty::TTYLineDiscipline;
 

@@ -1,11 +1,10 @@
 
 //! Reenix memory devices, /dev/null, /dev/zero
 
-use core::prelude::*;
 use util::Cacheable;
 use DeviceId;
 use base::errno::{Errno, KResult};
-use core::fmt::{self, Formatter};
+use std::fmt::{self, Formatter};
 use umem::mmobj::{MMObjId, MMObj};
 use umem::pframe::PFrame;
 use RDevice;

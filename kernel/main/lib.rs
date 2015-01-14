@@ -2,7 +2,6 @@
 
 #![crate_name="main"]
 #![crate_type="staticlib"]
-#![no_std]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
@@ -10,14 +9,11 @@
 
 
 #[macro_use] #[plugin] #[no_link] extern crate bassert;
-#[macro_use] extern crate core;
 #[macro_use] extern crate base;
 #[macro_use] extern crate procs;
 #[macro_use] extern crate mm;
-extern crate alloc;
 extern crate startup;
 extern crate libc;
-extern crate collections;
 extern crate drivers;
 //extern crate util;
 extern crate umem;
@@ -29,8 +25,6 @@ use procs::kproc;
 use procs::kproc::{KProc, Pid, ProcId};
 use libc::c_void;
 use mm::pagetable;
-use core::prelude::*;
-use collections::string::ToString;
 use procs::interrupt;
 
 mod proctest;
@@ -191,10 +185,3 @@ pub extern "C" fn get_dbg_pid() -> Option<ProcId> {
     if unsafe { !IS_PROCS_UP } { None } else { Some(current_pid!()) }
 }
 
-
-#[doc(hidden)]
-mod std {
-    pub use core::fmt;
-    pub use core::marker;
-    pub use core::clone;
-}

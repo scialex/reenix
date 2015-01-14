@@ -1,11 +1,9 @@
 
 //! The reenix byte device interface and usage functions.
 
-use alloc::boxed::Box;
-use core::prelude::*;
 use super::{DeviceId, Device, WDevice};
-use collections::*;
-use core::fmt;
+use std::collections::*;
+use std::fmt;
 
 mod tty;
 
@@ -31,7 +29,7 @@ pub fn shutdown() {
 }
 static mut DEVICES : *mut BTreeMap<DeviceId, Box<Device<u8> + 'static>> = 0 as *mut BTreeMap<DeviceId, Box<Device<u8> + 'static>>;
 fn init_device_tree() {
-    use core::mem::transmute;
+    use std::mem::transmute;
     unsafe {
         assert!(DEVICES.is_null());
         let d = box BTreeMap::<DeviceId, Box<ByteDevice>>::new();

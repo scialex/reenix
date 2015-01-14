@@ -1,8 +1,8 @@
 //! The cacheable trait.
 
-use alloc::rc::*;
-use core::cell::*;
-use core::ptr::*;
+use std::rc::*;
+use std::cell::*;
+use std::ptr::*;
 
 /// A trait that indicates the type could be dropped but we will not nessecarially want to do so.
 /// For example think of a data-point in an LRU cache, even if we have no reffernces if the data

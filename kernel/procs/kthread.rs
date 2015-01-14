@@ -1,22 +1,15 @@
 // TODO Copyright Header
 
-use core::prelude::*;
 //use base::describe;
-use mm::alloc;
-use alloc::boxed::*;
-use mm::page;
+use mm::{alloc, page};
 use libc::c_void;
 use base::errno;
-use core::ptr;
-use core::fmt;
+use std::{cmp, hash, fmt, num};
 use context;
-use core::num;
-use core::mem::{size_of, transmute_copy};
-use core::ptr::copy_nonoverlapping_memory;
-use core::cmp;
+use std::mem::{size_of, transmute_copy};
+use std::ptr::{self, copy_nonoverlapping_memory};
 use kqueue::KQueue;
 use context::{Context, ContextFunc};
-use core::hash;
 use mm::pagetable::PageDir;
 use mm::AllocError;
 

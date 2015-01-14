@@ -2,16 +2,14 @@
 //! The implementation of a process context
 
 use mm::pagetable;
-use alloc::boxed::*;
 use mm::page;
 use startup::{gdt, tsd};
 use libc::{c_void, uintptr_t};
 use interrupt;
-use core::mem::{transmute, transmute_copy};
-use collections::RingBuf;
-use core::ptr::null_mut;
-use core::prelude::*;
-use alloc::rc::*;
+use std::mem::{transmute, transmute_copy};
+use std::collections::RingBuf;
+use std::ptr::null_mut;
+use std::rc::*;
 use pcell::*;
 
 
@@ -69,7 +67,7 @@ impl RunQueue {
     ///
     /// NOTE This is the closest way I can say that a value is volatile...
     unsafe fn get_inner(&mut self) -> &mut RingBuf<SleepingThread> {
-        use core::intrinsics::volatile_load;
+        use std::intrinsics::volatile_load;
         let &mut RunQueue(ref mut b) = self;
         volatile_load::<&mut RingBuf<SleepingThread>>(&b as *const &mut RingBuf<SleepingThread>)
     }
@@ -264,8 +262,7 @@ impl Context {
 
     unsafe fn switch_to(&mut self, newc : &Context) {
         use kproc::{CUR_PROC_SLOT, KProc};
-        use core::prelude::*;
-        use core::ops::Deref;
+        use std::ops::Deref;
 
         let ipl = interrupt::get_ipl();
         interrupt::set_ipl(interrupt::HIGH);

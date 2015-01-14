@@ -2,8 +2,7 @@
 
 //! All things interrupts go here.
 
-use core::prelude::*;
-use core::intrinsics;
+use std::intrinsics;
 use startup::gdt;
 use super::apic;
 
@@ -211,7 +210,7 @@ pub unsafe extern "C" fn _rust_intr_handler(r: &mut Registers) {
  * it is known that this will not be the case.
  */
 pub fn register(intr: u8, handler: InterruptHandler) -> Option<InterruptHandler> {
-    use core::intrinsics::transmute;
+    use std::intrinsics::transmute;
     unsafe {
         let old = IDT.handlers[intr as usize];
         IDT.handlers[intr as usize] = handler;

@@ -1,18 +1,13 @@
 // TODO Copyright Header
 
-use procs::kproc;
-use alloc::boxed::*;
 use libc::c_void;
-use core::prelude::*;
-use procs::kthread;
-use core::mem::transmute_copy;
-use core::intrinsics::transmute;
-use procs::kproc::{ProcStatus, ProcId, KProc};
-use procs::interrupt;
-use procs::sync::*;
 use procs::args::ProcArgs;
-use alloc::rc::*;
-use collections::string::ToString;
+use procs::kproc::{self, ProcStatus, ProcId, KProc};
+use procs::sync::*;
+use procs::{interrupt, kthread};
+use std::intrinsics::transmute;
+use std::mem::transmute_copy;
+use std::rc::*;
 
 const GOOD : *mut c_void = 1 as *mut c_void;
 const BAD  : *mut c_void = 0 as *mut c_void;

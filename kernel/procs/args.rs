@@ -1,11 +1,9 @@
 
 use mm::alloc::*;
-use alloc::boxed::*;
-use core::prelude::*;
-use core::cell::*;
-use core::mem::{transmute, transmute_copy};
+use std::cell::*;
+use std::mem::{transmute, transmute_copy};
 use libc::c_void;
-use core::intrinsics::forget;
+use std::intrinsics::forget;
 
 pub struct ProcArgs<T> {
     val: Box<UnsafeCell<T>>,

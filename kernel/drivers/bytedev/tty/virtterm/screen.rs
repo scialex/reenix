@@ -1,8 +1,7 @@
 
 //! The Reenix screen writing code.
 
-use core::ptr::write;
-use core::prelude::*;
+use std::ptr::write;
 use base::io::outb;
 use mm::pagetable;
 use libc::uintptr_t;

@@ -1,9 +1,7 @@
 
-use core::cell::*;
-use core::marker;
-use core::prelude::*;
-use core::fmt;
-use core::ops::{Deref, DerefMut};
+use std::cell::*;
+use std::{marker, fmt};
+use std::ops::{Deref, DerefMut};
 
 type Borrowed = usize;
 const UNUSED : Borrowed = 0;

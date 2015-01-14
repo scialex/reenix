@@ -1,20 +1,16 @@
 
 //! An LRU cache where we can 'pin' items.
 
-use core::ops::Deref;
-use core::mem::size_of;
-use core::cell::*;
-use collections::*;
+use std::ops::{self, Deref};
+use std::mem::{transmute, size_of};
+use std::cell::*;
 use base::make::*;
 use base::errno::Errno;
-use core::atomic::*;
-use core::prelude::*;
-use core::ops;
+use std::sync::atomic::*;
 use lru_cache::*;
 use key_ref::*;
-use alloc::boxed::*;
-use core::mem::transmute;
-use core::fmt;
+use std::fmt;
+use std::collections::BTreeMap;
 use mm::{Allocation, AllocError};
 use cacheable::*;
 

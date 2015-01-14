@@ -1,8 +1,7 @@
-use core::prelude::*;
-use core::atomic::*;
-use core::atomic::Ordering::SeqCst;
-use core::cell::UnsafeCell;
-use core::ops::{DerefMut, Deref};
+use std::sync::atomic::*;
+use std::sync::atomic::Ordering::SeqCst;
+use std::cell::UnsafeCell;
+use std::ops::{DerefMut, Deref};
 
 pub use kmutex::KMutex;
 pub use kqueue::WQueue;

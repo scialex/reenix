@@ -1,9 +1,7 @@
 
 //! Stuff to make a Linked List.
-use core::prelude::*;
-use alloc::boxed::*;
-use core::cell::*;
-use core::mem::{transmute, transmute_copy};
+use std::cell::*;
+use std::mem::{transmute, transmute_copy};
 
 /// A node in a linked list used to for various things in this crate. Specifically it is used to
 /// implement both the LruCache and the pinnable cache by providing the backing storage to hold the

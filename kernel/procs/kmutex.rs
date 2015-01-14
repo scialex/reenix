@@ -3,13 +3,12 @@
 //! KMutex thing
 
 use kqueue::KQueue;
-use core::intrinsics::size_of;
+use std::intrinsics::size_of;
 use mm::alloc::request_slab_allocator;
-use core::fmt;
-use core::fmt::{Show, Formatter};
-use core::cell::*;
-use core::ptr::*;
-use core::atomic::*;
+use std::fmt::{self, Show, Formatter};
+use std::cell::*;
+use std::ptr::*;
+use std::sync::atomic::*;
 use sync::Wakeup;
 
 pub fn init_stage1() {

@@ -1,13 +1,10 @@
 //! A Least Recently Used cache.
 
-use alloc::boxed::*;
-use collections::*;
-use core::default::Default;
-use core::{fmt, iter};
-use core::mem::{size_of, transmute};
-use core::prelude::*;
-use core::ops;
-use core::iter::FromIterator;
+use std::default::Default;
+use std::{fmt, ops};
+use std::mem::{size_of, transmute};
+use std::iter::{self, FromIterator};
+use std::collections::BTreeMap;
 use key_ref::*;
 use list_node::ListNode;
 use mm::alloc::Allocation;

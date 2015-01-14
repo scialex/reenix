@@ -1,17 +1,15 @@
 
 //! The mmobj definitions.
 
-use core::fmt;
-use core::cmp::Ordering;
-use core::cell::*;
-use core::prelude::*;
 //use util::cacheable::*;
+use base::devices::*;
 use base::errno::*;
 use pframe;
-use alloc::rc::*;
+use std::cell::*;
+use std::cmp::Ordering;
+use std::fmt;
+use std::rc::*;
 use util::pinnable_cache::*;
-use alloc::boxed::*;
-use base::devices::*;
 
 // Cheating to get a uuid by just incrementing a counter. This is not really good in general but we
 // have 48 bits, which means we will probably never really run out...

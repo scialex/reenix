@@ -1,23 +1,17 @@
 // TODO Copyright Header
 
-use base::errno;
-use mm::page;
-use mm::alloc;
-use alloc::boxed::*;
-use core::cell::*;
+use base::errno::{self, KResult};
+use drivers::*;
+use drivers::bytedev::ByteWriter;
 use libc::c_void;
-use core::prelude::*;
+use mm::{alloc, page};
+use procs::args::ProcArgs;
 use procs::interrupt;
 use procs::kproc::{KProc, self};
-use drivers::*;
-use base::errno::KResult;
-use core::str::from_utf8;
-use drivers::bytedev::ByteWriter;
-use collections::*;
-use collections::str::FromStr;
-use procs::args::ProcArgs;
-use core::fmt::Writer;
-use core::fmt;
+use std::cell::*;
+use std::collections::*;
+use std::fmt::{self, Writer};
+use std::str::{FromStr, from_utf8};
 
 /// Just a wraper to writeln! or panic.
 macro_rules! twriteln {
@@ -333,7 +327,7 @@ fn do_cancel(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
 }
 
 fn do_bdread(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
-    use core::str::from_utf8;
+    use std::str::from_utf8;
     if argv.len() != 2 {
         twriteln!(io, "Usage: read-block block_num");
         return Ok(());
@@ -413,7 +407,7 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
             }
         ));
     for _ in range(0, blks) {
-        use core::slice::bytes::copy_memory;
+        use std::slice::bytes::copy_memory;
         let mut out : [u8; page::SIZE] = [0; page::SIZE];
         copy_memory(&mut out, &example);
         buf.push(out);
@@ -461,7 +455,7 @@ fn do_prepeat<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
 }
 #[allow(unused_must_use)]
 fn do_parallel<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
-    use core::mem::transmute;
+    use std::mem::transmute;
     if argv.len() < 2 {
         twriteln!(sh.get_tty(), "Usage: parallel cmd1 .. || cmd2 .. || cmd3 .. || ...");
         return Ok(());

@@ -44,13 +44,13 @@ macro_rules! bitmask_create {
         bitmask_create!(inner_flags $name { $($f),* });
     };
     (inner_flags $name:ident { $($f:ident),+ }) => {
-        impl ::core::fmt::Show for $name {
-            fn fmt(&self, fmt: &mut ::core::fmt::Formatter) -> fmt::Result {
-                (self as &::core::fmt::String).fmt(fmt)
+        impl ::std::fmt::Show for $name {
+            fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> fmt::Result {
+                (self as &::std::fmt::String).fmt(fmt)
             }
         }
-        impl ::core::fmt::String for $name {
-            fn fmt(&self, fmt: &mut ::core::fmt::Formatter) -> fmt::Result {
+        impl ::std::fmt::String for $name {
+            fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> fmt::Result {
                 try!(write!(fmt, "{}[",stringify!($name)));
                 let mut started = false;
                 $(
@@ -63,7 +63,7 @@ macro_rules! bitmask_create {
                 write!(fmt, "]")
             }
         }
-        impl ::core::ops::BitXor for $name {
+        impl ::std::ops::BitXor for $name {
             type Output = $name;
             #[inline] fn bitxor(self, r: $name) -> $name {
                 let $name(lhs) = self;
@@ -71,7 +71,7 @@ macro_rules! bitmask_create {
                 $name(lhs ^ rhs)
             }
         }
-        impl ::core::ops::BitOr for $name {
+        impl ::std::ops::BitOr for $name {
             type Output = $name;
             #[inline] fn bitor(self, r: $name) -> $name {
                 let $name(lhs) = self;
@@ -79,7 +79,7 @@ macro_rules! bitmask_create {
                 $name(lhs | rhs)
             }
         }
-        impl ::core::ops::BitAnd for $name {
+        impl ::std::ops::BitAnd for $name {
             type Output = $name;
             #[inline] fn bitand(self, r: $name) -> $name {
                 let $name(lhs) = self;
@@ -87,17 +87,17 @@ macro_rules! bitmask_create {
                 $name(lhs & rhs)
             }
         }
-        impl ::core::ops::Add for $name {
+        impl ::std::ops::Add for $name {
             type Output = $name;
             #[inline] fn add(self, r: $name) -> $name { self | r }
         }
-        impl ::core::ops::Sub for $name {
+        impl ::std::ops::Sub for $name {
             type Output = $name;
             #[inline] fn sub(self, r: $name) -> $name {
                 self & (!r)
             }
         }
-        impl ::core::ops::Not for $name {
+        impl ::std::ops::Not for $name {
             type Output = $name;
             #[inline] fn not(self) -> $name {
                 let $name(val) = self;

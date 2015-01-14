@@ -4,10 +4,9 @@
 use super::ScrollDirection;
 use super::ScrollDirection::{UP, DOWN};
 use bytedev::tty::Finalizer;
-use core::prelude::*;
 use bytedev::tty::TTYDriver;
 use procs::interrupt;
-use core::cmp;
+use std::cmp;
 
 mod screen;
 

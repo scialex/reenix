@@ -1,18 +1,16 @@
 
 //! Pframes for Reenix.
 
-use core::fmt;
-use core::cell::*;
-use procs::sync::*;
-use util::cacheable::*;
-use alloc::rc::*;
-use alloc::boxed::*;
-use core::prelude::*;
 use base::errno::{self, KResult, Errno};
 use base::make::*;
 use libc::c_void;
 use mm::{AllocError, page, tlb};
 use mmobj::*;
+use procs::sync::*;
+use std::cell::*;
+use std::fmt;
+use std::rc::*;
+use util::cacheable::*;
 
 pub use pframe::pfstate::PFState;
 use util::pinnable_cache::{self, PinnableCache, InsertError, PinnedValue};
@@ -41,7 +39,7 @@ pub fn init_stage1() {
 }
 
 pub fn init_stage2() {
-    use core::mem::transmute;
+    use std::mem::transmute;
     let pfcache : Box<PinnableCache<PFrameId, PFrame>> = box PinnableCache::new().unwrap();
     unsafe { PFRAME_CACHE = transmute(pfcache); }
     pageout::init_pageoutd();
@@ -55,10 +53,8 @@ pub fn init_stage3() {
 pub mod pageout {
     use libc::c_void;
     use procs::sync::*;
-    use core::prelude::*;
     use super::get_cache;
-    use alloc::boxed::*;
-    use core::mem::transmute;
+    use std::mem::transmute;
 
     pub fn init_pageoutd() {
         let pd : Box<PageOutD> = box PageOutD { queue: WQueue::new() };
@@ -98,8 +94,7 @@ fn get_cache() -> &'static mut PinnableCache<PFrameId, PFrame> {
 
 /// The different states a pframe can be in as it is being used.
 pub mod pfstate {
-    use core::fmt;
-    use core::prelude::*;
+    use std::fmt;
     bitmask_create!(
         #[doc = "The different states a pframe can be in"]
         flags PFState : u8 {

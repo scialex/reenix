@@ -13,7 +13,7 @@ macro_rules! alloc {
     // TODO This is rather wordy and arbitrary.
     (try $f:expr) => ({
         use $crate::alloc;
-        use core::mem;
+        use std::mem;
         if alloc::is_memory_low() {
             Err(())
         } else {
@@ -28,7 +28,7 @@ macro_rules! alloc {
     });
     (try_box $e:expr) => ({
         use $crate::alloc;
-        use core::mem;
+        use std::mem;
         if alloc::is_memory_low() {
             Err(())
         } else {

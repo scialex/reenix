@@ -2,16 +2,14 @@
 
 //! KQueue thing
 
-use collections::*;
-use core::mem::{transmute, transmute_copy};
-use core::prelude::*;
-use core::cell::*;
-use core::cmp::Ordering::{self, Equal};
-use core::ptr;
+use std::collections::*;
+use std::mem::{transmute, transmute_copy};
+use std::cell::*;
+use std::cmp::Ordering::{self, Equal};
+use std::{fmt, ptr};
 use kthread::KThread;
 use kthread;
 use sync;
-use core::fmt;
 
 pub struct QueuedThread(*mut KThread);
 pub struct KQueue(RefCell<BTreeSet<QueuedThread>>);

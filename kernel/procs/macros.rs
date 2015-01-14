@@ -50,12 +50,12 @@ macro_rules! current_pid{
 #[macro_export]
 macro_rules! current_proc{
     () => ({
-        use core::clone::*;
+        use std::clone::*;
         use startup::gdt;
-        use core::ops::Deref;
+        use std::ops::Deref;
         use procs::pcell::*;
-        use alloc::rc::*;
-        use core::intrinsics::transmute;
+        use std::rc::*;
+        use std::intrinsics::transmute;
         use procs::kproc::{CUR_PROC_SLOT, KProc};
         // We get the TSD copy of this data.
         let r = (**gdt::get_tsd().get_slot(CUR_PROC_SLOT).expect(add_file!("CUR_PROC slot not used")))
@@ -74,13 +74,13 @@ macro_rules! current_proc{
 #[macro_export]
 macro_rules! current_proc_mut{
     () => ({
-        use core::clone::*;
+        use std::clone::*;
         use startup::gdt;
-        use core::ops::Deref;
+        use std::ops::Deref;
         use procs::pcell::*;
-        use alloc::rc::*;
-        use core::ops::DerefMut;
-        use core::intrinsics::transmute;
+        use std::rc::*;
+        use std::ops::DerefMut;
+        use std::intrinsics::transmute;
         use procs::kproc::{CUR_PROC_SLOT, KProc};
         // We get the TSD copy of this data.
         let r = (**gdt::get_tsd().get_slot(CUR_PROC_SLOT).expect(add_file!("CUR_PROC slot not used")))
