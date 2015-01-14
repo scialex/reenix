@@ -1,4 +1,5 @@
 #include "types.h"
+#include "kernel.h"
 
 #include "main/acpi.h"
 
@@ -87,12 +88,20 @@ static void *_acpi_load_table(uintptr_t paddr)
         struct acpi_header *tmp =
                 (struct acpi_header *)(pt_phys_tmp_map((uintptr_t)PAGE_ALIGN_DOWN(paddr)) + (PAGE_OFFSET(paddr)));
 
-        /* this function is not designed to handle tables which
-         * cross page boundaries */
-        KASSERT(PAGE_OFFSET(paddr) + tmp->ah_size < PAGE_SIZE);
-        struct acpi_header *table = kmalloc(tmp->ah_size);
-        memcpy(table, tmp, tmp->ah_size);
-        return (void *)table;
+        uint32_t size   = tmp->ah_size;
+        uint8_t *buf    = kmalloc(tmp->ah_size);
+        void* ret = buf;
+        uint8_t *source = (uint8_t*) tmp;
+        /* Do each page of phys memory in sequence. */
+        while (size > 0) {
+                source = (uint8_t*) pt_phys_tmp_map((uintptr_t)PAGE_ALIGN_DOWN(paddr)) + (PAGE_OFFSET(paddr));
+                uint32_t cp = MIN(PAGE_SIZE - PAGE_OFFSET(paddr), size);
+                memcpy(buf, source, cp);
+                paddr += cp;
+                size  -= cp;
+                buf   += cp;
+        }
+        return ret;
 }
 
 void acpi_init()
