@@ -4,7 +4,7 @@
 use mm::page;
 use util::Cacheable;
 use DeviceId;
-use std::cell::*;
+use base::cell::*;
 use base::{io, kernel};
 use blockdev::disk::dma;
 use procs::interrupt;
@@ -233,8 +233,8 @@ pub fn init_stage2() {
             c.busmaster = ata_setup_busmaster_simple(c.get_channel_num());
 
             // Allocate the new disk.
-            let disk = box UnsafeCell::new(ATADisk::create(c, true, (id_buf[IDENT_MAX_LBA] as usize),
-                                                           BLOCK_SIZE / SECTOR_SIZE));
+            let disk = box SafeCell::new(ATADisk::create(c, true, (id_buf[IDENT_MAX_LBA] as usize),
+                                                         BLOCK_SIZE / SECTOR_SIZE));
             let rd = disk.get().as_ref().expect("should not be null");
             // TODO Doing this is somewhat bad but there is no way (At the moment) to remove disks
             // TODO so it is at least safe. Idealy we would not need this and just do dynamic_cast
@@ -276,7 +276,7 @@ impl Show for ATADisk {
     }
 }
 
-impl ::blockdev::BlockDevice for UnsafeCell<ATADisk> {}
+impl ::blockdev::BlockDevice for SafeCell<ATADisk> {}
 
 impl ATADisk {
     fn create(channel: Channel, is_master: bool, size: usize, sectors_per_block: usize) -> ATADisk {

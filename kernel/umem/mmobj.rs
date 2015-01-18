@@ -3,9 +3,9 @@
 
 //use util::cacheable::*;
 use base::devices::*;
+use base::cell::*;
 use base::errno::*;
 use pframe;
-use std::cell::*;
 use std::cmp::Ordering;
 use std::fmt;
 use std::rc::*;
@@ -38,7 +38,7 @@ impl Ord for MMObjId {
 
 /// An mmobj that needs interior mutability. This is used just like a regular mmobj through the use
 /// of cells.
-pub trait MMObjMut {
+pub trait MMObjMut : fmt::Show {
     /// Return an MMObjId for this object.
     fn get_id(&self) -> MMObjId;
 
@@ -66,11 +66,9 @@ pub trait MMObjMut {
      * Return 0 on success and -errno otherwise.
      */
     fn clean_page(&mut self, pf: &pframe::PFrame) -> KResult<()>;
-
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "mmobj_mut for {:?}", self.get_id()) }
 }
 
-pub trait MMObj {
+pub trait MMObj : fmt::Show {
     /// Return an MMObjId for this object.
     fn get_id(&self) -> MMObjId;
 
@@ -98,8 +96,6 @@ pub trait MMObj {
      * Return 0 on success and -errno otherwise.
      */
     fn clean_page(&self, pf: &pframe::PFrame) -> KResult<()>;
-
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "mmobj for {:?}", self.get_id()) }
 }
 
 pub trait MMObjExt {
@@ -126,7 +122,6 @@ pub trait MMObjExt {
 
 impl<T> MMObjExt for T where T: MMObj { }
 
-impl<'a> fmt::Show  for MMObj + 'a { fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.show(f) } }
 impl<'a> PartialOrd for MMObj + 'a { fn partial_cmp(&self, o: &MMObj) -> Option<Ordering> { self.get_id().partial_cmp(&o.get_id()) } }
 impl<'a> PartialEq  for MMObj + 'a { fn eq(&self, o: &MMObj) -> bool { self.get_id().eq(&o.get_id()) } }
 impl<'a> Ord        for MMObj + 'a { fn cmp(&self, o: &MMObj) -> Ordering { self.get_id().cmp(&o.get_id()) } }
@@ -135,10 +130,9 @@ impl<'a> Eq         for MMObj + 'a {}
 
 // TODO I might want to replace this with a trait that just lets us do the deref, that would let us
 // keep more safety.
-impl<T> MMObj for UnsafeCell<T> where T: MMObjMut {
-    fn get_id(&self) -> MMObjId { unsafe { self.get().as_ref().expect("cannot be null") }.get_id() }
-    fn fill_page(&self, pf: &mut pframe::PFrame) -> KResult<()> { unsafe { self.get().as_mut().expect("cannot be null") }.fill_page(pf) }
-    fn dirty_page(&self, pf: &pframe::PFrame) -> KResult<()> { unsafe { self.get().as_mut().expect("cannot be null") }.dirty_page(pf) }
-    fn clean_page(&self, pf: &pframe::PFrame) -> KResult<()> { unsafe { self.get().as_mut().expect("cannot be null") }.clean_page(pf) }
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { unsafe { self.get().as_ref().expect("cannot be null") }.show(f) }
+impl<T> MMObj for SafeCell<T> where T: MMObjMut {
+    fn get_id(&self) -> MMObjId { self.get_ref().get_id() }
+    fn fill_page(&self, pf: &mut pframe::PFrame) -> KResult<()> { self.get_mut().fill_page(pf) }
+    fn dirty_page(&self, pf: &pframe::PFrame) -> KResult<()> { self.get_mut().dirty_page(pf) }
+    fn clean_page(&self, pf: &pframe::PFrame) -> KResult<()> { self.get_mut().clean_page(pf) }
 }

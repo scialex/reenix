@@ -30,7 +30,7 @@ CFLAGS  += -D__KERNEL__
 ###
 
 # Crates for the kernel. they are in <name>/
-REENIX_CRATES  := main base mm startup procs drivers util umem
+REENIX_CRATES  := main base mm startup procs drivers util umem fs
 
 # Crates from the Rust standard library
 BUILTIN_CRATES := alloc arena core collections unicode rand
@@ -135,7 +135,6 @@ $(eval $(call crate-rule,      core,  ))
 $(eval $(call crate-rule,      libc,        core))
 $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
-# cstd is a libstd mock with core and rand.
 $(eval $(call crate-rule,      base,        bassert enabled core libc))
 $(eval $(call crate-rule,      mm,          $(HOST_CRATES) core libc base))
 $(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
@@ -148,7 +147,7 @@ $(eval $(call std-crate-rule,  util,        $(BASIC_REQS),                    ba
 $(eval $(call std-crate-rule,  procs,       $(BASIC_REQS) util startup,       basicstd))
 $(eval $(call std-crate-rule,  umem,        $(BASIC_REQS) procs util startup, basicstd))
 #$(eval $(call std-crate-rule,  pageoutd,    $(BASIC_REQS) util procs,         basicstd))
-#$(eval $(call std-crate-rule,  fs,          $(BASIC_REQS) umem procs,         basicstd))
+$(eval $(call std-crate-rule,  fs,          $(BASIC_REQS) umem procs,         basicstd))
 $(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem basicstd,$(DRIVERS_RSFLAGS), $(DRIVERS_RDFLAGS)))
 $(eval $(call std-crate-rule,  main,        $(MAIN_REQS), basicstd))
 

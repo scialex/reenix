@@ -94,7 +94,6 @@ fn get_cache() -> &'static mut PinnableCache<PFrameId, PFrame> {
 
 /// The different states a pframe can be in as it is being used.
 pub mod pfstate {
-    use std::fmt;
     bitmask_create!(
         #[doc = "The different states a pframe can be in"]
         flags PFState : u8 {

@@ -2,27 +2,24 @@
 
 #![crate_name="fs"]
 #![crate_type="rlib"]
-#![no_std]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(asm, macro_rules, globs, concat_idents, lang_items, phase, intrinsics, unsafe_destructor)]
+#![feature(plugin, unsafe_destructor, unboxed_closures)]
 
 //! # The Reenix User memory stuff.
 ///
 /// It has things like the pframe
 
-#[phase(plugin)] extern crate bassert;
+#[macro_use] #[no_link] #[plugin] extern crate bassert;
 
-#[phase(plugin, link)] extern crate base;
-#[phase(plugin, link)] extern crate core;
-#[phase(plugin, link)] extern crate mm;
+#[macro_use] extern crate base;
+#[macro_use] extern crate mm;
 extern crate drivers;
-extern crate collections;
-extern crate alloc;
 extern crate libc;
 extern crate umem;
 
-use alloc::rc::*;
+use std::rc::*;
+use ::vnode::VNode;
 
 //pub mod s5fs;
 pub mod ramfs;
@@ -35,13 +32,13 @@ pub mod filesystem {
 
 pub type InodeNum = u32;
 
-pub trait FileSystem<T> where T: Vnode {
+pub trait FileSystem<T> where T: VNode {
     fn get_type() -> &'static str;
-    fn get_fs_root<'a>(&'a self) -> T + 'a;
+    fn get_fs_root<'a>(&'a self) -> T;
     /// Get the refcount of the vnode on the disk, does not count references in memory.
-    fn get_refcount(&self, node: &T) -> uint;
+    fn get_refcount(&self, node: &T) -> usize;
     /// Called when a VNode is deleted from memory.
     fn vnode_freed(&self, node: &T);
     fn unmount(&mut self);
-    fn get_vnode<'a>(&'a self, vnode_num: InodeNum) -> T + 'a;
+    fn get_vnode<'a>(&'a self, vnode_num: InodeNum) -> T;
 }
