@@ -49,7 +49,6 @@ impl MMObj for NullDev {
     // TODO The next two maybe should panic?
     fn dirty_page(&self, _pf: &PFrame)      -> KResult<()> { Ok(()) }
     fn clean_page(&self, _pf: &PFrame)      -> KResult<()> { Ok(()) }
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "[/dev/null device]") }
 }
 
 /// The device for /dev/zero
@@ -94,5 +93,4 @@ impl MMObj for ZeroDev {
         dbg!(debug::MEMDEV, "clean-page called on zero device? This might be a bug.");
         Err(Errno::ENOTSUP)
     }
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "[/dev/zero device]") }
 }

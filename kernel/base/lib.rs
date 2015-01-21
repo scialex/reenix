@@ -33,6 +33,7 @@ pub mod io;
 
 pub mod kernel;
 pub mod sync;
+pub mod cell;
 
 pub mod pid;
 pub fn init_stage1() { debug::setup(); }

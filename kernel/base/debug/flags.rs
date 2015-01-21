@@ -2,8 +2,6 @@
 
 //! The flags for dbg!.
 
-use core::fmt;
-
 macro_rules! dbg_modes {
     ($(($n:ident, $v:expr, $c:expr, $ex:expr)),+) => (
         bitmask_create!(
