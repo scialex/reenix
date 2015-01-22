@@ -2,7 +2,7 @@
 //! than any real organizational reason. Some crates need this but don't really need to know much
 //! more about drivers.
 
-use core::cell::*;
+use cell::*;
 use core::fmt::{self, Show, Formatter};
 use core::prelude::*;
 use errno::KResult;
@@ -69,21 +69,21 @@ pub trait WDeviceMut<T> {
     fn write_to(&mut self, offset: usize, buf: &[T]) -> KResult<usize>;
 }
 
-impl<T, D> RDevice<T> for UnsafeCell<D> where D: RDeviceMut<T> {
+impl<T, D> RDevice<T> for SafeCell<D> where D: RDeviceMut<T> {
     fn read_from(&self, offset: usize, buf: &mut [T]) -> KResult<usize> {
         // TODO I might want to replace this with a trait that just lets us do the deref, that
         // TODO would let us keep more safety.
-        unsafe { self.get().as_mut() }.expect("illegal cell state").read_from(offset, buf)
+        self.get_mut().read_from(offset, buf)
     }
 }
 
-impl<T, D> WDevice<T> for UnsafeCell<D> where D: WDeviceMut<T> {
+impl<T, D> WDevice<T> for SafeCell<D> where D: WDeviceMut<T> {
     fn write_to(&self, offset: usize, buf: &[T]) -> KResult<usize> {
-        unsafe { self.get().as_mut() }.expect("illegal cell state").write_to(offset, buf)
+        self.get_mut().write_to(offset, buf)
     }
 }
 
 /// A Device that can both read and write.
 pub trait Device<T> : WDevice<T> + RDevice<T> + 'static {}
 
-impl<T,D> Device<T> for UnsafeCell<D> where D: RDeviceMut<T> + WDeviceMut<T> + 'static {}
+impl<T,D> Device<T> for SafeCell<D> where D: RDeviceMut<T> + WDeviceMut<T> + 'static {}

@@ -235,14 +235,13 @@ pub fn init_stage2() {
             // Allocate the new disk.
             let disk = box SafeCell::new(ATADisk::create(c, true, (id_buf[IDENT_MAX_LBA] as usize),
                                                          BLOCK_SIZE / SECTOR_SIZE));
-            let rd = disk.get().as_ref().expect("should not be null");
             // TODO Doing this is somewhat bad but there is no way (At the moment) to remove disks
             // TODO so it is at least safe. Idealy we would not need this and just do dynamic_cast
             // TODO to TTY in interrupt handler.
-            DISKS[rd.channel.get_channel_num() as usize] = disk.get();
-            interrupt::register(rd.channel.intr, ata_intr_handler);
-            dbg!(debug::DISK, "Registering disk {:?}", rd);
-            ::blockdev::register(rd.channel.dev, disk);
+            DISKS[disk.get_ref().channel.get_channel_num() as usize] = (&*disk.get_ref()) as *const ATADisk as *mut ATADisk;
+            interrupt::register(disk.get_ref().channel.intr, ata_intr_handler);
+            dbg!(debug::DISK, "Registering disk {:?}", disk);
+            ::blockdev::register(disk.get_ref().channel.dev, disk);
         }
     }
 }
@@ -260,13 +259,13 @@ const DEFAULT_CHANNELS : [Channel; NUM_CHANNELS] = [Channel { cmd : ports::PRIMA
                                                                 busmaster : 0, } ];
 
 pub struct ATADisk {
-    channel           : Channel, // The channel we are on.
-    is_master         : bool,             // Master or slave. Currently must be master because no slave support.
-    size              : usize,             // Size of disk in sectors.
+    channel           : Channel,  // The channel we are on.
+    is_master         : bool,     // Master or slave. Currently must be master because no slave support.
+    size              : usize,    // Size of disk in sectors.
     sectors_per_block : usize,
-    mutex             : SMutex,           // Only one proc can be using the disk at any time.
-    queue             : WQueue,           // We need to sleep while holding the lock.
-    prd               : dma::Prd,         // The dma information.
+    mutex             : SMutex,   // Only one proc can be using the disk at any time.
+    queue             : WQueue,   // We need to sleep while holding the lock.
+    prd               : dma::Prd, // The dma information.
 }
 
 impl Show for ATADisk {
@@ -420,8 +419,6 @@ impl MMObjMut for ATADisk {
         let pgnum = pf.get_pagenum();
         self.write_to(pgnum, ref_slice(pf.get_page())).map(|_| ())
     }
-
-    fn show(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{:?}", self) }
 }
 
 impl Cacheable for ATADisk { fn is_still_useful(&self) -> bool { true } }

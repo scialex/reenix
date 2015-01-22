@@ -3,7 +3,7 @@
 /// caution and are only here to allow some stdlib provided initialization code.
 
 use core::prelude::*;
-use core::atomic::{AtomicUint, ATOMIC_UINT_INIT};
+use core::atomic::{AtomicUsize, ATOMIC_USIZE_INIT};
 use core::atomic::Ordering::*;
 
 /// We have never been called yet.
@@ -17,11 +17,11 @@ const INITIALIZED  : usize = 2;
 /// Use only with extreeme caution. Prefer procs::sync::Once if possible.
 pub struct SpinOnce {
     /// What the current state is.
-    state: AtomicUint,
+    state: AtomicUsize,
 }
 
 pub const SPIN_ONCE_INIT : SpinOnce = SpinOnce {
-    state: ATOMIC_UINT_INIT,
+    state: ATOMIC_USIZE_INIT,
 };
 
 impl SpinOnce {

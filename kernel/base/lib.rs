@@ -15,6 +15,7 @@
 extern crate libc;
 
 //pub use errno::*;
+pub use core::nonzero;
 
 // NOTE Needs to go first so everything else can get the macro's defined in it.
 #[macro_use] mod bitflags;

@@ -1,6 +1,6 @@
 
 use std::cell::*;
-use std::{marker, fmt};
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 type Borrowed = usize;
@@ -13,8 +13,6 @@ const WRITING : Borrowed = -1;
 pub struct ProcRefCell<T> {
     value: UnsafeCell<T>,
     borrow: Cell<Borrowed>,
-    nocopy: marker::NoCopy,
-    noshare: marker::NoSync,
 }
 
 impl<T> ProcRefCell<T> {
@@ -22,8 +20,6 @@ impl<T> ProcRefCell<T> {
         ProcRefCell {
             value: UnsafeCell::new(value),
             borrow: Cell::new(UNUSED),
-            nocopy: marker::NoCopy,
-            noshare: marker::NoSync,
         }
     }
 
