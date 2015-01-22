@@ -10,67 +10,97 @@
 #![crate_type="rlib"]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-
+#![feature(unsafe_destructor, int_uint, box_syntax)]
 #![no_std]
 
+extern crate base;
 #[macro_reexport(assert, assert_eq, debug_assert, write, writeln)]
-#[macro_use] extern crate "core" as rcore;
-#[macro_use] extern crate "collections" as rcollections;
+#[macro_use] extern crate core;
+#[macro_reexport(vec)]
+#[macro_use] extern crate "collections" as core_collections;
 extern crate "rand" as rrand;
-extern crate "alloc" as ralloc;
+extern crate alloc;
+extern crate libc;
+extern crate unicode;
 
-pub use ralloc::{boxed, rc};
-pub use rcore::{any, borrow, cell, char, clone, cmp, default};
-pub use rcore::{f32, f64, finally, hash, i16, i32, i64, i8, int, intrinsics};
-pub use rcore::{isize, iter, marker, mem, num, ops, option, panicking, ptr, raw};
-pub use rcore::{result, simd, slice, str, u16, u32, u64, u8, uint, usize};
-
-pub use rcollections::vec;
-pub use rcollections::string;
+pub use alloc::{boxed, rc};
+pub use core::{any, borrow, cell, clone, cmp, default};
+pub use core::{f32, f64, finally, hash, i16, i32, i64, i8, int, intrinsics};
+pub use core::{isize, iter, marker, mem, num, ops, option, panicking, ptr, raw};
+pub use core::{result, simd, u16, u32, u64, u8, uint, usize};
+pub use core_collections::{str, string, slice, vec};
+pub use unicode::char;
 
 #[macro_use] mod macros;
 
-pub mod collections {
-    pub use rcollections::*;
-}
+
+pub mod fmt;
+pub mod error;
+pub mod collections;
+pub mod ffi;
 
 pub mod rand {
-    pub use ::rrand::*;
+    pub use rrand::*;
+    /// This is just a front. We will use what we have, which is a IsaacRng. The rng will be based
+    /// on the current threads pid.
+    #[derive(Clone)]
+    #[allow(missing_copy_implementations)]
+    pub struct ThreadRng(IsaacRng);
+    impl Rng for ThreadRng {
+        fn next_u32(&mut self) -> u32 { self.0.next_u32() }
+    }
+    static mut base_seed : [u32; 256] = [0; 256];
+    /// Get an rng
+    pub fn thread_rng() -> ThreadRng {
+        use ::slice::*;
+        let mut rng = IsaacRng::new_unseeded();
+        rng.reseed(unsafe { &base_seed });
+        let bs : &'static mut [u32] = unsafe { &mut base_seed };
+        let len = bs.len();
+        bs[rng.gen_range(0, len)] = rng.gen();
+        ThreadRng(rng)
+    }
 }
 
 pub mod sync {
-    pub use rcore::atomic;
-    pub use ralloc::arc::{Arc, Weak};
+    pub use core::atomic;
+    pub use base::sync::SPIN_ONCE_INIT as ONCE_INIT;
+    pub use base::sync::SpinOnce as Once;
+    pub use alloc::arc::{Arc, Weak};
 }
-
-pub mod fmt {
-    pub use rcore::fmt::*;
-    pub fn format(args: Arguments) -> ::string::String {
-        let mut output = ::string::String::new();
-        let _ = write!(&mut output, "{}", args);
-        output
-    }
-}
-
-pub mod error;
 
 pub mod rt {
-    pub use ralloc::heap;
+    pub use alloc::heap;
 
     pub fn begin_unwind(msg: &str, fl: &(&'static str, usize)) -> ! {
-        ::rcore::panicking::panic_fmt(format_args!("{}", msg), fl)
+        ::core::panicking::panic_fmt(format_args!("{}", msg), fl)
     }
     pub fn begin_unwind_fmt(msg: ::fmt::Arguments, file_line: &(&'static str, usize)) -> ! {
-        ::rcore::panicking::panic_fmt(msg, file_line)
+        ::core::panicking::panic_fmt(msg, file_line)
     }
 }
 
 pub mod prelude {
     pub mod v1 {
-        pub use rcore::prelude::*;
-        pub use ralloc::boxed::Box;
-        pub use rcollections::vec::Vec;
-        pub use rcollections::string::{String, ToString};
+        pub use marker::{Copy, Send, Sized, Sync};
+        pub use ops::{Drop, Fn, FnMut, FnOnce};
+        pub use mem::drop;
+        pub use boxed::Box;
+        pub use char::CharExt;
+        pub use clone::Clone;
+        pub use cmp::{PartialEq, PartialOrd, Eq, Ord};
+        pub use iter::DoubleEndedIterator;
+        pub use iter::ExactSizeIterator;
+        pub use iter::{Iterator, IteratorExt, Extend};
+        pub use option::Option::{self, Some, None};
+        pub use ptr::{PtrExt, MutPtrExt};
+        pub use result::Result::{self, Ok, Err};
+        pub use slice::AsSlice;
+        pub use slice::{SliceExt, SliceConcatExt};
+        pub use str::{Str, StrExt};
+        pub use string::{String, ToString};
+        pub use vec::Vec;
+        pub use iter::range;
     }
 }
 
