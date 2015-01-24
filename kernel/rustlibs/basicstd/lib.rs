@@ -11,9 +11,9 @@
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![feature(unsafe_destructor, int_uint, box_syntax)]
+#![feature(optin_builtin_traits)]
 #![no_std]
 
-extern crate base;
 #[macro_reexport(assert, assert_eq, debug_assert, write, writeln)]
 #[macro_use] extern crate core;
 #[macro_reexport(vec)]
@@ -62,12 +62,15 @@ pub mod rand {
     }
 }
 
-pub mod sync {
-    pub use core::atomic;
-    pub use base::sync::SPIN_ONCE_INIT as ONCE_INIT;
-    pub use base::sync::SpinOnce as Once;
-    pub use alloc::arc::{Arc, Weak};
+mod thread {
+    pub struct Thread;
+    impl Thread {
+        pub fn panicking() -> bool {
+            false
+        }
+    }
 }
+pub mod sync;
 
 pub mod rt {
     pub use alloc::heap;
