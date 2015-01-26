@@ -155,12 +155,12 @@ pub mod page {
 
     pub unsafe fn alloc<T>() -> super::Allocation<*mut T> {
         let res = c_alloc();
-        if res.is_null() { Err(()) } else { Ok(res as *mut T) }
+        if res.is_null() { Err(super::AllocError) } else { Ok(res as *mut T) }
     }
 
     pub unsafe fn alloc_n<T>(pages: usize) -> super::Allocation<*mut T> {
         let res = c_alloc_n(pages as u32);
-        if res.is_null() { Err(()) } else { Ok(res as *mut T) }
+        if res.is_null() { Err(super::AllocError) } else { Ok(res as *mut T) }
     }
 
     #[inline]

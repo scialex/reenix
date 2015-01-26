@@ -172,13 +172,13 @@ impl TTYDriver for VirtualTerminal {
 
     fn redraw(&self) {
         let first_end = cmp::min(HISTORY_LINES, self.view_line + screen::UINT_DISPLAY_HEIGHT);
-        unsafe { screen::get_screen().put_lines(self.buf.slice(self.view_line, first_end), 0); }
+        unsafe { screen::get_screen().put_lines(&self.buf[self.view_line..first_end], 0); }
 
         let second_end = (self.view_line + screen::UINT_DISPLAY_HEIGHT) % HISTORY_LINES;
 
         if second_end < self.view_line && second_end != 0 {
             bassert!((HISTORY_LINES - self.view_line) + second_end == screen::UINT_DISPLAY_HEIGHT);
-            unsafe { screen::get_screen().put_lines(self.buf.slice(0, second_end), (first_end - self.view_line) as u8); }
+            unsafe { screen::get_screen().put_lines(&self.buf[0..second_end], (first_end - self.view_line) as u8); }
         } else {
             bassert!(first_end - self.view_line == screen::UINT_DISPLAY_HEIGHT);
         }

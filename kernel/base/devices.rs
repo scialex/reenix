@@ -3,7 +3,7 @@
 //! more about drivers.
 
 use cell::*;
-use core::fmt::{self, Show, Formatter};
+use core::fmt::{self, Debug, Formatter};
 use core::prelude::*;
 use errno::KResult;
 
@@ -28,7 +28,7 @@ impl DeviceId {
     }
 }
 
-impl Show for DeviceId {
+impl Debug for DeviceId {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "DeviceId({}.{})", self.get_major(), self.get_minor()) }
 }
 

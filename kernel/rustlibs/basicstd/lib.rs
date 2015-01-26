@@ -24,7 +24,7 @@ extern crate libc;
 extern crate unicode;
 
 pub use alloc::{boxed, rc};
-pub use core::{any, borrow, cell, clone, cmp, default};
+pub use core::{any, borrow, cell, clone, cmp, default, error};
 pub use core::{f32, f64, finally, hash, i16, i32, i64, i8, int, intrinsics};
 pub use core::{isize, iter, marker, mem, num, ops, option, panicking, ptr, raw};
 pub use core::{result, simd, u16, u32, u64, u8, uint, usize};
@@ -35,9 +35,7 @@ pub use unicode::char;
 
 
 pub mod fmt;
-pub mod error;
 pub mod collections;
-pub mod ffi;
 
 pub mod rand {
     pub use rrand::*;

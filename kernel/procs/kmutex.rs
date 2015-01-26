@@ -5,7 +5,7 @@
 use kqueue::KQueue;
 use std::intrinsics::size_of;
 use mm::alloc::request_slab_allocator;
-use std::fmt::{self, Show, Formatter};
+use std::fmt::{self, Debug, Formatter};
 use std::cell::*;
 use std::ptr::*;
 use std::sync::atomic::*;
@@ -72,7 +72,7 @@ impl KMutex {
     }
 }
 
-impl Show for KMutex {
+impl Debug for KMutex {
     fn fmt(&self, f : &mut Formatter) -> fmt::Result {
         write!(f, "KMutex '{}' {{ held: {}, waiters: {} }}", self.name, self.held.load(Ordering::SeqCst),
                 unsafe { self.queue.get().as_mut().expect("Kmutex queue cannot be null")}.len())

@@ -207,13 +207,15 @@ impl<'b, T> DerefMut for SilentProcRefMut<'b, T> {
     }
 }
 
-impl<'b, T: fmt::Show> fmt::Show for SilentProcRef<'b, T> {
+impl<'b, T: fmt::Debug> fmt::Debug for SilentProcRef<'b, T> {
+    #[allow(deprecated)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (**self).fmt(f)
     }
 }
 
-impl<'b, T: fmt::Show> fmt::Show for SilentProcRefMut<'b, T> {
+impl<'b, T: fmt::Debug> fmt::Debug for SilentProcRefMut<'b, T> {
+    #[allow(deprecated)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (*(self.deref())).fmt(f)
     }
@@ -300,13 +302,15 @@ impl<'b, T> DerefMut for ProcRefMut<'b, T> {
     }
 }
 
-impl<'b, T: fmt::Show> fmt::Show for ProcRef<'b, T> {
+impl<'b, T: fmt::Debug> fmt::Debug for ProcRef<'b, T> {
+    #[allow(deprecated)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (**self).fmt(f)
     }
 }
 
-impl<'b, T: fmt::Show> fmt::Show for ProcRefMut<'b, T> {
+impl<'b, T: fmt::Debug> fmt::Debug for ProcRefMut<'b, T> {
+    #[allow(deprecated)]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         (*(self.deref())).fmt(f)
     }

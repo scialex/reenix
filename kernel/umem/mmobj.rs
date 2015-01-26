@@ -14,7 +14,7 @@ use util::pinnable_cache::*;
 // Cheating to get a uuid by just incrementing a counter. This is not really good in general but we
 // have 48 bits, which means we will probably never really run out...
 // There has got to be a better way but this is just easier for now.
-#[derive(Copy, Eq, PartialEq, Show)]
+#[derive(Copy, Eq, PartialEq, Debug)]
 pub struct MMObjId(DeviceId, u32);
 //const FAKE_DEVICE : DeviceId = DeviceId_static!(0xFF,0x00);
 //static mut NEXT_ID : MMObjId = MMObjId(FAKE_DEVICE,0);
@@ -38,7 +38,7 @@ impl Ord for MMObjId {
 
 /// An mmobj that needs interior mutability. This is used just like a regular mmobj through the use
 /// of cells.
-pub trait MMObjMut : fmt::Show {
+pub trait MMObjMut : fmt::Debug {
     /// Return an MMObjId for this object.
     fn get_id(&self) -> MMObjId;
 
@@ -68,7 +68,7 @@ pub trait MMObjMut : fmt::Show {
     fn clean_page(&mut self, pf: &pframe::PFrame) -> KResult<()>;
 }
 
-pub trait MMObj : fmt::Show {
+pub trait MMObj : fmt::Debug {
     /// Return an MMObjId for this object.
     fn get_id(&self) -> MMObjId;
 

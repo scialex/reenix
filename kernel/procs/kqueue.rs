@@ -126,7 +126,7 @@ impl sync::Wakeup for WQueue {
     /// Wake up all waiting threads in this queue.
     fn signal(&self) { self.get_inner().signal(); }
 }
-impl fmt::Show for WQueue {
+impl fmt::Debug for WQueue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         block_interrupts!( write!(f, "WQueue {{ waiters: {} }}", self.get_inner().len()) )
     }

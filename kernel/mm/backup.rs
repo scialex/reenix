@@ -340,7 +340,7 @@ impl BackupAllocator {
     }
 }
 
-impl fmt::Show for BackupAllocator {
+impl fmt::Debug for BackupAllocator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "BackupAllocator {{ used: {}, npages: {}, threshold: {} (pages), largest_space: {} (pages), total_space: {} }}",
                self.is_used(), self.pages, self.threshold_pages, self.largest_space, self.calc_total_space())

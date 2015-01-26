@@ -17,7 +17,6 @@ use core::{fmt, mem, ptr};
 use libc::{size_t, c_void, c_int};
 use slabmap::{SlabMap, DEFAULT_SLAB_MAP};
 use backup::{BackupAllocator, DEFAULT_BACKUP_ALLOCATOR};
-use core::fmt::Show;
 use page;
 
 /// An allocator is a type that can allocate memory. It is currently a wrapper around C functions.
@@ -50,7 +49,13 @@ static mut BASE_ALLOCATOR : Allocator = Allocator {
 };
 
 /// A type representing that we had an error allocating. We might put more in this eventually.
-pub type AllocError = ();
+#[derive(Copy)]
+pub struct AllocError;
+impl fmt::Debug for AllocError {
+    fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
+        write!(w, "AllocError")
+    }
+}
 /// The result of an allocation.
 pub type Allocation<T> = Result<T, AllocError>;
 
@@ -151,7 +156,7 @@ impl SlabAllocator {
     }
 }
 
-impl fmt::Show for SlabAllocator {
+impl fmt::Debug for SlabAllocator {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         let name  = self.get_name();
         let size  = self.get_size();
@@ -202,7 +207,7 @@ pub fn request_slab_allocator(name: &'static str, size: size_t) {
     ba.request_slab_allocator(name, size);
 }
 
-impl fmt::Show for Allocator {
+impl fmt::Debug for Allocator {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(writeln!(f, "Weenix allocator"));
         try!(writeln!(f, "{:?}", self.slabs));
@@ -461,9 +466,9 @@ pub fn stats_print() {
 }
 
 #[precond = "requests_closed()"]
-pub fn get_stats() -> &'static (fmt::Show + 'static) {
+pub fn get_stats() -> &'static (fmt::Debug + 'static) {
     let x = unsafe { &BASE_ALLOCATOR };
-    x as &'static fmt::Show
+    x as &'static fmt::Debug
 }
 
 /// Return's true if we have low memory and have a better then even chance of failing to allocate a

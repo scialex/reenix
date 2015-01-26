@@ -11,7 +11,7 @@ use procs::interrupt;
 use procs::sync::*;
 use base::errno::{KResult, self};
 use libc::c_void;
-use std::fmt::{self, Formatter, Show};
+use std::fmt::{self, Formatter, Debug};
 use umem::mmobj::{MMObjId, MMObjMut};
 use umem::pframe::PFrame;
 use RDeviceMut;
@@ -268,7 +268,7 @@ pub struct ATADisk {
     prd               : dma::Prd, // The dma information.
 }
 
-impl Show for ATADisk {
+impl Debug for ATADisk {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "{}-ATADisk {{ channel: {:?}, size: {}k }}",
                if self.is_master { "master" } else {"slave"}, self.channel, ((self.size/self.sectors_per_block)*BLOCK_SIZE)/1024)

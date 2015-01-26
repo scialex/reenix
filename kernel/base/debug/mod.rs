@@ -56,7 +56,7 @@ pub fn dbg_pid() -> MaybePid {
 #[derive(Copy)]
 pub struct MaybePid(Option<::pid::ProcId>);
 
-impl fmt::Show for MaybePid {
+impl fmt::Debug for MaybePid {
     #[no_stack_check]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.0 {

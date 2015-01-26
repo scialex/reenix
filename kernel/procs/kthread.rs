@@ -11,7 +11,7 @@ use std::ptr::{self, copy_nonoverlapping_memory};
 use kqueue::KQueue;
 use context::{Context, ContextFunc};
 use mm::pagetable::PageDir;
-use mm::AllocError;
+use mm::{AllocError, Allocation};
 
 pub static CUR_THREAD_SLOT : usize = 0;
 pub static DEFAULT_STACK_PAGES : usize = 16;
@@ -20,11 +20,11 @@ pub static DEFAULT_STACK_PAGES : usize = 16;
 pub struct KStack(usize, *mut u8);
 
 impl KStack {
-    pub fn with_size(pages : usize) -> Result<KStack,()> {
+    pub fn with_size(pages : usize) -> Allocation<KStack> {
         Ok(KStack(pages, try!(unsafe { page::alloc_n::<u8>(pages) })))
     }
 
-    pub fn new() -> Result<KStack, ()> {
+    pub fn new() -> Allocation<KStack> {
         KStack::with_size(DEFAULT_STACK_PAGES)
     }
 
@@ -63,10 +63,10 @@ impl Drop for KStack {
     }
 }
 
-#[derive(Show, Copy)]
+#[derive(Debug, Copy)]
 pub enum Mode { USER, KERNEL }
 
-#[derive(Show, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Copy)]
 pub enum State { NOSTATE, RUN, SLEEP, SLEEPCANCELLABLE, EXITED }
 
 pub struct KThread {
@@ -95,7 +95,7 @@ impl<S: hash::Writer + hash::Hasher> hash::Hash<S> for KThread {
 }
 
 impl KThread {
-    pub fn new(pdir: &Box<PageDir>, main: ContextFunc, arg1 : i32, arg2 : *mut c_void) -> Result<KThread, AllocError> {
+    pub fn new(pdir: &Box<PageDir>, main: ContextFunc, arg1 : i32, arg2 : *mut c_void) -> Allocation<KThread> {
         let kstack = try!(KStack::new());
         Ok(KThread {
             ctx       : unsafe { Context::new(main, arg1, arg2, kstack.ptr() as *mut u8,
@@ -162,7 +162,7 @@ impl KThread {
     }
 }
 
-impl fmt::Show for KThread {
+impl fmt::Debug for KThread {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "KThread {{ cancelled: {}, state: {:?}, errno: {:?} }}",
                self.cancelled, self.state, self.errno)

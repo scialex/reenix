@@ -21,22 +21,22 @@ impl<T> SafeCell<T> {
     pub fn get_mut<'a>(&'a self) -> SafeMutRef<'a, T> { SafeMutRef(&self.inner) }
 }
 
-impl<T> fmt::Show for SafeCell<T> where T: fmt::Show {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&self.get_ref() as &fmt::Show).fmt(f) }
+impl<T> fmt::Debug for SafeCell<T> where T: fmt::Debug {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&self.get_ref() as &fmt::Debug).fmt(f) }
 }
 
-impl<T> fmt::String for SafeCell<T> where T: fmt::String {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&self.get_ref() as &fmt::String).fmt(f) }
+impl<T> fmt::Display for SafeCell<T> where T: fmt::Display {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&self.get_ref() as &fmt::Display).fmt(f) }
 }
 
 pub struct SafeMutRef<'a, T: 'a>(&'a UnsafeCell<T>);
 
-impl<'a, T> fmt::Show for SafeMutRef<'a, T> where T: fmt::Show {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Show).fmt(f) }
+impl<'a, T> fmt::Debug for SafeMutRef<'a, T> where T: fmt::Debug {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Debug).fmt(f) }
 }
 
-impl<'a, T> fmt::String for SafeMutRef<'a, T> where T: fmt::String {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::String).fmt(f) }
+impl<'a, T> fmt::Display for SafeMutRef<'a, T> where T: fmt::Display {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Display).fmt(f) }
 }
 
 impl<'a, T> DerefMut for SafeMutRef<'a, T> {
@@ -60,10 +60,10 @@ impl<'a, T> Deref for SafeRef<'a, T> {
         unsafe { self.0.get().as_ref().expect("SafeCell cannot be null") }
     }
 }
-impl<'a, T> fmt::Show for SafeRef<'a, T> where T: fmt::Show {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Show).fmt(f) }
+impl<'a, T> fmt::Debug for SafeRef<'a, T> where T: fmt::Debug {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Debug).fmt(f) }
 }
 
-impl<'a, T> fmt::String for SafeRef<'a, T> where T: fmt::String {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::String).fmt(f) }
+impl<'a, T> fmt::Display for SafeRef<'a, T> where T: fmt::Display {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Display).fmt(f) }
 }

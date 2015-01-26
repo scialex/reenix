@@ -120,7 +120,7 @@ pub mod tsd {
         pub fn pop_slot(&mut self, i : usize) -> Option<Box<Any>> { self.data.remove(&i) }
         pub fn remove_slot(&mut self, i : usize) -> bool { self.pop_slot(i).is_some() }
     }
-    impl fmt::Show for TSDInfo {
+    impl fmt::Debug for TSDInfo {
         fn fmt(&self, f : &mut fmt::Formatter) -> fmt::Result {
             write!(f, "TSDInfo {{ stack_high: 0x{:x}, {} data items }}", self.stack_high, self.data.len())
         }

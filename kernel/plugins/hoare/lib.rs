@@ -350,7 +350,6 @@ fn fn_body(cx: &ExtCtxt,
            stmts: Vec<P<ast::Stmt>>,
            sp: Span) -> P<ast::Block> {
     P(ast::Block {
-        view_items: vec!(),
         stmts: stmts,
         expr: Some(result_expr(&*cx)),
         id: ast::DUMMY_NODE_ID,

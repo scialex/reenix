@@ -326,7 +326,7 @@ impl Drop for PFrame {
     }
 }
 
-impl fmt::Show for PFrame {
+impl fmt::Debug for PFrame {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "PFrame {{ page: {}, flags: {:?}, obj: {:?} }}",
                self.pagenum, self.flags.get(), self.get_mmo())

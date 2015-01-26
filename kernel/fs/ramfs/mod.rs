@@ -11,7 +11,8 @@ use std::sync::atomic::AtomicUint;
 use std::sync::atomic::Ordering::{SeqCst, Relaxed};
 use std::{slice, mem, fmt};
 use std::cell::*;
-use umem::mmobj::MMObj;
+use std::slice::bytes::copy_memory;
+use umem::mmobj::{MMObjId, MMObj};
 
 use self::RVNode::*;
 
@@ -138,14 +139,14 @@ impl<'a> VNode for RVNode<'a> {
     }
 
     // TODO Maybe this should be &Self for from...
-    fn link(&self, from: &Self, to: &str) -> KResult<()> { Err(errno::ENOTDIR) }
-    fn unlink(&self, to: &str) -> KResult<()> { Err(errno::ENOTDIR) }
-    fn mkdir(&self, to: &str) -> KResult<()> { Err(errno::ENOTDIR) }
-    fn rmdir(&self, to: &str) -> KResult<()> { Err(errno::ENOTDIR) }
+    fn link(&self, to: &str) -> KResult<()> { if let Directory(d) = *self { d.link(to) } else { Err(errno::ENOTDIR) } }
+    fn unlink(&self, to: &str) -> KResult<()> { if let Directory(d) = *self { d.unlink(to) } else { Err(errno::ENOTDIR) } }
+    fn mkdir(&self, to: &str) -> KResult<()> { if let Directory(d) = *self { d.mkdir(to) } else { Err(errno::ENOTDIR) } }
+    fn rmdir(&self, to: &str) -> KResult<()> { if let Directory(d) = *self { d.rmdir(to) } else { Err(errno::ENOTDIR) } }
     /// Given offset into directory returns the size of the dirent in the directory structure and
     /// the given dirent. If it returns EOK then we have read the whole directory. To read the next
     /// entry add the returned length to the offset.
-    fn readdir(&self, off: usize) -> KResult<(usize, DirEnt)> { Err(errno::ENOTDIR) }
+    fn readdir(&self, off: usize) -> KResult<(usize, DirEnt)> { if let Directory(d) = *self { d.readdir(off) } else { Err(errno::ENOTDIR) } }
 }
 
 #[deriving(Show)]
@@ -163,10 +164,21 @@ impl Inode {
     fn incr(&self) {
         self.links.fetch_add(1, Relaxed);
     }
+    fn get_size(&self) -> usize { self.size.load(Relaxed) }
     fn decr(&self) {
         bassert!(self.links.fetch_sub(1, Relaxed) != 0, "decr called when no links present");
     }
     fn get_link_count(&self) -> usize { self.links.load(Relaxed) }
+    fn new(n: InodeNum) -> Inode {
+        Inode {
+            size: AtomicUint::new(0),
+            num: n,
+            mem: page::alloc().unwrap(),
+            mode: vnode::Unused,
+            links: AtomicUint::new(0),
+            devid: None,
+        }
+    }
 }
 
 struct ByteInode<'a> {
@@ -214,6 +226,17 @@ impl<'a> RegInode<'a> {
         bassert!(inode.mode == vnode::Regular);
         inode.incr();
         RegInode { inode: inode, fs: fs }
+    }
+
+    fn read(&self, off: usize, buf: &mut [u8]) -> KResult<usize> {
+        use std::cmp::{max, min};
+        use std::slice::{bytes, from_raw_buf};
+        let ret = max(0, min(buf.len() as usize, self.inode.get_size() - off));
+        unsafe { 
+            let src =  from_raw_buf(self.inode.mem, page::SIZE);
+            bytes::copy_memory(buf, src[off..off + ret]);
+        }
+        Ok(ret)
     }
 }
 impl<'a> Drop for RegInode<'a> { fn drop(&mut self) { self.inode.decr() } }
@@ -409,6 +432,9 @@ impl RamFS {
         let inodes : [Inode; MAX_INODES] = mem::uninitialized();
         //let memory : *mut u8 = 
 
+        for i in range(0, MAX_INODES) {
+            inodes[i] = Inode::new();
+        }
 
         RamFS { inodes: UnsafeCell::new(inodes) }
     }

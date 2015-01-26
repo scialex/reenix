@@ -362,7 +362,7 @@ impl<K: Ord, V> ops::Index<K> for LruCache<K, V> {
 
 impl<K: Clone + Ord, V: Clone> Clone for LruCache<K, V> {
     fn clone(&self) -> LruCache<K, V> {
-        let mut nc = LruCache::new().unwrap();
+        let mut nc = match LruCache::new() { Ok(v) => v, Err(_) => { panic!("Unable to clone an lru cache"); } };
         for (k, v) in self.iter_least() { nc.insert(k.clone(), v.clone()); }
         nc
     }
@@ -376,15 +376,19 @@ impl<K: Ord, V> Extend<(K, V)> for LruCache<K, V> {
 
 impl<K: Ord, V> FromIterator<(K, V)> for LruCache<K, V> {
     fn from_iter<T: Iterator<Item = (K, V)>>(iter: T) -> LruCache<K, V> {
-        let mut nc = LruCache::new().unwrap();
+        let mut nc = match LruCache::new() { Ok(v) => v, Err(_) => { panic!("Unable to make an lru cache"); } };
         nc.extend(iter);
         nc
     }
 }
 
-impl<K: Ord, V> Default for LruCache<K, V> { fn default() -> LruCache<K, V> { LruCache::new().unwrap() } }
+impl<K: Ord, V> Default for LruCache<K, V> {
+    fn default() -> LruCache<K, V> {
+        LruCache::new().unwrap_or_else(|:_| { panic!("Unable to create lru cache");})
+    }
+}
 
-impl<K: fmt::Show + Ord, V: fmt::Show> fmt::Show for LruCache<K, V> {
+impl<K: fmt::Show + Ord, V: fmt::Debug> fmt::Debug for LruCache<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(f, "LruCache (len: {}) {{", self.len()));
         let mut first = true;

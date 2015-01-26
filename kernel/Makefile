@@ -117,6 +117,8 @@ docs: $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 LIBALLOC_RSFLAGS := -A dead_code --cfg feature=\"external_crate\" --extern external=$(call lib-name,mm) \
                     -C opt-level=$(DEFAULT_CRATE_OPT)
 LIBALLOC_RDFLAGS := --cfg external_crate --extern external=$(call lib-name,mm)
+BASICSTD_RSFLAGS := --cfg feature=\"spin\" -C opt-level=$(DEFAULT_CRATE_OPT)
+BASICSTD_RDFLAGS := --cfg feature=\"spin\"
 # TODO For some reason LLVM doesn't like -O2 in drivers.
 DRIVERS_RSFLAGS  := -C opt-level=1 --extern std=$(call lib-name,basicstd)
 DRIVERS_RDFLAGS  := --extern std=$(call lib-name,basicstd)
@@ -140,14 +142,14 @@ $(eval $(call crate-rule,      mm,          $(HOST_CRATES) core libc base))
 $(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
 # basicstd is a libstd mock with core, rand, alloc and collections.
-$(eval $(call crate-rule,      basicstd,    core alloc collections rand))
+$(eval $(call long-crate-rule, basicstd,    core alloc collections rand, $(BASICSTD_RSFLAGS), $(BASICSTD_RDFLAGS)))
 $(eval $(call crate-rule,      startup,     $(BASIC_REQS)))
 $(eval $(call std-crate-rule,  arena,       $(BASIC_REQS),                    basicstd))
 $(eval $(call std-crate-rule,  util,        $(BASIC_REQS),                    basicstd))
 $(eval $(call std-crate-rule,  procs,       $(BASIC_REQS) util startup,       basicstd))
 $(eval $(call std-crate-rule,  umem,        $(BASIC_REQS) procs util startup, basicstd))
 #$(eval $(call std-crate-rule,  pageoutd,    $(BASIC_REQS) util procs,         basicstd))
-$(eval $(call std-crate-rule,  fs,          $(BASIC_REQS) umem procs,         basicstd))
+$(eval $(call std-crate-rule,  fs,          $(BASIC_REQS) umem procs drivers, basicstd))
 $(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem basicstd,$(DRIVERS_RSFLAGS), $(DRIVERS_RDFLAGS)))
 $(eval $(call std-crate-rule,  main,        $(MAIN_REQS), basicstd))
 

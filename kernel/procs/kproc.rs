@@ -18,6 +18,7 @@ use sync::Wait;
 use mm::pagetable::PageDir;
 use mm::AllocError;
 use util::uid::*;
+use mm::Allocation;
 
 pub use self::WaitProcId::*;
 pub use base::pid::*;
@@ -77,7 +78,7 @@ pub fn init_stage2() {
     unsafe {
         let y : Box<BTreeMap<ProcId, Rc<ProcRefCell<KProc>>>> = box BTreeMap::new();
         PROC_LIST = transmute(y);
-        let z : Box<UIDSource<ProcId>> = box UIDSource::new(ProcId(0)).unwrap();
+        let z : Box<UIDSource<ProcId>> = box UIDSource::new(ProcId(0)).unwrap_or_else(|:_| { panic!("unable to create pid source"); });
         PID_GEN = transmute(z);
     }
 }
@@ -286,9 +287,9 @@ impl KProc {
     }
 
     /// The base creation function for a process. This should not generally be used.
-    pub fn create(name: String) -> Result<KProc, AllocError> {
+    pub fn create(name: String) -> Allocation<KProc> {
         Ok(KProc {
-            pid : try!(get_pid().ok_or_else(|| { dbg!(debug::PROC, "Unable to allocate PID!"); () })),
+            pid : try!(get_pid().ok_or_else(|| { dbg!(debug::PROC, "Unable to allocate PID!"); AllocError })),
             command : name,
             // TODO Maybe I should just have this be a box for now.
             threads : try!(alloc!(try BTreeMap::new())),
@@ -296,7 +297,7 @@ impl KProc {
             status : 0,
             state : ProcState::RUNNING,
             parent : None,
-            pagedir : try!(alloc!(try_box PageDir::new())),
+            pagedir : try!(alloc!(try box PageDir::new())),
             wait : try!(alloc!(try WQueue::new())),
         })
     }
@@ -435,7 +436,7 @@ impl Drop for KProc {
     }
 }
 
-impl fmt::Show for KProc {
+impl fmt::Debug for KProc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "KProc {:?} ({:?} {:p})", self.pid, self.command, self)
     }

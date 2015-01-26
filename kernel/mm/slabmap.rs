@@ -15,12 +15,12 @@ pub struct SlabMap {
     cnt : usize,
 }
 
-impl fmt::Show for SlabMap {
+impl fmt::Debug for SlabMap {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(w, "SlabMap (size: {}) [", self.len()));
         if self.cnt != 0 {
             try!(write!(w, "{:?}", self.vals[0].expect("shouldn't be null")));
-            for &i in self.vals.slice(1, self.cnt).iter() {
+            for &i in self.vals[1..self.cnt].iter() {
                 try!(write!(w, ", {:?}", i.expect("shouldn't be null")));
             }
         }
@@ -93,7 +93,7 @@ impl SlabMap {
     }
 
     pub fn find_smallest(&self, key: usize) -> Option<SlabAllocator> {
-        match self.vals.slice_to(self.cnt).binary_search_by(|&:v| -> cmp::Ordering { (v.expect("should have value").get_size() as usize).cmp(&key) }) {
+        match self.vals[..self.cnt].binary_search_by(|&:v| -> cmp::Ordering { (v.expect("should have value").get_size() as usize).cmp(&key) }) {
             Ok(v)  => Some(self.vals[v].expect("should have value")),
             Err(v) => if v == self.cnt { None } else { Some(self.vals[v].expect("should have value")) },
         }

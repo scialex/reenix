@@ -13,14 +13,14 @@ macro_rules! alloc {
     // TODO This is rather wordy and arbitrary.
     (try $f:expr) => ({
         use $crate::alloc;
-        use std::mem;
+        use ::std::mem;
         if alloc::is_memory_low() {
-            Err(())
+            Err(alloc::AllocError)
         } else {
             let x = $f;
             if alloc::is_memory_low() {
                 mem::drop(x);
-                Err(())
+                Err(alloc::AllocError)
             } else {
                 Ok(x)
             }
@@ -28,15 +28,15 @@ macro_rules! alloc {
     });
     (try_box $e:expr) => ({
         use $crate::alloc;
-        use std::mem;
+        use ::std::mem;
         if alloc::is_memory_low() {
-            Err(())
+            Err(alloc::AllocError)
         } else {
             let x = box $e;
 
             if alloc::is_memory_low() {
                 mem::drop(x);
-                Err(())
+                Err(alloc::AllocError)
             } else {
                 Ok(x)
             }

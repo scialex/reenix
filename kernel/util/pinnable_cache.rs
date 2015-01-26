@@ -59,7 +59,7 @@ impl<K: Ord, V: Cacheable> CacheItem<K, V> {
     // TODO
 }
 
-impl<K: fmt::Show, V: fmt::Show> fmt::Show for CacheItem<K, V> {
+impl<K: fmt::Show, V: fmt::Show> fmt::Debug for CacheItem<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{{ pinned: {}, val: {:?} }}", self.pcnt.load(Ordering::SeqCst), self.val) }
 }
 
