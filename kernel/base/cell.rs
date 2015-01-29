@@ -22,21 +22,21 @@ impl<T> SafeCell<T> {
 }
 
 impl<T> fmt::Debug for SafeCell<T> where T: fmt::Debug {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&self.get_ref() as &fmt::Debug).fmt(f) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&*self.get_ref()).fmt(f) }
 }
 
 impl<T> fmt::Display for SafeCell<T> where T: fmt::Display {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&self.get_ref() as &fmt::Display).fmt(f) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&*self.get_ref()).fmt(f) }
 }
 
 pub struct SafeMutRef<'a, T: 'a>(&'a UnsafeCell<T>);
 
 impl<'a, T> fmt::Debug for SafeMutRef<'a, T> where T: fmt::Debug {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Debug).fmt(f) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&**self).fmt(f) }
 }
 
 impl<'a, T> fmt::Display for SafeMutRef<'a, T> where T: fmt::Display {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Display).fmt(f) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&**self).fmt(f) }
 }
 
 impl<'a, T> DerefMut for SafeMutRef<'a, T> {
@@ -61,9 +61,9 @@ impl<'a, T> Deref for SafeRef<'a, T> {
     }
 }
 impl<'a, T> fmt::Debug for SafeRef<'a, T> where T: fmt::Debug {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Debug).fmt(f) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&**self).fmt(f) }
 }
 
 impl<'a, T> fmt::Display for SafeRef<'a, T> where T: fmt::Display {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { ((&*self) as &fmt::Display).fmt(f) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { (&**self).fmt(f) }
 }
