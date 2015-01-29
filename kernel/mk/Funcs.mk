@@ -37,6 +37,7 @@ else ifneq (,$$(findstring $(1),$$(TARGET_CRATES)))
 else
     $$(error $(1) is not given any type of crate!)
 endif
+$(strip $(1))_PRESENT := 1
 $(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) $$(TMP_SBCN_FLAG) --print file-names $(strip $(2))/lib.rs 2>/dev/null))
 $(strip $(1))_DIR  := $(strip $(2))
 $(strip $(1))_DOC  := $$(call base-doc-name,$(strip $(1)))
@@ -77,6 +78,10 @@ endef
 # $(1) is the name of the crate
 define lib-name
 $(foreach l,$(1),$($(l)_LIB))
+endef
+
+define is-present
+$($(strip $(1))_PRESENT)
 endef
 
 # Get the file name of documentation for a crate
@@ -198,24 +203,24 @@ endef
 # $(4) is any rustdoc flags you want.
 # $(5) is any addional files to depend on
 define base-crate-rule
-$(call local-var-init, TMP_BCR_RSFILES,$$(shell find $(call dir-name,$(1))/ -type f -name "*.rs"))
-$(call local-var-init, TMP_BCR_CRATES,)
-
-$(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $$(call lib-name,$(2))
+ifeq ($(call is-present, $(1)),1)
+$(call local-var-init, TMP_BCR_RSFILES,$$(shell find $$(call dir-name,$(1)) -type f -name "*.rs"))
+$(call local-var-init, TMP_BCR_CRATES,$$(call lib-name,$(2)))
+$(call local-var-init, TMP_BCR_EXTERNS,$$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))))
+$(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES)
 	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..."
-	$$(HIDE_SIGIL) $$(RUST) $$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))) \
-		                    $(3) $$(call dir-name,$(1))/lib.rs                         \
-						   	--out-dir $$(dir $(call lib-name,$(1)))
+	$$(HIDE_SIGIL) $$(RUST) $(TMP_BCR_EXTERNS) $(3) $$(call dir-name,$(1))/lib.rs --out-dir $$(dir $(call lib-name,$(1)))
 
-$(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $$(call lib-name,$(2)) | $$(call doc-name,$(2))
+$(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES) | $$(call doc-name,$(2))
 	@ echo "[RDOC] Documenting \"kernel/$$(call dir-name,$(1))\"..."
-	$$(HIDE_SIGIL) $$(RUSTDOC) $$(foreach l,$(2),--extern $$(l)=$$(call lib-name,$$(l))) \
-	                           $(4)                                                      \
-							   --output $$(DOC_DIR)                                      \
-							   $$(call dir-name,$(1))/lib.rs
+	$$(HIDE_SIGIL) $$(RUSTDOC) $(TMP_BCR_EXTERNS) $(4) --output $$(DOC_DIR) $$(call dir-name,$(1))/lib.rs
 
 $(call local-var-destroy, TMP_BCR_RSFILES)
 $(call local-var-destroy, TMP_BCR_CRATES)
+$(call local-var-destroy, TMP_BCR_EXTERNS)
+else
+$$(warning Found build rule for unknown crate '$(1)'. Did you remember to call a set-*-name function with it?)
+endif
 endef
 
 # A Crate with custom flags
