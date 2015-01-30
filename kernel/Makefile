@@ -30,7 +30,7 @@ CFLAGS  += -D__KERNEL__
 ###
 
 # Crates for the kernel. they are in <name>/
-REENIX_CRATES  := main base mm startup procs drivers util umem fs
+REENIX_CRATES  := main base mm startup procs drivers util umem #fs
 
 # Crates from the Rust standard library
 BUILTIN_CRATES := alloc arena core collections unicode rand
@@ -132,19 +132,20 @@ $(eval $(call plugin-rule, hoare  ,))
 MAIN_REQS := $(filter-out main, $(CRATES)) morestack compiler-rt
 
 # Reenix Crates.
-BASIC_REQS := alloc base collections core libc mm $(HOST_CRATES)
+BASIC_REQS := base libc $(HOST_CRATES)
 $(eval $(call crate-rule,      core,  ))
 $(eval $(call crate-rule,      libc,        core))
 $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
 $(eval $(call crate-rule,      base,        bassert enabled core libc))
-$(eval $(call crate-rule,      mm,          $(HOST_CRATES) core libc base))
-$(eval $(call long-crate-rule, alloc,       core libc mm,                $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
+$(eval $(call crate-rule,      mm,          $(BASIC_REQS) core))
+$(eval $(call long-crate-rule, alloc,       core libc mm,                        $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
 # basicstd is a libstd mock with core, rand, alloc and collections.
-$(eval $(call long-crate-rule, basicstd,    core alloc collections rand, $(BASICSTD_RSFLAGS), $(BASICSTD_RDFLAGS)))
-$(eval $(call crate-rule,      startup,     $(BASIC_REQS)))
-$(eval $(call std-crate-rule,  arena,       $(BASIC_REQS),                    basicstd))
+STD_REQS := core alloc collections rand unicode
+$(eval $(call long-crate-rule, basicstd,    core alloc collections rand unicode, $(BASICSTD_RSFLAGS), $(BASICSTD_RDFLAGS)))
+$(eval $(call std-crate-rule,  arena,       ,                                 basicstd))
+$(eval $(call std-crate-rule,  startup,     $(BASIC_REQS),                    basicstd))
 $(eval $(call std-crate-rule,  util,        $(BASIC_REQS),                    basicstd))
 $(eval $(call std-crate-rule,  procs,       $(BASIC_REQS) util startup,       basicstd))
 $(eval $(call std-crate-rule,  umem,        $(BASIC_REQS) procs util startup, basicstd))

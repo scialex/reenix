@@ -1,11 +1,8 @@
 // TODO Copyright Header
 #![crate_name="startup"]
 #![crate_type="rlib"]
-#![no_std]
 #![feature(asm, concat_idents, lang_items, intrinsics)]
 #![feature(core)]
-#![feature(alloc)]
-#![feature(collections)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
@@ -18,11 +15,8 @@
 // TODO This should be placed before base in initialization and we should
 // remove the pci stuff to drivers.
 
-#[macro_use] extern crate core;
 #[macro_use] extern crate base;
 extern crate mm;
-extern crate collections;
-extern crate alloc;
 extern crate libc;
 
 #[no_stack_check]
@@ -75,14 +69,13 @@ pub mod pit {
 
 /// Thread specific data support.
 pub mod tsd {
-    use alloc::boxed::*;
-    use collections::*;
-    use core::prelude::*;
-    use core::any::Any;
-    use core::fmt;
+    use std::boxed::*;
+    use std::collections::*;
+    use std::any::Any;
+    use std::fmt;
     pub fn init_stage1() {
         use mm::alloc::request_slab_allocator;
-        use core::intrinsics::size_of;
+        use std::intrinsics::size_of;
         request_slab_allocator("Thread Specific Data (TSD) allocator", unsafe { size_of::<TSDInfo>() as u32 });
         request_slab_allocator("Very small object allocator", 8);
     }
@@ -138,7 +131,7 @@ pub mod tsd {
 // TODO I should move this to rust.
 pub mod gdt {
     use libc::{c_void, c_int};
-    use core::ptr::*;
+    use std::ptr::*;
     pub const ZERO        : u16 = 0;
     pub const KERNEL_TEXT : u16 = 0x08;
     pub const KERNEL_DATA : u16 = 0x10;
@@ -192,9 +185,3 @@ pub mod gdt {
     }
 }
 
-
-#[doc(hidden)]
-mod std {
-    pub use core::marker;
-    pub use core::fmt;
-}
