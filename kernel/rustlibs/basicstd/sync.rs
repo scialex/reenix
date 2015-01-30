@@ -11,7 +11,7 @@ pub use alloc::arc::{Arc, Weak};
 #[cfg(feature="spin")] pub use self::spin::*;
 #[cfg(feature="spin")] pub use self::poison::*;
 
-#[cfg(feature="spin")] mod poison;
+#[cfg(feature="spin")] #[path="../../../external/rust/src/libstd/sync/poison.rs"] mod poison;
 #[cfg(feature="spin")] mod spin {
     use super::atomic::{AtomicBool, AtomicUsize, ATOMIC_USIZE_INIT};
     use super::atomic::Ordering::SeqCst;

@@ -26,21 +26,24 @@
 #[macro_use] extern crate "collections" as core_collections;
 extern crate "rand" as rrand;
 extern crate alloc;
-extern crate libc;
 extern crate unicode;
 
 pub use alloc::{boxed, rc};
 pub use core::{any, borrow, cell, clone, cmp, default, error};
 pub use core::{f32, f64, finally, hash, i16, i32, i64, i8, int, intrinsics};
-pub use core::{isize, iter, marker, mem, num, ops, option, panicking, ptr, raw};
+pub use core::{isize, iter, marker, mem, num, ops, option, ptr, raw};
 pub use core::{result, simd, u16, u32, u64, u8, uint, usize};
 pub use core_collections::{str, string, slice, vec};
 pub use unicode::char;
 
+#[path = "../../../external/rust/src/libstd/macros.rs"]
 #[macro_use] mod macros;
 
-
+#[path = "../../../external/rust/src/libstd/ascii.rs"]
+pub mod ascii;
+#[path = "../../../external/rust/src/libstd/fmt.rs"]
 pub mod fmt;
+#[path = "../../../external/rust/src/libstd/collections/mod.rs"]
 pub mod collections;
 
 pub mod rand {
@@ -66,7 +69,8 @@ pub mod rand {
     }
 }
 
-mod thread {
+pub mod thread {
+    #[allow(missing_copy_implementations)]
     pub struct Thread;
     impl Thread {
         pub fn panicking() -> bool {

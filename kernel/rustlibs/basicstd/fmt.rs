@@ -1,1 +1,0 @@
-../../../external/rust/src/libstd/fmt.rs
