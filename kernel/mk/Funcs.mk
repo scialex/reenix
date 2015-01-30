@@ -205,18 +205,21 @@ endef
 define base-crate-rule
 ifeq ($(call is-present, $(1)),1)
 $(call local-var-init, TMP_BCR_RSFILES,$$(shell find $$(call dir-name,$(1)) -follow -type f -name "*.rs"))
-$(call local-var-init, TMP_BCR_CRATES,$$(call lib-name,$(2)))
+$(call local-var-init, TMP_BCR_CRATES,$$(call lib-name,$$(filter-out $$(HOST_CRATES),$(2))))
+$(call local-var-init, TMP_BCR_PLUGINS,$$(call lib-name,$$(filter $$(HOST_CRATES),$(2))))
 $(call local-var-init, TMP_BCR_EXTERNS,$$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))))
-$(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES)
+
+$(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES) | $(TMP_BCR_PLUGINS)
 	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..."
 	$$(HIDE_SIGIL) $$(RUST) $(TMP_BCR_EXTERNS) $(3) $$(call dir-name,$(1))/lib.rs --out-dir $$(dir $(call lib-name,$(1)))
 
-$(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES) | $$(call doc-name,$(2))
+$(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES) | $(TMP_BCR_PLUGINS) $$(call doc-name,$(2))
 	@ echo "[RDOC] Documenting \"kernel/$$(call dir-name,$(1))\"..."
 	$$(HIDE_SIGIL) $$(RUSTDOC) $(TMP_BCR_EXTERNS) $(4) --output $$(DOC_DIR) $$(call dir-name,$(1))/lib.rs
 
 $(call local-var-destroy, TMP_BCR_RSFILES)
 $(call local-var-destroy, TMP_BCR_CRATES)
+$(call local-var-destroy, TMP_BCR_PLUGINS)
 $(call local-var-destroy, TMP_BCR_EXTERNS)
 else
 $$(warning Found build rule for unknown crate '$(1)'. Did you remember to call a set-*-name function with it?)
@@ -232,22 +235,27 @@ define long-crate-rule
 $(eval $(call base-crate-rule,$(strip $(1)),$(2) ,$(3) $$(RSFLAGS),$(4) $$(RDFLAGS),$$(TARGET_FILENAME)))
 endef
 
-# A Crate with std
+# A Crate with default args.
 # $(1) is the name of the crate
 # $(2) is the list of dependencies
-# $(3) is the `std` crate
 define crate-rule
 $(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2)),-C opt-level=$$(DEFAULT_CRATE_OPT)))
 endef
 
+# A Crate with std
+# $(1) is the name of the crate
+# $(2) is the list of dependencies
+# $(3) is the `std` crate
 define std-crate-rule
 $(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2) $(3)),--extern std=$(call lib-name, $(3)) -C opt-level=$$(DEFAULT_CRATE_OPT),--extern std=$(call lib-name, $(3))))
 endef
 
-# A plugin
+# A plugin.
+# These depend upon the rustc binary itself since they need to be recompiled
+# whenever we change that
 # $(1) is the name of the plugin
 # $(2) is the list of dependencies.
 define plugin-rule
-$(eval $(call base-crate-rule,$(strip $(1)),$(2),,,,))
+$(eval $(call base-crate-rule,$(strip $(1)),$(2),,,$(RUST_FULL),))
 endef
 

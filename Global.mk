@@ -1,4 +1,7 @@
 SHELL     := /bin/sh
+# We want to have this option so we can update on rustc update even if we have
+# a symlinked rustc
+MAKEFLAGS += "--check-symlink-times"
 CC        := gcc
 LD        := ld
 AR        := ar
@@ -7,6 +10,7 @@ CSCOPE    := cscope
 RUST      := rustc
 RUSTDOC   := rustdoc
 MKRESCUE  := grub-mkrescue
+RUST_FULL := $(shell which $(RUST))
 
 RSFLAGS   += -g -Z no-landing-pads
 CFLAGS    += -fno-builtin -nostdinc -std=c99 -g3 -fno-stack-protector -m32 -march=i686 -fsigned-char -Iinclude
