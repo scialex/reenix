@@ -56,7 +56,7 @@ pub use alloc::arc::{Arc, Weak};
             Mutex { locked: AtomicBool::new(false), val: UnsafeCell::new(t) }
         }
         pub fn lock(&self) -> LockResult<MutexGuard<T>> {
-            while !self.locked.compare_and_swap(false, true, SeqCst) { }
+            while self.locked.compare_and_swap(false, true, SeqCst) { }
             Ok(MutexGuard { __mtx: self })
         }
         pub fn try_lock(&self) -> TryLockResult<MutexGuard<T>> {
@@ -99,7 +99,9 @@ pub use alloc::arc::{Arc, Weak};
                 false
             } else if self.state.compare_and_swap(UNUSED, INITIALIZING, SeqCst) == UNUSED {
                 // We are the ones who won the race.
-                f(); true
+                f();
+                self.state.store(INITIALIZED, SeqCst);
+                true
             } else if self.state.load(SeqCst) == INITIALIZED { false } else {
                 while self.state.load(SeqCst) != INITIALIZED { }
                 false
