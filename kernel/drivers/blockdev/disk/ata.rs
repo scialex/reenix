@@ -137,7 +137,7 @@ mod command {
 
 const IDENT_MAX_LBA : usize = 30;
 
-#[derive(Show, Clone)]
+#[derive(Debug, Clone)]
 struct Channel {
     cmd : u16,
     ctrl: u16,

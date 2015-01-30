@@ -129,7 +129,7 @@ DEFAULT_CRATE_OPT := 2
         MEMORY=256
 
 # The rust lints to use
- ALLOW_LINTS = unstable
+ ALLOW_LINTS =
   WARN_LINTS =
   DENY_LINTS =
 FORBID_LINTS =

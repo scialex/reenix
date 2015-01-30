@@ -59,7 +59,7 @@ impl<K: Ord, V: Cacheable> CacheItem<K, V> {
     // TODO
 }
 
-impl<K: fmt::Show, V: fmt::Show> fmt::Debug for CacheItem<K, V> {
+impl<K: fmt::Debug, V: fmt::Debug> fmt::Debug for CacheItem<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{{ pinned: {}, val: {:?} }}", self.pcnt.load(Ordering::SeqCst), self.val) }
 }
 
@@ -82,7 +82,7 @@ pub enum State {
 }
 
 /// The errors that can happen when we try to insert a value into the cache.
-#[derive(Show, Copy)]
+#[derive(Debug, Copy)]
 pub enum InsertError {
     /// There is already a key with that value in the cache.
     KeyPresent,

@@ -11,7 +11,7 @@ use super::apic;
 /// the source of the interrupt.
 #[allow(missing_copy_implementations)]
 #[repr(C)]
-#[derive(Clone, Show)]
+#[derive(Clone, Debug)]
 pub struct Registers {
     pub es   : u32, pub ds  : u32, pub gs  : u32,                                     /* Pushed manually */
     pub edi  : u32, pub esi : u32, pub ebp : u32, pub esp : u32,                      /* pushed by pusha */

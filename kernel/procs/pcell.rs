@@ -254,7 +254,6 @@ impl<'b, T> Deref for ProcRef<'b, T> {
 ///
 /// A `Clone` implementation would interfere with the widespread
 /// use of `r.borrow().clone()` to clone the contents of a `ProcRefCell`.
-#[experimental = "likely to be moved to a method, pending language changes"]
 pub fn clone_pref<'b, T>(orig: &ProcRef<'b, T>) -> ProcRef<'b, T> {
     // Since this ProcRef exists, we know the borrow flag
     // is not set to WRITING.

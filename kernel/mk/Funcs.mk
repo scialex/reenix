@@ -204,7 +204,7 @@ endef
 # $(5) is any addional files to depend on
 define base-crate-rule
 ifeq ($(call is-present, $(1)),1)
-$(call local-var-init, TMP_BCR_RSFILES,$$(shell find $$(call dir-name,$(1)) -type f -name "*.rs"))
+$(call local-var-init, TMP_BCR_RSFILES,$$(shell find $$(call dir-name,$(1)) -follow -type f -name "*.rs"))
 $(call local-var-init, TMP_BCR_CRATES,$$(call lib-name,$(2)))
 $(call local-var-init, TMP_BCR_EXTERNS,$$(foreach l,$(2), --extern $$(l)=$$(call lib-name,$$(l))))
 $(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES)
@@ -248,6 +248,6 @@ endef
 # $(1) is the name of the plugin
 # $(2) is the list of dependencies.
 define plugin-rule
-$(eval $(call base-crate-rule,$(strip $(1)),$(2),--allow unstable,,,))
+$(eval $(call base-crate-rule,$(strip $(1)),$(2),,,,))
 endef
 

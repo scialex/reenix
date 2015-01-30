@@ -12,6 +12,10 @@
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
 #![feature(asm, unsafe_destructor, plugin, box_syntax)]
+#![feature(core)]
+#![feature(alloc)]
+#![feature(collections)]
+#![feature(hash)]
 
 #[macro_use] #[plugin] #[no_link] extern crate bassert;
 #[macro_use] extern crate base;

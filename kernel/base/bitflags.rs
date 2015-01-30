@@ -44,12 +44,12 @@ macro_rules! bitmask_create {
         bitmask_create!(inner_flags $name { $($f),* });
     };
     (inner_flags $name:ident { $($f:ident),+ }) => {
-        impl ::std::fmt::Show for $name {
+        impl ::std::fmt::Debug for $name {
             fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-                (self as &::std::fmt::String).fmt(fmt)
+                (self as &::std::fmt::Display).fmt(fmt)
             }
         }
-        impl ::std::fmt::String for $name {
+        impl ::std::fmt::Display for $name {
             fn fmt(&self, fmt: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
                 try!(write!(fmt, "{}[",stringify!($name)));
                 let mut started = false;

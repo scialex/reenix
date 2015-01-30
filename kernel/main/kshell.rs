@@ -201,8 +201,8 @@ impl<'a> KShell<'a> {
     }
 }
 
-struct Showwer<'a>(&'a (fmt::Show + 'static));
-impl<'a> fmt::Show for Showwer<'a> {
+struct Showwer<'a>(&'a (fmt::Debug + 'static));
+impl<'a> fmt::Debug for Showwer<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { self.0.fmt(f) }
 }
 fn do_memstats(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {

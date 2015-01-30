@@ -12,7 +12,7 @@ pub type KResult<T> = Result<T, Errno>;
 
 macro_rules! errnos {
     ($(($n:ident, $v:expr, $ex:expr)),+) => (
-        #[derive(PartialEq, Eq, Show, FromPrimitive, Clone, Copy)]
+        #[derive(PartialEq, Eq, Debug, FromPrimitive, Clone, Copy)]
         #[repr(i32)]
         #[doc = "The standard errno definition."]
         pub enum Errno {

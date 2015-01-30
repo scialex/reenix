@@ -3,7 +3,7 @@
 #![crate_name="util"]
 #![crate_type="rlib"]
 
-#![feature(asm, unsafe_destructor, plugin, box_syntax)]
+#![feature(asm, unsafe_destructor, plugin, box_syntax, core, alloc)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 

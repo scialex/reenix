@@ -4,7 +4,7 @@
 #![crate_type="rlib"]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(asm, concat_idents, lang_items, plugin, intrinsics, box_syntax)]
+#![feature(asm, concat_idents, lang_items, plugin, intrinsics, box_syntax, core)]
 
 //! # The Reenix drivers stuff.
 ///

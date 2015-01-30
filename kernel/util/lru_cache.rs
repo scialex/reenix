@@ -388,7 +388,7 @@ impl<K: Ord, V> Default for LruCache<K, V> {
     }
 }
 
-impl<K: fmt::Show + Ord, V: fmt::Debug> fmt::Debug for LruCache<K, V> {
+impl<K: fmt::Debug + Ord, V: fmt::Debug> fmt::Debug for LruCache<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(f, "LruCache (len: {}) {{", self.len()));
         let mut first = true;

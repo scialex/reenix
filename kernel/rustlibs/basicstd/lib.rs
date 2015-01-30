@@ -12,6 +12,12 @@
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![feature(unsafe_destructor, int_uint, box_syntax)]
 #![feature(optin_builtin_traits)]
+#![feature(core)]
+#![feature(alloc)]
+#![feature(unicode)]
+#![feature(collections)]
+#![feature(rand)]
+#![feature(hash)]
 #![no_std]
 
 #[macro_reexport(assert, assert_eq, debug_assert, write, writeln)]

@@ -41,7 +41,7 @@ fn get_pid() -> Option<ProcId> {
 /// Notify that we are done with a pid.
 fn drop_pid(i: &ProcId) { unsafe { &mut *PID_GEN }.destroy(i); }
 
-#[derive(Show, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Copy)]
 pub enum ProcState { RUNNING, DEAD }
 pub type ProcStatus = isize;
 
@@ -99,7 +99,7 @@ pub fn start_idle_proc(init_main : ContextFunc, arg1: i32, arg2: *mut c_void) ->
     assert!(unsafe { IDLE_STARTED } == false, "IDLE THREAD ALREADY STARTED");
     unsafe { IDLE_STARTED = true; }
 
-    let pid = KProc::new(String::from_str("IDLE PROCESS"), init_main, arg1, arg2).ok().expect("Unable to allocate idle proc!");
+    let pid = KProc::new("IDLE PROCESS".to_string(), init_main, arg1, arg2).ok().expect("Unable to allocate idle proc!");
 
     assert!(pid == IDLE_PID);
     dbg!(debug::CORE, "Starting idle process {:?} now!", pid);

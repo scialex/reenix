@@ -20,7 +20,7 @@ pub const ZERO_DEVID : DeviceId = DeviceId_static!(3, 1);
 static mut NEXT_ZERO_ID : u32 = 0;
 /// The device for /dev/null
 #[allow(missing_copy_implementations)]
-#[derive(Show)]
+#[derive(Debug)]
 pub struct NullDev;
 
 impl NullDev {
@@ -53,7 +53,7 @@ impl MMObj for NullDev {
 
 /// The device for /dev/zero
 #[allow(missing_copy_implementations)]
-#[derive(Show)]
+#[derive(Debug)]
 pub struct ZeroDev(u32);
 
 impl ZeroDev {

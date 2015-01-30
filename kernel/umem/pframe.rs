@@ -17,7 +17,7 @@ use util::pinnable_cache::{self, PinnableCache, InsertError, PinnedValue};
 
 pub type PageNum = usize;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Show, Clone)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
 pub struct PFrameId { mmobj: Rc<Box<MMObj + 'static>>, page: PageNum, }
 impl PFrameId {
     /// Create a pframe id.
