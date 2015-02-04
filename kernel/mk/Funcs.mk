@@ -187,6 +187,7 @@ $(call copy-rule, $(TMP_EXT_INTERMEDIATE), $(TMP_EXT_TARGET))
 $(TMP_EXT_INTERMEDIATE) : $(TMP_EXT_PREREQS) $(strip $(6))
 	@ echo "[MAKE] Recursive make of \"kernel/$$@\"..."
 	$$(HIDE_SIGIL) $$(MAKE) HIDE_SIGIL=$$(HIDE_SIGIL) $$(MFLAGS) --no-print-directory -C $(TMP_EXT_DIR) $(strip $(2)) $(strip $(5)) $$(SILENT_SUFFIX)
+	$$(HIDE_SIGIL) touch -c $$@
 
 .PHONEY:
 clean-$(strip $(1)) :

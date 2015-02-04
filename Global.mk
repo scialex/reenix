@@ -1,7 +1,7 @@
 SHELL     := /bin/sh
 # We want to have this option so we can update on rustc update even if we have
 # a symlinked rustc
-MAKEFLAGS += "--check-symlink-times"
+MAKEFLAGS += --check-symlink-times
 CC        := gcc
 LD        := ld
 AR        := ar
