@@ -89,7 +89,7 @@ macro_rules! current_proc_mut{
         // Now we get the actual borrow.
         let mut v = r.deref().try_silent_borrow_mut().expect(add_file!("Curproc is currently being borrowed by something!"));
         // Now we make that borrow have the 'static lifetime it actually has (for this thread).
-        let out = |:| { unsafe { transmute::<&mut KProc, &'static mut KProc>(v.deref_mut()) } };
+        let mut out = |:| { unsafe { transmute::<&mut KProc, &'static mut KProc>(v.deref_mut()) } };
         out()
     })
 }

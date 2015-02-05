@@ -6,7 +6,9 @@
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
 #![feature(plugin, asm, unsafe_destructor, lang_items, box_syntax)]
-
+#![feature(alloc)]
+#![feature(core)]
+#![feature(collections)]
 
 #[macro_use] #[plugin] #[no_link] extern crate bassert;
 #[macro_use] extern crate base;

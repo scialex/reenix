@@ -233,7 +233,7 @@ pub fn map(irq: u16, intr: u8) -> Option<u16> {
 macro_rules! make_noerr_handlers {
     ($(($num:expr, $seg:expr, $flag:expr)),*) => ({
         #[cfg(target_arch = "x86")]
-        #[no_stack_check] #[inline(never)] #[no_mangle]
+        #[no_stack_check] #[inline(never)]
         unsafe extern "C" fn intr_entry() {
             // NOTE This is a huge hack to make sure that this code is not removed for being
             // unreachable
@@ -296,9 +296,8 @@ macro_rules! make_noerr_handlers {
 
 macro_rules! make_err_handlers {
     ($(($num:expr, $seg:expr, $flag:expr)),*) => ({
-        #[no_stack_check]
-        #[inline(never)]
-        #[no_mangle]
+        #[cfg(target_arch = "x86")]
+        #[no_stack_check] #[inline(never)]
         unsafe extern "C" fn intr_entry_noerr() {
             // NOTE This is a huge hack to make sure that this code is not removed for being
             // unreachable without declaring it public.

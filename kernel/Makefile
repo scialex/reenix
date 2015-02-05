@@ -116,12 +116,9 @@ docs: $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 # We need to tell liballoc to use our memory manager.
 LIBALLOC_RSFLAGS := -A dead_code --cfg feature=\"external_crate\" --extern external=$(call lib-name,mm) \
                     -C opt-level=$(DEFAULT_CRATE_OPT)
-LIBALLOC_RDFLAGS := --cfg external_crate --extern external=$(call lib-name,mm)
+LIBALLOC_RDFLAGS := --cfg feature=\"external_crate\" --extern external=$(call lib-name,mm)
 BASICSTD_RSFLAGS := --cfg feature=\"spin\" -C opt-level=$(DEFAULT_CRATE_OPT)
 BASICSTD_RDFLAGS := --cfg feature=\"spin\"
-# TODO For some reason LLVM doesn't like -O2 in drivers.
-DRIVERS_RSFLAGS  := -C opt-level=1 --extern std=$(call lib-name,basicstd)
-DRIVERS_RDFLAGS  := --extern std=$(call lib-name,basicstd)
 
 # Plugins
 $(eval $(call plugin-rule, bassert,))
@@ -133,7 +130,7 @@ MAIN_REQS := $(filter-out main, $(CRATES)) morestack compiler-rt
 
 # Reenix Crates.
 BASIC_REQS := base libc $(HOST_CRATES)
-$(eval $(call crate-rule,      core,  ))
+$(eval $(call crate-rule,      core,  ,1))
 $(eval $(call crate-rule,      libc,        core))
 $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
@@ -141,8 +138,6 @@ $(eval $(call crate-rule,      base,        bassert enabled core libc))
 $(eval $(call crate-rule,      mm,          $(BASIC_REQS) core))
 $(eval $(call long-crate-rule, alloc,       core libc mm,                        $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
-# basicstd is a libstd mock with core, rand, alloc and collections.
-STD_REQS := core alloc collections rand unicode
 $(eval $(call long-crate-rule, basicstd,    core alloc collections rand unicode, $(BASICSTD_RSFLAGS), $(BASICSTD_RDFLAGS)))
 $(eval $(call std-crate-rule,  arena,       ,                                 basicstd))
 $(eval $(call std-crate-rule,  startup,     $(BASIC_REQS),                    basicstd))
@@ -151,7 +146,7 @@ $(eval $(call std-crate-rule,  procs,       $(BASIC_REQS) util startup,       ba
 $(eval $(call std-crate-rule,  umem,        $(BASIC_REQS) procs util startup, basicstd))
 #$(eval $(call std-crate-rule,  pageoutd,    $(BASIC_REQS) util procs,         basicstd))
 $(eval $(call std-crate-rule,  fs,          $(BASIC_REQS) umem procs drivers, basicstd))
-$(eval $(call long-crate-rule, drivers,     $(BASIC_REQS) procs umem basicstd,$(DRIVERS_RSFLAGS), $(DRIVERS_RDFLAGS)))
+$(eval $(call std-crate-rule,  drivers,     $(BASIC_REQS) procs umem,         basicstd,1))
 $(eval $(call std-crate-rule,  main,        $(MAIN_REQS), basicstd))
 
 # Make the target for libm

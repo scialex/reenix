@@ -239,16 +239,18 @@ endef
 # A Crate with default args.
 # $(1) is the name of the crate
 # $(2) is the list of dependencies
+# $(3) is optional opt level
 define crate-rule
-$(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2)),-C opt-level=$$(DEFAULT_CRATE_OPT)))
+$(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2)),-C opt-level=$$(if $(3),$(3),$$(DEFAULT_CRATE_OPT))))
 endef
 
 # A Crate with std
 # $(1) is the name of the crate
 # $(2) is the list of dependencies
 # $(3) is the `std` crate
+# $(4) is optional opt level
 define std-crate-rule
-$(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2) $(3)),--extern std=$(call lib-name, $(3)) -C opt-level=$$(DEFAULT_CRATE_OPT),--extern std=$(call lib-name, $(3))))
+$(eval $(call long-crate-rule,$(strip $(1)),$(sort $(2) $(3)),--extern std=$(call lib-name, $(3)) -C opt-level=$$(if $(4),$(4),$$(DEFAULT_CRATE_OPT)),--extern std=$(call lib-name, $(3))))
 endef
 
 # A plugin.

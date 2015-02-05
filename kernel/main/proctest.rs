@@ -20,11 +20,11 @@ pub fn start() {
 
     if cfg!(all(not(TEST_LOW_MEMORY), TEST_KILL_ALL)) {
         debug::remove_mode(debug::TEST);
-        for i in range::<i32>(0, 10) {
+        for i in 0..10 {
             kproc::KProc::new("fork fn".to_string(), fork_some, i, 0 as *mut c_void);
             kthread::kyield();
         }
-        for _ in range::<usize>(0, 10) {
+        for _ in 0..10 {
             kthread::kyield();
         }
         dbg!(debug::TEST | debug::CORE, "killing everything");
@@ -118,7 +118,7 @@ extern "Rust" fn return_intr(r: &mut interrupt::Registers) {
 
 #[allow(unused_must_use)]
 extern "C" fn orphan_procs(n: i32, _:*mut c_void) -> *mut c_void {
-    for i in range(0, n) {
+    for i in 0..n {
         kproc::KProc::new("ignored".to_string(), orphan_procs, i, 0 as *mut c_void);
     }
     kthread::kyield();
@@ -138,10 +138,10 @@ extern "C" fn kill_self(_: i32, _: *mut c_void) -> *mut c_void {
 
 extern "C" fn normal_fork(_: i32, _:*mut c_void) -> *mut c_void { GOOD }
 
-#[allow(unused_must_use, dead_code)]
+#[allow(unused_must_use, dead_code, unconditional_recursion)]
 extern "C" fn fork_some(n: i32, _: *mut c_void) -> *mut c_void {
     if n > 0 {
-        for i in range::<i32>(1, n) {
+        for i in 1..n {
             if (current_thread!()).cancelled {
                 (current_thread!()).exit((current_thread!()).retval);
             } else {
@@ -172,7 +172,7 @@ extern "C" fn to_die(_: i32, _: *mut c_void) -> *mut c_void {
 }
 
 extern "C" fn to_kill(n: i32, p: *mut c_void) -> *mut c_void {
-    for _ in range(0, n) {
+    for _ in 0..n {
         kthread::kyield();
     }
     let pid : Box<ProcId> = unsafe { transmute(p) };
@@ -237,13 +237,13 @@ extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 
     let high : i32 = 200;
 
-    for _ in range(0, n) {
+    for _ in 0..n {
         // TODO How to make this say which number they are?
         kproc::KProc::new("counter n".to_string(), counter, high, 0 as *mut c_void);
     }
 
     let mut tot : i32 = 0;
-    for _ in range(0, n) {
+    for _ in 0..n {
         let (p, v) = match kproc::KProc::waitpid(kproc::Any, 0) {
             Ok(e) => e,
             Err(_) => { return BAD; },
@@ -269,13 +269,13 @@ extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 
     let high : i32 = 200;
 
-    for _ in range(0, n) {
+    for _ in 0..n {
         // TODO How to make this say which number they are?
         kproc::KProc::new("better counter n".to_string(), better_counter, high, unsafe { ProcArgs::new(x.clone()).unwrap().to_arg() });
     }
 
     let mut tot : i32 = 0;
-    for _ in range(0, n) {
+    for _ in 0..n {
         let (p, v) = match kproc::KProc::waitpid(kproc::Any, 0) {
             Ok(e) => e,
             Err(_) => { return BAD; },

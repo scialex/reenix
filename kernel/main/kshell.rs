@@ -36,7 +36,7 @@ macro_rules! twrite {
 
 pub fn start(i: i32) {
     let tty = ProcArgs::new(bytedev::lookup(DeviceId::create(2,i as u8)).unwrap()).unwrap();
-    assert!(KProc::new(String::from_str("KSHELL proc"), tty_proc_run, 0, unsafe { tty.to_arg() }).is_ok());
+    assert!(KProc::new(FromStr::from_str("KSHELL proc").unwrap(), tty_proc_run, 0, unsafe { tty.to_arg() }).is_ok());
 }
 
 extern "C" fn tty_proc_run(_:i32, t:*mut c_void) -> *mut c_void {
@@ -151,7 +151,7 @@ impl<'a> KShell<'a> {
             let req = self.get_tty().read_from(0, &mut buf);
             let cmd = match from_utf8(
                         match req {
-                            Ok(v) => buf.slice_to(v - 1),
+                            Ok(v) => &buf[..v - 1],
                             Err(e) => {
                                 twriteln!(self.get_tty(), "An error occured while reading command. Error was {:?}. Quiting.", e);
                                 return;
@@ -163,7 +163,7 @@ impl<'a> KShell<'a> {
                     continue;
                 },
             };
-            match self.run_command(cmd.split(' ').filter(|&: s: & &str| -> bool { (*s).len() != 0 }).collect::<Vec<&str>>().as_slice()) {
+            match self.run_command(&cmd.split(' ').filter(|&: s: & &str| -> bool { (*s).len() != 0 }).collect::<Vec<&str>>()[]) {
                 Ok(_) => {},
                 Err(e) => { dbg!(debug::KSHELL, "recieved {:?}", e); },
             }
@@ -239,8 +239,8 @@ fn do_exit(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         return Ok(());
     } else {
         match FromStr::from_str(argv[1]) {
-            Some(v) => v,
-            None => {
+            Ok(v) => v,
+            Err(_) => {
                 twriteln!(io, "usage: exit [number]");
                 return Ok(());
             },
@@ -270,8 +270,8 @@ fn do_newkshell(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         return Ok(());
     }
     let id : u8 = match FromStr::from_str(argv[1]) {
-        Some(v) => v,
-        None => {
+        Ok(v) => v,
+        Err(_) => {
             twriteln!(io, "Usage: kshell [tty id]");
             return Err(errno::EINVAL);
         },
@@ -284,7 +284,7 @@ fn do_newkshell(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         },
     }).or_else(|_| Err(errno::ENOMEM)));
     twriteln!(io, "Creating new shell on tty {:?}", id);
-    KProc::new(String::from_str("KSHELL proc"), tty_proc_run, 0, unsafe { tty.to_arg() }).and(Ok(())).or_else(|_| Err(errno::ENOMEM))
+    KProc::new(FromStr::from_str("KSHELL proc").unwrap(), tty_proc_run, 0, unsafe { tty.to_arg() }).and(Ok(())).or_else(|_| Err(errno::ENOMEM))
 }
 
 /// Cancel a specific thread.
@@ -295,15 +295,15 @@ fn do_cancel(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         return Ok(());
     }
     let pid_num = match FromStr::from_str(argv[1]) {
-        Some(v) => v,
-        None => {
+        Ok(v) => v,
+        Err(_) => {
             twriteln!(io, "Illegal pid number {:?}, Usage: cancel pid", argv[1]);
             return Ok(());
         }
     };
-    let exit_status = match argv.get(2).map_or(Some(0), |v| FromStr::from_str(*v)) {
-        Some(v) => v,
-        None => {
+    let exit_status = match argv.get(2).map_or(Ok(0), |v| FromStr::from_str(*v)) {
+        Ok(v) => v,
+        Err(_) => {
             twriteln!(io, "illegal exit status {:?} given.", argv[2]);
             return Ok(());
         },
@@ -333,8 +333,8 @@ fn do_bdread(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         return Ok(());
     }
     let blk = match FromStr::from_str(argv[1]) {
-        Some(v) => v,
-        None => {
+        Ok(v) => v,
+        Err(_) => {
             twriteln!(io, "Illegal block number {:?}, Usage: read_block block_num", argv[1]);
             return Ok(());
         }
@@ -354,7 +354,7 @@ fn do_bdread(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
             cnt += 1;
         }
     }
-    let s = buf[0].slice_to(cnt);
+    let s = &buf[0][..cnt];
     match from_utf8(s) {
         Ok(v) => { twriteln!(io, "{:?}", v); },
         Err(e) => { twriteln!(io, "**read succeeded but contained unprintable chars because {:?} **", e); }
@@ -368,15 +368,15 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         return Ok(());
     }
     let start = match FromStr::from_str(argv[1]) {
-        Some(v) => v,
-        None => {
+        Ok(v) => v,
+        Err(_) => {
             twriteln!(io, "Illegal block number {:?}, Usage: write-blocks block_num reps text [...]", argv[1]);
             return Ok(());
         }
     };
     let blks : usize = match FromStr::from_str(argv[2]) {
-        Some(v) => v,
-        None => {
+        Ok(v) => v,
+        Err(_) => {
             twriteln!(io, "Illegal reps number {:?}, Usage: write-blocks block_num reps text [...]", argv[2]);
             return Ok(());
         },
@@ -387,7 +387,7 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     }
     let mut example : [u8; page::SIZE] = [0; page::SIZE];
     let mut cur = 0;
-    'end: for i in argv.slice_from(3).iter() {
+    'end: for i in &argv[3..] {
         for v in i.bytes() {
             if cur >= (example.len() - 1) {
                 break 'end;
@@ -406,14 +406,14 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
                 Err(errno::ENOMEM)
             }
         ));
-    for _ in range(0, blks) {
+    for _ in 0..blks {
         use std::slice::bytes::copy_memory;
         let mut out : [u8; page::SIZE] = [0; page::SIZE];
         copy_memory(&mut out, &example);
         buf.push(out);
     }
     let disk = blockdev::lookup(DeviceId::create(1,0)).expect("should have disk 0");
-    disk.write_to(start, buf.as_slice()).and(Ok(()))
+    disk.write_to(start, &buf[]).and(Ok(()))
 }
 
 fn do_help<'a>(sh: &KShell<'a>, _: &[&str]) -> KResult<()> {
@@ -437,21 +437,21 @@ fn do_prepeat<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
         return Ok(());
     }
     let reps = match FromStr::from_str(argv[1]) {
-        Some(v) => v,
-        None => {
+        Ok(v) => v,
+        Err(_) => {
             twriteln!(sh.get_tty(), "Usage: prepeat cnt cmd ..");
             return Ok(());
         },
     };
     let mut cmd = Vec::with_capacity((argv.len() - 1) * reps + 1);
     cmd.push("parallel");
-    for i in range(0, reps) {
+    for i in 0..reps {
         if i != 0 {
             cmd.push("||");
         }
-        cmd.push_all(argv.slice_from(2));
+        cmd.push_all(&argv[2..]);
     }
-    do_parallel(sh, cmd.as_slice())
+    do_parallel(sh, &cmd[])
 }
 #[allow(unused_must_use)]
 fn do_parallel<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
@@ -461,7 +461,7 @@ fn do_parallel<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
         return Ok(());
     }
     let mut pids = Vec::new();
-    let all_commands = argv.slice_from(1);
+    let all_commands = &argv[1..];
     for cmd in all_commands.split(|x| { *x == "||" }) {
         if cmd.len() == 0 {
             continue;
@@ -475,7 +475,7 @@ fn do_parallel<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
                 Err(_) => { continue; },
             }.to_arg()
         };
-        match KProc::new(String::from_str("KSHELL parallel proc"), parallel_run, 0, pa) {
+        match KProc::new(FromStr::from_str("KSHELL parallel proc").unwrap(), parallel_run, 0, pa) {
             Ok(pid) => pids.push(pid),
             Err(v) => {
                 twriteln!(sh.get_tty(), "Unable to create process for command {:?}, error was {:?}", cmd, v);
@@ -503,13 +503,13 @@ fn do_repeat<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
         return Err(errno::EBADMSG);
     }
     match FromStr::from_str(argv[1]) {
-        Some(c) => {
+        Ok(c) => {
             for _ in range(0, c) {
-                sh.run_command(argv.slice_from(2));
+                sh.run_command(&argv[2..]);
             }
             Ok(())
         },
-        None => {
+        Err(_) => {
             twriteln!(sh.get_tty(), "{:?} is not a number, usage: repeat num cmd ...", argv[1]);
             Err(errno::EBADMSG)
         },

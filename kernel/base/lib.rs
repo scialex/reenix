@@ -52,5 +52,6 @@ mod std {
     pub use core::clone;
     pub use core::marker;
     pub use core::ops;
+    pub use core::iter;
 }
 mod base { pub use debug; pub use kernel; }

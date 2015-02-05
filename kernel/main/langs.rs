@@ -2,6 +2,7 @@
 
 #[cold]
 #[no_mangle]
+#[allow(private_no_mangle_fns)]
 #[inline(never)]
 #[lang="panic_fmt"]
 pub extern fn rust_begin_unwind(msg: &::std::fmt::Arguments,

@@ -224,4 +224,5 @@ mod std {
     pub use core::option;
     pub use core::num;
     pub use core::clone;
+    pub use core::iter;
 }

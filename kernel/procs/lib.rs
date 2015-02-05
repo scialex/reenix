@@ -14,7 +14,6 @@
 #![feature(asm, unsafe_destructor, plugin, box_syntax)]
 #![feature(core)]
 #![feature(alloc)]
-#![feature(collections)]
 #![feature(hash)]
 
 #[macro_use] #[plugin] #[no_link] extern crate bassert;

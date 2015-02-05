@@ -119,17 +119,17 @@ impl<'a, K: Ord, V> Iterator for LTMModifyEntries<'a, K, V> {
 }
 
 pub type ModifyEntries<'a, K, V> = LTMModifyEntries<'a, K, V>;
-pub type LTMRemoveEntries<'a, K, V> = iter::Map<ModifiableEntry<'a, K, V>, (K, V), LTMModifyEntries<'a, K, V>, fn(ModifiableEntry<'a, K, V>) -> (K, V)>;
-pub type MTLRemoveEntries<'a, K, V> = iter::Map<ModifiableEntry<'a, K, V>, (K, V), MTLModifyEntries<'a, K, V>, fn(ModifiableEntry<'a, K, V>) -> (K, V)>;
+pub type LTMRemoveEntries<'a, K, V> = iter::Map<LTMModifyEntries<'a, K, V>, fn(ModifiableEntry<'a, K, V>) -> (K, V)>;
+pub type MTLRemoveEntries<'a, K, V> = iter::Map<MTLModifyEntries<'a, K, V>, fn(ModifiableEntry<'a, K, V>) -> (K, V)>;
 pub type RemoveEntries<'a, K, V> = LTMRemoveEntries<'a, K, V>;
 pub type Entries<'a, K, V> = LTMEntries<'a, K, V>;
 pub type MutEntries<'a, K, V> = LTMMutEntries<'a, K, V>;
-pub type LTMKeys<'a, K, V> = iter::Map<(&'a K, &'a V), &'a K, LTMEntries<'a, K, V>, fn((&'a K, &'a V)) -> &'a K>;
-pub type MTLKeys<'a, K, V> = iter::Map<(&'a K, &'a V), &'a K, MTLEntries<'a, K, V>, fn((&'a K, &'a V)) -> &'a K>;
-pub type Keys<'a, K, V> = iter::Map<(&'a K, &'a V), &'a K, Entries<'a, K, V>, fn((&'a K, &'a V)) -> &'a K>;
-pub type LTMValues<'a, K, V> = iter::Map<(&'a K, &'a V), &'a V, LTMEntries<'a, K, V>, fn((&'a K, &'a V)) -> &'a V>;
-pub type MTLValues<'a, K, V> = iter::Map<(&'a K, &'a V), &'a V, MTLEntries<'a, K, V>, fn((&'a K, &'a V)) -> &'a V>;
-pub type Values<'a, K, V> = iter::Map<(&'a K, &'a V), &'a V, Entries<'a, K, V>, fn((&'a K, &'a V)) -> &'a V>;
+pub type LTMKeys<'a, K, V> = iter::Map<LTMEntries<'a, K, V>, fn((&'a K, &'a V)) -> &'a K>;
+pub type MTLKeys<'a, K, V> = iter::Map<MTLEntries<'a, K, V>, fn((&'a K, &'a V)) -> &'a K>;
+pub type Keys<'a, K, V> = iter::Map<Entries<'a, K, V>, fn((&'a K, &'a V)) -> &'a K>;
+pub type LTMValues<'a, K, V> = iter::Map<LTMEntries<'a, K, V>, fn((&'a K, &'a V)) -> &'a V>;
+pub type MTLValues<'a, K, V> = iter::Map<MTLEntries<'a, K, V>, fn((&'a K, &'a V)) -> &'a V>;
+pub type Values<'a, K, V> = iter::Map<Entries<'a, K, V>, fn((&'a K, &'a V)) -> &'a V>;
 
 impl<K: Ord, V> LruCache<K, V> {
     pub fn new() -> Allocation<LruCache<K, V>> {
@@ -369,7 +369,7 @@ impl<K: Clone + Ord, V: Clone> Clone for LruCache<K, V> {
 }
 
 impl<K: Ord, V> Extend<(K, V)> for LruCache<K, V> {
-    fn extend<T: Iterator<Item = (K, V)>>(&mut self, mut iter: T) {
+    fn extend<T: Iterator<Item = (K, V)>>(&mut self, iter: T) {
         for (k, v) in iter { self.insert(k, v); }
     }
 }

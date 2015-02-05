@@ -18,7 +18,10 @@
 #![feature(collections)]
 #![feature(rand)]
 #![feature(hash)]
+#![feature(macro_reexport)]
 #![no_std]
+// For rust rand
+#![allow(deprecated)]
 
 #[macro_reexport(assert, assert_eq, debug_assert, write, writeln)]
 #[macro_use] extern crate core;
