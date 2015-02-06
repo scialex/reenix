@@ -384,7 +384,7 @@ impl<K: Ord, V> FromIterator<(K, V)> for LruCache<K, V> {
 
 impl<K: Ord, V> Default for LruCache<K, V> {
     fn default() -> LruCache<K, V> {
-        LruCache::new().unwrap_or_else(|:_| { panic!("Unable to create lru cache");})
+        LruCache::new().unwrap_or_else(|_| { panic!("Unable to create lru cache");})
     }
 }
 

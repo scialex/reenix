@@ -8,7 +8,7 @@
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![feature(asm, concat_idents, lang_items, plugin, unboxed_closures)]
-#![feature(core)]
+#![feature(core, hash)]
 
 #[plugin] #[no_link] #[macro_use] extern crate bassert;
 #[plugin] #[no_link] #[macro_use] extern crate enabled;
@@ -53,5 +53,6 @@ mod std {
     pub use core::marker;
     pub use core::ops;
     pub use core::iter;
+    pub use core::hash;
 }
 mod base { pub use debug; pub use kernel; }

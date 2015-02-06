@@ -29,6 +29,12 @@ pub mod pframe;
 
 pub fn init_stage1() {
     pframe::init_stage1();
+    procs::interrupt::register(procs::interrupt::PAGE_FAULT, handle_pagefault);
+}
+
+#[cfg(not(VM))]
+extern "Rust" fn handle_pagefault(regs: &mut procs::interrupt::Registers) {
+    panic!("Pagefault found! regs were {:?}", regs);
 }
 
 pub fn init_stage2() {

@@ -11,7 +11,6 @@
 #[plugin] #[no_link] extern crate hoare;
 #[macro_use] extern crate base;
 #[macro_use] extern crate mm;
-extern crate libc;
 
 pub use cacheable::Cacheable;
 

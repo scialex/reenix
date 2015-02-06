@@ -7,7 +7,7 @@ use core::ops::Add;
 #[cfg(not(SMALL_PID))] pub type PidInner = u32;
 #[cfg(SMALL_PID)]      pub type PidInner = u8;
 
-#[derive(Eq, PartialEq, Debug, PartialOrd, Ord, Clone, Copy)] #[repr(C)]
+#[derive(Hash, Eq, PartialEq, Debug, PartialOrd, Ord, Clone, Copy)] #[repr(C)]
 pub struct ProcId(pub PidInner);
 
 impl Add<usize> for ProcId {

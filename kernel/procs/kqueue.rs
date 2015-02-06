@@ -10,9 +10,12 @@ use std::{fmt, ptr};
 use kthread::KThread;
 use kthread;
 use sync;
+use base::cell::*;
 
+#[allow(raw_pointer_derive)]
+#[derive(Hash)]
 pub struct QueuedThread(*mut KThread);
-pub struct KQueue(RefCell<BTreeSet<QueuedThread>>);
+pub struct KQueue(SafeCell<HashSet<QueuedThread>>);
 
 pub fn init_stage1() {}
 pub fn init_stage2() {}
@@ -41,21 +44,25 @@ impl Eq for QueuedThread {}
 impl KQueue {
     pub fn len(&self) -> usize {
         let &KQueue(ref s) = self;
-        (*s.borrow()).len()
+        (*s.get_ref()).len()
     }
 
     /// Remove a thread from this queue without waking it.
     pub fn remove(&mut self, t: &mut KThread) {
-        assert!((self as *mut KQueue) == t.queue, "Attempting to cancel on incorrect queue.");
-        t.queue = ptr::null_mut();
-        let k : *mut KThread = unsafe { transmute(t) };
-        let &mut KQueue(ref s) = self;
-        assert!((*s.borrow_mut()).remove(&QueuedThread(k)));
+        block_interrupts!({
+            assert!((self as *mut KQueue) == t.queue, "Attempting to cancel on incorrect queue.");
+            t.queue = ptr::null_mut();
+            let k : *mut KThread = t as *mut KThread;
+            let &mut KQueue(ref s) = self;
+            assert!((*s.get_mut()).remove(&QueuedThread(k)));
+        });
     }
 
     fn add(&mut self, t: &mut KThread) {
-        let &mut KQueue(ref s) = self;
-        assert!((*s.borrow_mut()).insert(QueuedThread(unsafe { transmute(t) })));
+        block_interrupts!({
+            let &mut KQueue(ref s) = self;
+            assert!((*s.get_mut()).insert(QueuedThread(unsafe { transmute(t) })));
+        });
     }
 
     /// Add a thread into this queue. This returns after some call to signal. false if we were
@@ -68,6 +75,7 @@ impl KQueue {
         }
         block_interrupts!({
             dbg!(debug::SCHED, "{:?} begining wait", t);
+            bassert!(t.queue == ptr::null_mut());
             unsafe {
                 t.queue = transmute_copy(&self);
             }
@@ -88,7 +96,7 @@ impl KQueue {
     }
 
     pub fn new() -> KQueue {
-        KQueue ( RefCell::new(BTreeSet::new()) )
+        KQueue ( SafeCell::new(HashSet::new()) )
     }
 }
 
@@ -97,11 +105,10 @@ impl sync::Wakeup for KQueue {
     fn signal(&self) {
         block_interrupts!({
             let &KQueue(ref q) = self;
-            dbg!(debug::SCHED, "Waking up {} threads", q.borrow().len());
-            for &QueuedThread(x) in q.borrow().iter() {
+            dbg!(debug::SCHED, "Waking up {} threads", q.get_ref().len());
+            for QueuedThread(x) in q.get_mut().drain() {
                 self.wakeup_one(x);
             }
-            q.borrow_mut().clear();
         });
     }
 }

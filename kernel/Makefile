@@ -143,7 +143,7 @@ $(eval $(call std-crate-rule,  procs,       $(BASIC_REQS) util startup,       ba
 $(eval $(call std-crate-rule,  umem,        $(BASIC_REQS) procs util startup, basicstd))
 #$(eval $(call std-crate-rule,  pageoutd,    $(BASIC_REQS) util procs,         basicstd))
 $(eval $(call std-crate-rule,  fs,          $(BASIC_REQS) umem procs drivers, basicstd))
-$(eval $(call std-crate-rule,  drivers,     $(BASIC_REQS) procs umem,         basicstd,1))
+$(eval $(call std-crate-rule,  drivers,     $(BASIC_REQS) procs umem,         basicstd, 1))
 $(eval $(call std-crate-rule,  main,        $(MAIN_REQS), basicstd))
 
 # Make the target for libm

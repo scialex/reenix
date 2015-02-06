@@ -3,7 +3,7 @@
 use std::{num, hash, fmt};
 use std::rc::{self, Rc, Weak};
 use base::errno;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 use context::ContextFunc;
 use std::mem::{transmute, transmute_copy};
 use std::ptr::null_mut;
@@ -48,8 +48,8 @@ pub type ProcStatus = isize;
 pub struct KProc {
     pid      : ProcId,                      /* Our pid */
     command  : String,                      /* Process Name */
-    threads  : BTreeMap<u64, Box<KThread>>, /* Our threads */
-    children : BTreeMap<ProcId, Rc<ProcRefCell<KProc>>>, /* Our children */
+    threads  : HashMap<u64, Box<KThread>>, /* Our threads */
+    children : HashMap<ProcId, Rc<ProcRefCell<KProc>>>, /* Our children */
     status   : ProcStatus,                  /* Our exit status */
     state    : ProcState,                   /* running/sleeping/etc. */
     parent   : Option<Weak<ProcRefCell<KProc>>>,/* Our parent */
@@ -76,14 +76,14 @@ pub fn init_stage1() {
 pub fn init_stage2() {
     use std::intrinsics::transmute;
     unsafe {
-        let y : Box<BTreeMap<ProcId, Rc<ProcRefCell<KProc>>>> = box BTreeMap::new();
+        let y : Box<HashMap<ProcId, Rc<ProcRefCell<KProc>>>> = box HashMap::new();
         PROC_LIST = transmute(y);
-        let z : Box<UIDSource<ProcId>> = box UIDSource::new(ProcId(0)).unwrap_or_else(|:_| { panic!("unable to create pid source"); });
+        let z : Box<UIDSource<ProcId>> = box UIDSource::new(ProcId(0)).unwrap_or_else(|_| { panic!("unable to create pid source"); });
         PID_GEN = transmute(z);
     }
 }
 
-static mut PROC_LIST : *mut BTreeMap<ProcId, Weak<ProcRefCell<KProc>>> = 0 as *mut BTreeMap<ProcId, Weak<ProcRefCell<KProc>>>;
+static mut PROC_LIST : *mut HashMap<ProcId, Weak<ProcRefCell<KProc>>> = 0 as *mut HashMap<ProcId, Weak<ProcRefCell<KProc>>>;
 macro_rules! proc_list{
     () => ({
         unsafe { PROC_LIST.as_mut().expect("proc_list not yet initialized") }
@@ -201,6 +201,7 @@ impl KProc {
                     self.children.values().find(|a: &&Rc<ProcRefCell<KProc>>| -> bool {
                                                     (**a).borrow().state == ProcState::DEAD
                                                 }) {
+                dbg!(debug::PROC, "found already dead thread {:?}", *(***kproc).borrow());
                 return Ok((*kproc).clone());
             }
             if self.wait.wait().is_err() {
@@ -223,6 +224,7 @@ impl KProc {
                         // We need to make sure the borrow isn't held during the sleep. Something
                         // else might want to look at it.
                         drop(b);
+                        dbg!(debug::PROC, "Begining wait for {:?}", pid);
                         if self.wait.wait().is_err() {
                             dbg!(debug::PROC, "Process {:?} interrupted while waiting for child {:?} to exit",self, pid); //describe!(self), pid);
                             return Err(errno::ECANCELED);
@@ -292,8 +294,8 @@ impl KProc {
             pid : try!(get_pid().ok_or_else(|| { dbg!(debug::PROC, "Unable to allocate PID!"); AllocError })),
             command : name,
             // TODO Maybe I should just have this be a box for now.
-            threads : try!(alloc!(try BTreeMap::new())),
-            children : try!(alloc!(try BTreeMap::new())),
+            threads : try!(alloc!(try HashMap::new())),
+            children : try!(alloc!(try HashMap::new())),
             status : 0,
             state : ProcState::RUNNING,
             parent : None,

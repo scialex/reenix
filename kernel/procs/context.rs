@@ -73,12 +73,13 @@ impl RunQueue {
     }
 
     fn pop(&mut self) -> &mut Context {
-        assert!(interrupt::get_ipl() == interrupt::HIGH);
         loop {
+            assert!(interrupt::get_ipl() == interrupt::HIGH);
             if let Some(next) = unsafe { self.get_inner().pop_front() } {
                 // TODO Put this dbg back in.
                 //dbg!(debug::SCHED, "found context for thead {} in {}", next.get_current_thread(), next.get_current_proc());
                 dbg!(debug::SCHED, "found a thread and executing it");
+                assert!(interrupt::get_ipl() == interrupt::HIGH);
                 let SleepingThread(c) = next;
                 return unsafe { c.as_mut().expect("Null thread in queue?") };
             }
@@ -261,15 +262,18 @@ impl Context {
     }
 
     unsafe fn switch_to(&mut self, newc : &Context) {
-        use kproc::{CUR_PROC_SLOT, KProc};
+        use kproc::{CUR_PROC_SLOT, CUR_PID_SLOT, KProc, ProcId};
         use std::ops::Deref;
 
         let ipl = interrupt::get_ipl();
         interrupt::set_ipl(interrupt::HIGH);
         gdt::set_kernel_stack((newc.kstack + newc.kstack_size) as *mut c_void);
         newc.pd.as_mut().expect("pagedir is missing").set_active();
-        gdt::set_tsd(transmute_copy(&newc.tsd));
+        if let Some(v) = newc.tsd.get_slot(CUR_PID_SLOT) {
+            dbg!(debug::SCHED, "Switching to {:?}",v.downcast_ref::<ProcId>().expect(add_file!("CUR_PID_SLOT not used")))
+        }
 
+        gdt::set_tsd(transmute_copy(&newc.tsd));
 
         // NOTE LLVM Really doesn't seem to like the inline ASM for some reason. If it even works
         // it gets incorrect asm. This is a function compiled by GDB.
