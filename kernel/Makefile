@@ -129,14 +129,14 @@ $(eval $(call plugin-rule, hoare  ,))
 MAIN_REQS := $(filter-out main, $(CRATES)) morestack compiler-rt
 
 # Reenix Crates.
-BASIC_REQS := base libc $(HOST_CRATES)
-$(eval $(call crate-rule,      core,  ,1))
+BASIC_REQS := base $(HOST_CRATES)
+$(eval $(call crate-rule,      core,            ,1))
 $(eval $(call crate-rule,      libc,        core))
 $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
 $(eval $(call crate-rule,      base,        bassert enabled core libc))
 $(eval $(call crate-rule,      mm,          $(BASIC_REQS) core))
-$(eval $(call long-crate-rule, alloc,       core libc mm,                        $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
+$(eval $(call long-crate-rule, alloc,       core mm,                             $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
 $(eval $(call long-crate-rule, basicstd,    core alloc collections rand unicode, $(BASICSTD_RSFLAGS), $(BASICSTD_RDFLAGS)))
 $(eval $(call std-crate-rule,  arena,       ,                                 basicstd))
