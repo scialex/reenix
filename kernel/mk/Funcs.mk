@@ -27,6 +27,8 @@ endef
 
 # $(1) is the name of the crate
 # $(2) is the directory it is in.
+# $(3) are any special RSFLAGS to add
+# $(4) are any special RDFLAGS to add
 define set-base-crate-name
 $(call local-var-init,TMP_SBCN_FLAG,)
 
@@ -38,9 +40,11 @@ else
     $$(error $(1) is not given any type of crate!)
 endif
 $(strip $(1))_PRESENT := 1
-$(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) $$(TMP_SBCN_FLAG) --print file-names $(strip $(2))/lib.rs 2>/dev/null))
+$(strip $(1))_LIB  := $$(firstword $$(BUILD_DIR)/libs/$$(shell $$(RUST) $$(TMP_SBCN_FLAG) $(strip $(3)) --print file-names $(strip $(2))/lib.rs 2>/dev/null))
 $(strip $(1))_DIR  := $(strip $(2))
 $(strip $(1))_DOC  := $$(call base-doc-name,$(strip $(1)))
+$(strip $(1))_FLAGS:= $(strip $(3))
+$(strip $(1))_RDFLAGS:= $(strip $(4))
 $(call local-var-destroy,TMP_SBCN_FLAG)
 endef
 
@@ -49,11 +53,11 @@ $(eval $(strip $(1))_LIB := $(BUILD_DIR)/libs/$(strip $(2)))
 endef
 
 define set-builtin-crate-name
-$(eval $(call set-base-crate-name,$(1),$(RUST_SOURCE_DIR)/src/lib$(1)))
+$(eval $(call set-base-crate-name,$(1),$(RUST_SOURCE_DIR)/src/lib$(1),,))
 endef
 
 define set-plugin-crate-name
-$(eval $(call set-base-crate-name,$(1),plugins/$(1)))
+$(eval $(call set-base-crate-name,$(1),plugins/$(1), -C extra-filename=-plugin-$(strip $(1)),))
 endef
 
 define set-other-crate-name
@@ -78,6 +82,27 @@ endef
 # $(1) is the name of the crate
 define lib-name
 $(foreach l,$(1),$($(l)_LIB))
+endef
+
+define lib-flags
+$($(strip $(1))_FLAGS)
+endef
+
+define doc-flags
+$($(strip $(1))_RDFLAGS)
+endef
+
+define add-doc-flags
+$(strip $(1))_RDFLAGS += $(2)
+endef
+
+define add-lib-flags
+$(strip $(1))_FLAGS += $(2)
+endef
+
+define add-flags
+$(strip $(1))_FLAGS += $(2)
+$(strip $(1))_RDFLAGS += $(2)
 endef
 
 define is-present
@@ -212,11 +237,11 @@ $(call local-var-init, TMP_BCR_EXTERNS,$$(foreach l,$(2), --extern $$(l)=$$(call
 
 $(call lib-name,$(1)) :  $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES) | $(TMP_BCR_PLUGINS)
 	@ echo "[RUST] Compiling \"kernel/$$(call dir-name,$(1))/lib.rs\"..."
-	$$(HIDE_SIGIL) $$(RUST) $(TMP_BCR_EXTERNS) $(3) $$(call dir-name,$(1))/lib.rs --out-dir $$(dir $(call lib-name,$(1)))
+	$$(HIDE_SIGIL) $$(RUST) $(TMP_BCR_EXTERNS) $$(call lib-flags, $(1)) $(3) $$(call dir-name,$(1))/lib.rs --out-dir $$(dir $(call lib-name,$(1)))
 
 $(call doc-name,$(1)) : $(TMP_BCR_RSFILES) $(5) $(TMP_BCR_CRATES) | $(TMP_BCR_PLUGINS) $$(call doc-name,$(2))
 	@ echo "[RDOC] Documenting \"kernel/$$(call dir-name,$(1))\"..."
-	$$(HIDE_SIGIL) $$(RUSTDOC) $(TMP_BCR_EXTERNS) $(4) --output $$(DOC_DIR) $$(call dir-name,$(1))/lib.rs
+	$$(HIDE_SIGIL) $$(RUSTDOC) $(TMP_BCR_EXTERNS) $$(call doc-flags, $(1)) $(4) --output $$(DOC_DIR) $$(call dir-name,$(1))/lib.rs
 
 $(call local-var-destroy, TMP_BCR_RSFILES)
 $(call local-var-destroy, TMP_BCR_CRATES)

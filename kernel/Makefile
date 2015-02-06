@@ -114,11 +114,8 @@ all:  $(SYMBOLS) $(BSYMBOLS) $(ISO_IMAGE) $(GDBCOMM)
 docs: $(foreach dr, $(CRATES), $(call doc-name,$(dr)))
 
 # We need to tell liballoc to use our memory manager.
-LIBALLOC_RSFLAGS := -A dead_code --cfg feature=\"external_crate\" --extern external=$(call lib-name,mm) \
-                    -C opt-level=$(DEFAULT_CRATE_OPT)
-LIBALLOC_RDFLAGS := --cfg feature=\"external_crate\" --extern external=$(call lib-name,mm)
-BASICSTD_RSFLAGS := --cfg feature=\"spin\" -C opt-level=$(DEFAULT_CRATE_OPT)
-BASICSTD_RDFLAGS := --cfg feature=\"spin\"
+$(eval $(call add-flags, alloc,    --cfg feature=\"external_crate\" --extern external=$(call lib-name,mm)))
+$(eval $(call add-flags, basicstd, --cfg feature=\"spin\"))
 
 # Plugins
 $(eval $(call plugin-rule, bassert,))
@@ -136,9 +133,9 @@ $(eval $(call crate-rule,      rand,        core))
 $(eval $(call crate-rule,      unicode,     core))
 $(eval $(call crate-rule,      base,        bassert enabled core libc))
 $(eval $(call crate-rule,      mm,          $(BASIC_REQS) core))
-$(eval $(call long-crate-rule, alloc,       core mm,                             $(LIBALLOC_RSFLAGS), $(LIBALLOC_RDFLAGS)))
+$(eval $(call crate-rule,      alloc,       core mm))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
-$(eval $(call long-crate-rule, basicstd,    core alloc collections rand unicode, $(BASICSTD_RSFLAGS), $(BASICSTD_RDFLAGS)))
+$(eval $(call crate-rule,      basicstd,    core alloc collections rand unicode))
 $(eval $(call std-crate-rule,  arena,       ,                                 basicstd))
 $(eval $(call std-crate-rule,  startup,     $(BASIC_REQS),                    basicstd))
 $(eval $(call std-crate-rule,  util,        $(BASIC_REQS),                    basicstd))
