@@ -8,7 +8,7 @@ use base::errno::KResult;
 use core::u32;
 use core::prelude::*;
 use core::intrinsics::copy_nonoverlapping_memory;
-use core::ptr::{zero_memory,null,null_mut};
+use core::ptr::{write_bytes,null,null_mut};
 use core::mem::uninitialized;
 
 // TODO Make this bitflags.
@@ -28,7 +28,11 @@ pub const VADDR_SIZE  : usize = page::SIZE * ENTRY_COUNT;
 type pte = usize;
 type pde = usize;
 
+#[inline]
+unsafe fn zero_memory<T>(dst: *mut T, count: usize) { write_bytes(dst, 0, count) }
+
 #[repr(C, packed)]
+#[unsafe_no_drop_flag]
 pub struct PageDir {
     pd_physical : [pde; ENTRY_COUNT],
     pd_virtual  : [*mut pte; ENTRY_COUNT],
@@ -93,7 +97,6 @@ impl PageDir {
     }
 
     pub unsafe fn unmap_range(&mut self, low: usize, high: usize) {
-        use core::ptr::zero_memory;
         let mut vhigh = high;
         let mut vlow = low;
         bassert!(vlow < vhigh);
@@ -173,6 +176,7 @@ impl Drop for PageDir {
         dbg!(debug::MM, "Freeing pagedir");
         for i in range(begin, end) {
             if let Some(x) = self.get_pagetable(i) {
+                self.pd_physical[i] = 0;
                 unsafe { page::free(x as *mut c_void) }
             }
         }

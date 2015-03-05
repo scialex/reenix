@@ -3,7 +3,7 @@
 use std::default::Default;
 use std::{fmt, ops};
 use std::mem::{size_of, transmute};
-use std::iter::{self, FromIterator};
+use std::iter::{self, IntoIterator, FromIterator};
 use std::collections::BTreeMap;
 use key_ref::*;
 use list_node::ListNode;
@@ -349,7 +349,6 @@ impl<K: Ord, V> LruCache<K, V> {
 }
 
 impl<K: Ord, V> ops::IndexMut<K> for LruCache<K, V> {
-    type Output = V;
     #[inline]
     fn index_mut<'a>(&'a mut self, i: &K) -> &'a mut V { self.get_mut(i).expect("no entry found in lru_cache") }
 }
@@ -369,13 +368,13 @@ impl<K: Clone + Ord, V: Clone> Clone for LruCache<K, V> {
 }
 
 impl<K: Ord, V> Extend<(K, V)> for LruCache<K, V> {
-    fn extend<T: Iterator<Item = (K, V)>>(&mut self, iter: T) {
+    fn extend<T: IntoIterator<Item = (K, V)>>(&mut self, iter: T) {
         for (k, v) in iter { self.insert(k, v); }
     }
 }
 
 impl<K: Ord, V> FromIterator<(K, V)> for LruCache<K, V> {
-    fn from_iter<T: Iterator<Item = (K, V)>>(iter: T) -> LruCache<K, V> {
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> LruCache<K, V> {
         let mut nc = match LruCache::new() { Ok(v) => v, Err(_) => { panic!("Unable to make an lru cache"); } };
         nc.extend(iter);
         nc

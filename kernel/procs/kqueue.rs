@@ -106,7 +106,8 @@ impl sync::Wakeup for KQueue {
         block_interrupts!({
             let &KQueue(ref q) = self;
             dbg!(debug::SCHED, "Waking up {} threads", q.get_ref().len());
-            for QueuedThread(x) in q.get_mut().drain() {
+            let mut lst = q.get_mut();
+            for QueuedThread(x) in lst.drain() {
                 self.wakeup_one(x);
             }
         });

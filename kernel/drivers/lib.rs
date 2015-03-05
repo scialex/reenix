@@ -4,13 +4,15 @@
 #![crate_type="rlib"]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(asm, concat_idents, lang_items, plugin, intrinsics, box_syntax, core)]
+#![feature(asm, concat_idents, lang_items, plugin, intrinsics, box_syntax, core, alloc)]
+
+#![plugin(bassert)]
 
 //! # The Reenix drivers stuff.
 ///
 /// This is all the drivers code in reenix.
 
-#[macro_use] #[plugin] #[no_link] extern crate bassert;
+#[macro_use] #[no_link] extern crate bassert;
 #[macro_use] extern crate base;
 #[macro_use] extern crate mm;
 #[macro_use] extern crate procs;

@@ -56,7 +56,7 @@ pub fn register(id: DeviceId, dev: Box<Device<u8> + 'static>) -> bool {
 
 pub struct ByteWriter<'a>(pub &'a mut Device<u8>);
 
-impl<'a> fmt::Writer for ByteWriter<'a> {
+impl<'a> fmt::Write for ByteWriter<'a> {
     fn write_str<'b>(&'b mut self, s: &str) -> fmt::Result {
         let &mut ByteWriter(ref mut this) = self;
         match this.write_to(0, s.as_bytes()) {

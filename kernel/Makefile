@@ -147,12 +147,11 @@ $(eval $(call std-crate-rule,  drivers,     $(BASIC_REQS) procs umem,         ba
 $(eval $(call std-crate-rule,  main,        $(MAIN_REQS), basicstd))
 
 # Make the target for libm
-$(eval $(call external-targets, openlibm,                                           \
-	libopenlibm.a,                                                                  \
-	libopenlibm.a,. ,                                                               \
-	SFLAGS="-m32 -march=i386"                                                       \
-   	LDFLAGS="-m32 -march=i386 -ffreestanding -nostdlib -static"                     \
-	CFLAGS="-Wno-maybe-uninitialized -g3 -gdwarf-3 -m32 -march=i386 -ffreestanding" \
+$(eval $(call external-targets, openlibm,                          \
+	libopenlibm.a,                                                 \
+	libopenlibm.a,. ,                                              \
+   	LDFLAGS="-ffreestanding -nostdlib -static"                     \
+	CFLAGS="-Wno-maybe-uninitialized -g3 -gdwarf-3 -ffreestanding" \
 	ARCH=i386,))
 
 # Make the targets for building libcompiler-rt.a, if we want to.

@@ -149,14 +149,14 @@ pub extern "Rust" fn unhandled_intr(r: &mut Registers) {
            r.intr, r, current_proc!(), current_thread!());
 }
 
-static mut IDT : InterruptState<'static> = InterruptState {
+static mut IDT : InterruptState = InterruptState {
     table    : [InterruptDescription { baselo : 0, selector: 0, zero: 0, attr: 0, basehi: 0 }; MAX_INTERRUPTS as usize],
     handlers : [unhandled_intr; MAX_INTERRUPTS as usize],
     mappings : [None; MAX_INTERRUPTS as usize],
     data     : InterruptInfo { size: 0, base : 0 as *const InterruptDescription }
 };
 
-pub struct InterruptState<'a> {
+pub struct InterruptState {
     table    : [InterruptDescription; MAX_INTERRUPTS as usize],
     handlers : [InterruptHandler; MAX_INTERRUPTS as usize],
     mappings : [Option<u16>; MAX_INTERRUPTS as usize],

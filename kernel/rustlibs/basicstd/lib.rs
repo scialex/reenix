@@ -12,6 +12,7 @@
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![feature(unsafe_destructor, int_uint, box_syntax)]
 #![feature(optin_builtin_traits)]
+#![feature(unique)]
 #![feature(core)]
 #![feature(alloc)]
 #![feature(unicode)]
@@ -19,6 +20,9 @@
 #![feature(rand)]
 #![feature(hash)]
 #![feature(macro_reexport)]
+#![feature(no_std)]
+#![feature(asm)]
+#![feature(unsafe_no_drop_flag)]
 #![no_std]
 // For rust rand
 #![allow(deprecated)]
@@ -32,11 +36,11 @@ extern crate alloc;
 extern crate unicode;
 
 pub use alloc::{boxed, rc};
-pub use core::{any, borrow, cell, clone, cmp, default, error};
+pub use core::{any, cell, clone, cmp, default, error};
 pub use core::{f32, f64, finally, hash, i16, i32, i64, i8, int, intrinsics};
 pub use core::{isize, iter, marker, mem, num, ops, option, ptr, raw};
 pub use core::{result, simd, u16, u32, u64, u8, uint, usize};
-pub use core_collections::{str, string, slice, vec};
+pub use core_collections::{str, string, slice, vec, fmt, borrow};
 pub use unicode::char;
 
 #[path = "../../../external/rust/src/libstd/macros.rs"]
@@ -44,8 +48,6 @@ pub use unicode::char;
 
 #[path = "../../../external/rust/src/libstd/ascii.rs"]
 pub mod ascii;
-#[path = "../../../external/rust/src/libstd/fmt.rs"]
-pub mod fmt;
 #[path = "../../../external/rust/src/libstd/collections/mod.rs"]
 pub mod collections;
 
@@ -80,6 +82,9 @@ pub mod thread {
             false
         }
     }
+    pub fn panicking() -> bool {
+        false
+    }
 }
 pub mod sync;
 
@@ -87,10 +92,10 @@ pub mod rt {
     pub use alloc::heap;
 
     pub fn begin_unwind(msg: &str, fl: &(&'static str, usize)) -> ! {
-        ::core::panicking::panic_fmt(format_args!("{}", msg), fl)
+        ::core::panicking::panic_fmt(format_args!("{}", msg), &(fl.0, fl.1 as u32))
     }
     pub fn begin_unwind_fmt(msg: ::fmt::Arguments, file_line: &(&'static str, usize)) -> ! {
-        ::core::panicking::panic_fmt(msg, file_line)
+        ::core::panicking::panic_fmt(msg, &(file_line.0, file_line.1 as u32))
     }
 }
 

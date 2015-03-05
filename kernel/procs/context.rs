@@ -7,7 +7,7 @@ use startup::{gdt, tsd};
 use libc::{c_void, uintptr_t};
 use interrupt;
 use std::mem::{transmute, transmute_copy};
-use std::collections::RingBuf;
+use std::collections::VecDeque;
 use std::ptr::null_mut;
 use std::rc::*;
 use pcell::*;
@@ -53,7 +53,7 @@ pub fn cleanup_bootstrap_function() {
 }
 
 struct SleepingThread(*mut Context);
-struct RunQueue(RingBuf<SleepingThread>);
+struct RunQueue(VecDeque<SleepingThread>);
 
 impl RunQueue {
     fn push(&mut self, ctx: &mut Context) {
@@ -66,10 +66,10 @@ impl RunQueue {
     /// Needed to make sure the whole check isnt optimized away.
     ///
     /// NOTE This is the closest way I can say that a value is volatile...
-    unsafe fn get_inner(&mut self) -> &mut RingBuf<SleepingThread> {
+    unsafe fn get_inner(&mut self) -> &mut VecDeque<SleepingThread> {
         use std::intrinsics::volatile_load;
         let &mut RunQueue(ref mut b) = self;
-        volatile_load::<&mut RingBuf<SleepingThread>>(&b as *const &mut RingBuf<SleepingThread>)
+        volatile_load::<&mut VecDeque<SleepingThread>>(&b as *const &mut VecDeque<SleepingThread>)
     }
 
     fn pop(&mut self) -> &mut Context {
@@ -117,7 +117,7 @@ static mut runq : *mut RunQueue = 0 as *mut RunQueue;
 
 pub fn init_stage1() {}
 pub fn init_stage2() {
-    let x = box RunQueue(RingBuf::new());
+    let x = box RunQueue(VecDeque::new());
     unsafe {
         runq = transmute(x);
     }

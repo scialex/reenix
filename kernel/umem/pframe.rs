@@ -10,6 +10,7 @@ use procs::sync::*;
 use std::cell::*;
 use std::fmt;
 use std::rc::*;
+use std::cmp::Ordering;
 use util::cacheable::*;
 
 pub use pframe::pfstate::PFState;
@@ -17,12 +18,29 @@ use util::pinnable_cache::{self, PinnableCache, InsertError, PinnedValue};
 
 pub type PageNum = usize;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub struct PFrameId { mmobj: Rc<Box<MMObj + 'static>>, page: PageNum, }
 impl PFrameId {
     /// Create a pframe id.
     pub fn new(mmo: Rc<Box<MMObj + 'static >>, page: PageNum) -> PFrameId { PFrameId { mmobj: mmo, page: page } }
 }
+
+impl PartialEq for PFrameId {
+    fn eq(&self, o: &PFrameId) -> bool {
+        self.page == o.page && self.mmobj.get_id().eq(&o.mmobj.get_id())
+    }
+}
+impl PartialOrd for PFrameId {
+    fn partial_cmp(&self, o: &PFrameId) -> Option<Ordering> {
+        match self.mmobj.get_id().cmp(&o.mmobj.get_id()) {
+            Ordering::Less => Some(Ordering::Less),
+            Ordering::Greater => Some(Ordering::Greater),
+            Ordering::Equal => Some(self.page.cmp(&o.page)),
+        }
+    }
+}
+impl Ord for PFrameId { fn cmp(&self, o: &PFrameId) -> Ordering { self.partial_cmp(o).unwrap() } }
+impl Eq for PFrameId { }
 
 impl Make<(Rc<Box<MMObj + 'static >>, PageNum)> for PFrameId {
     fn make(v: (Rc<Box<MMObj + 'static>>, PageNum)) -> PFrameId {

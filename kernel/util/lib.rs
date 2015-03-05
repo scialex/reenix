@@ -4,11 +4,10 @@
 #![crate_type="rlib"]
 
 #![feature(asm, unsafe_destructor, plugin, box_syntax, core, alloc)]
-#![feature(collections)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
-#[plugin] #[no_link] extern crate hoare;
+#![plugin(hoare)]
 #[macro_use] extern crate base;
 #[macro_use] extern crate mm;
 
@@ -18,7 +17,7 @@ pub fn init_stage1() {}
 pub fn init_stage2() {}
 pub fn init_stage3() {}
 
-pub mod serialize;
+//pub mod serialize;
 pub mod uid;
 pub mod lru_cache;
 pub mod pinnable_cache;

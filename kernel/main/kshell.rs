@@ -10,7 +10,7 @@ use procs::interrupt;
 use procs::kproc::{KProc, self};
 use std::cell::*;
 use std::collections::*;
-use std::fmt::{self, Writer};
+use std::fmt::{self, Write};
 use std::str::{FromStr, from_utf8};
 
 /// Just a wraper to writeln! or panic.
@@ -163,7 +163,7 @@ impl<'a> KShell<'a> {
                     continue;
                 },
             };
-            match self.run_command(&cmd.split(' ').filter(|&: s: & &str| -> bool { (*s).len() != 0 }).collect::<Vec<&str>>()[]) {
+            match self.run_command(&cmd.split(' ').filter(|&: s: & &str| -> bool { (*s).len() != 0 }).collect::<Vec<&str>>()[..]) {
                 Ok(_) => {},
                 Err(e) => { dbg!(debug::KSHELL, "recieved {:?}", e); },
             }
@@ -413,7 +413,7 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
         buf.push(out);
     }
     let disk = blockdev::lookup(DeviceId::create(1,0)).expect("should have disk 0");
-    disk.write_to(start, &buf[]).and(Ok(()))
+    disk.write_to(start, &buf[..]).and(Ok(()))
 }
 
 fn do_help<'a>(sh: &KShell<'a>, _: &[&str]) -> KResult<()> {
@@ -451,7 +451,7 @@ fn do_prepeat<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
         }
         cmd.push_all(&argv[2..]);
     }
-    do_parallel(sh, &cmd[])
+    do_parallel(sh, &cmd[..])
 }
 #[allow(unused_must_use)]
 fn do_parallel<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {

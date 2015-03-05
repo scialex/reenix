@@ -98,34 +98,28 @@ pub trait MMObj : fmt::Debug {
     fn clean_page(&self, pf: &pframe::PFrame) -> KResult<()>;
 }
 
-pub trait MMObjExt {
-    /**
-     * Finds the correct page frame from a high-level perspective
-     * for performing the given operation on an area backed by
-     * the given pagenum of the given object. If "forwrite" is
-     * specified then the pframe should be suitable for writing;
-     * otherwise, it is permitted not to support writes. In
-     * either case, it must correctly support reads.
-     *
-     * Most objects will simply return a page from their
-     * own list of pages, but objects such as shadow objects
-     * may need to perform more complicated operations to find
-     * the appropriate page.
-     * This may block.
-     */
-    // TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
-    // better. Using this stuff is annoying.
-    fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: usize, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
-        pframe::PFrame::get(this, pagenum)
-    }
+/**
+    * Finds the correct page frame from a high-level perspective
+    * for performing the given operation on an area backed by
+    * the given pagenum of the given object. If "forwrite" is
+    * specified then the pframe should be suitable for writing;
+    * otherwise, it is permitted not to support writes. In
+    * either case, it must correctly support reads.
+    *
+    * Most objects will simply return a page from their
+    * own list of pages, but objects such as shadow objects
+    * may need to perform more complicated operations to find
+    * the appropriate page.
+    * This may block.
+    */
+// TODO This isn't the best interface Maybe a holder that will unpin when we leave, might be
+// better. Using this stuff is annoying.
+pub fn lookup_page(this: Rc<Box<MMObj + 'static>>, pagenum: usize, _writable: bool) -> KResult<PinnedValue<'static, pframe::PFrameId, pframe::PFrame>> {
+    pframe::PFrame::get(this, pagenum)
 }
 
-impl<T> MMObjExt for T where T: MMObj { }
-
-impl<'a> PartialOrd for MMObj + 'a { fn partial_cmp(&self, o: &MMObj) -> Option<Ordering> { self.get_id().partial_cmp(&o.get_id()) } }
-impl<'a> PartialEq  for MMObj + 'a { fn eq(&self, o: &MMObj) -> bool { self.get_id().eq(&o.get_id()) } }
-impl<'a> Ord        for MMObj + 'a { fn cmp(&self, o: &MMObj) -> Ordering { self.get_id().cmp(&o.get_id()) } }
-impl<'a> Eq         for MMObj + 'a {}
+impl<'a, T: MMObj + 'a> PartialOrd<T> for MMObj + 'a { fn partial_cmp(&self, o: &T) -> Option<Ordering> { self.get_id().partial_cmp(&o.get_id()) } }
+impl<'a, T: MMObj + 'a> PartialEq<T>  for MMObj + 'a { fn eq(&self, o: &T) -> bool { self.get_id().eq(&o.get_id()) } }
 
 
 // TODO I might want to replace this with a trait that just lets us do the deref, that would let us

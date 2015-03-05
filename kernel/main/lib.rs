@@ -10,7 +10,8 @@
 #![feature(core)]
 #![feature(collections)]
 
-#[macro_use] #[plugin] #[no_link] extern crate bassert;
+#![plugin(bassert)]
+#[macro_use] #[no_link] extern crate bassert;
 #[macro_use] extern crate base;
 #[macro_use] extern crate procs;
 #[macro_use] extern crate mm;
@@ -34,6 +35,10 @@ mod kshell;
 mod langs;
 
 extern "C" { fn dbg_init(); }
+
+extern "Rust" fn page_fault_temp(regs: &mut interrupt::Registers) {
+    panic!("Page Fault occured! regs {:?}, proc {:?}, thr {:?}", regs, current_proc!(), current_thread!());
+}
 
 #[no_stack_check]
 fn run_init() {
@@ -116,6 +121,7 @@ fn finish_init() {
     procs::init_stage3();
     umem::init_stage3();
     drivers::init_stage3();
+    interrupt::register(interrupt::PAGE_FAULT, page_fault_temp);
     interrupt::enable();
     interrupt::set_ipl(interrupt::LOW);
     unsafe { IS_PROCS_UP = true; }

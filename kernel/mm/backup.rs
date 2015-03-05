@@ -6,7 +6,7 @@ use core::prelude::*;
 use super::page;
 use core::cmp;
 use core::mem::{size_of, transmute};
-use core::ptr::{set_memory, zero_memory, write};
+use core::ptr::{write_bytes, write};
 use core::fmt;
 
 const FREE_FILL : u8 = 0xF7;
@@ -125,7 +125,7 @@ impl BackupAllocator {
         let res = self.real_allocate(req, align);
         unsafe { transmute::<&BackupAllocator, &mut BackupAllocator>(self).recalculate() };
         if !res.is_null() {
-            unsafe { set_memory(res, ALOC_FILL, size); }
+            unsafe { write_bytes(res, ALOC_FILL, size); }
             let recieved_size =  unsafe { (res as *const Tag).offset(-1).as_ref().expect("shouldn't be null").size() };
             dbg!(debug::MM|debug::BACKUP_MM, "allocated {:p}-{:p} which is {} bytes long for request for {}",
                  res, unsafe { res.offset(recieved_size as isize) }, recieved_size, size);
@@ -227,7 +227,7 @@ impl BackupAllocator {
     }
 
     pub fn deallocate(&self, ptr: *mut u8, size: usize, align: usize) {
-        unsafe { set_memory(ptr, FREE_FILL, size); }
+        unsafe { write_bytes(ptr, FREE_FILL, size); }
         dbg!(debug::MM|debug::BACKUP_MM, "Request to deallocate {:p} of size {}", ptr, size);
         let req = (size + (size_of::<Tag>() - 1)) & (!(size_of::<Tag>() - 1));
         self.real_deallocate(ptr, req, align);
@@ -262,7 +262,7 @@ impl BackupAllocator {
 
     pub fn setup(&mut self) {
         unsafe {
-            zero_memory::<u8>(self.buf, page::num_to_addr::<u8>(self.pages as usize) as usize);
+            write_bytes::<u8>(self.buf, 0, page::num_to_addr::<u8>(self.pages as usize) as usize);
             write(self.buf as *mut Tag, Tag::new((self.byte_len() as usize) - size_of::<Tag>()));
         }
     }

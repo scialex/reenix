@@ -6,12 +6,13 @@
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 #![feature(asm, concat_idents, lang_items, plugin, intrinsics, unsafe_destructor, box_syntax, core, alloc)]
 
+#![plugin(bassert)]
 // TODO I should maybe rename this...
 //! The Reenix User memory stuff.
 ///
 /// It has things like the pframe
 
-#[macro_use] #[plugin] #[no_link] extern crate bassert;
+#[macro_use] #[no_link] extern crate bassert;
 
 #[macro_use] extern crate procs;
 #[macro_use] extern crate base;

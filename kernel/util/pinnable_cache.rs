@@ -22,7 +22,7 @@ struct CacheItem<K, V> {
     pcnt: AtomicUint,
 }
 
-impl<'a, K, V: 'a> Make<K> for Allocation<Box<CacheItem<K, V>>> where K: Ord, V: RefMake<'a, K> + Cacheable {
+impl<K, V> Make<K> for Allocation<Box<CacheItem<K, V>>> where K: Ord, V: RefMake<K> + Cacheable {
     fn make(k: K) -> Allocation<Box<CacheItem<K, V>>> {
         let val = RefMake::make_from(&k);
         CacheItem::new(k, val)

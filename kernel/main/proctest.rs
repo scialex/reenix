@@ -176,7 +176,8 @@ extern "C" fn to_kill(n: i32, p: *mut c_void) -> *mut c_void {
         kthread::kyield();
     }
     let pid : Box<ProcId> = unsafe { transmute(p) };
-    (*KProc::get_proc(&*pid).expect("there is no process of that pid")).borrow_mut().kill(GOOD as ProcStatus);
+    let prc = &*KProc::get_proc(&*pid).expect("there is no process of that pid");
+    prc.borrow_mut().kill(GOOD as ProcStatus);
     dbg!(debug::TEST, "to_die thread killed");
     GOOD
 }

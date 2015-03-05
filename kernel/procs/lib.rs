@@ -15,8 +15,10 @@
 #![feature(core)]
 #![feature(alloc)]
 #![feature(hash)]
+#![feature(unsafe_no_drop_flag)]
 
-#[macro_use] #[plugin] #[no_link] extern crate bassert;
+#![plugin(bassert)]
+#[macro_use] #[no_link] extern crate bassert;
 #[macro_use] extern crate base;
 #[macro_use] extern crate mm;
 extern crate startup;

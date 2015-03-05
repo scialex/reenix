@@ -9,12 +9,14 @@
 #![allow(non_camel_case_types)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(plugin, asm, core)]
+#![feature(plugin, asm, core, no_std, unsafe_no_drop_flag)]
 #![no_std]
 
-#[plugin] #[no_link] extern crate hoare;
-#[plugin] #[no_link] #[macro_use] extern crate bassert;
-#[plugin] #[no_link] #[macro_use] extern crate enabled;
+#![plugin(hoare)]
+#![plugin(bassert)]
+#![plugin(enabled)]
+#[no_link] #[macro_use] extern crate bassert;
+#[no_link] #[macro_use] extern crate enabled;
 #[macro_use] extern crate core;
 #[macro_use] extern crate base;
 extern crate libc;

@@ -7,7 +7,7 @@ use base::errno;
 use std::{cmp, hash, fmt, num};
 use context;
 use std::mem::{size_of, transmute_copy};
-use std::ptr::{self, copy_nonoverlapping_memory};
+use std::ptr::{self, copy_nonoverlapping};
 use kqueue::KQueue;
 use context::{Context, ContextFunc};
 use mm::pagetable::PageDir;
@@ -39,7 +39,7 @@ impl KStack {
         let &mut KStack(msize, mptr) = self;
         let &KStack(osize, optr) = other;
         let size = cmp::min(msize, osize);
-        unsafe { copy_nonoverlapping_memory(mptr, optr as *const u8, size); }
+        unsafe { copy_nonoverlapping(mptr, optr as *const u8, size); }
     }
 
     pub fn num_pages(&self) -> usize {
@@ -88,8 +88,8 @@ pub fn kyield() {
     ct.ctx.kyield();
 }
 
-impl<S: hash::Writer + hash::Hasher> hash::Hash<S> for KThread {
-    fn hash(&self, state: &mut S) {
+impl hash::Hash for KThread {
+    fn hash<S: hash::Hasher>(&self, state: &mut S) {
         self.kstack.hash(state)
     }
 }
