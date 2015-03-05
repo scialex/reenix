@@ -14,7 +14,7 @@
 #![crate_name="hoare"]
 #![feature(plugin_registrar)]
 #![feature(quote)]
-#![feature(rustc_private, core, collections)]
+#![feature(rustc_private, core)]
 #![feature(box_syntax)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
@@ -59,14 +59,14 @@ fn precond(cx: &mut ExtCtxt,
                 Some(pred) => pred,
                 None => return item.clone()
             };
-            let pred_str = pred.get();
+            let pred_str = pred;
             let pred = cx.parse_expr(pred_str.to_string());
 
             // Construct the wrapper function.
             let fn_name = token::get_ident(item.ident);
 
             let mut stmts = Vec::new();
-            stmts.push(assert(&*cx, "precondition of", &fn_name, pred.clone(), pred_str));
+            stmts.push(assert(&*cx, "precondition of", &fn_name, pred.clone(), &*pred_str));
 
             let fn_name = ast::Ident::new(token::intern(format!("__inner_fn_{}", fn_name).as_slice()));
             // Construct the inner function.
@@ -103,7 +103,7 @@ fn postcond(cx: &mut ExtCtxt,
                 Some(pred) => pred,
                 None => return item.clone()
             };
-            let pred_str = pred.get();
+            let pred_str = &*pred;
             // Rename `return` to `__result`
             let pred_str = pred_str.replace("return", "__result");
             let pred = cx.parse_expr(pred_str.clone());
@@ -149,7 +149,7 @@ fn invariant(cx: &mut ExtCtxt,
                 Some(pred) => pred,
                 None => return item.clone()
             };
-            let pred_str = pred.get();
+            let pred_str = &*pred;
             let pred = cx.parse_expr(pred_str.to_string());
 
             // Construct the wrapper function.
@@ -291,12 +291,12 @@ fn args(cx: &ExtCtxt, decl: &ast::FnDecl, sp: Span) -> Option<Vec<ast::TokenTree
     }
 
     let cm = &cx.parse_sess.span_diagnostic.cm;
-    let mut args = decl.inputs.iter().map(|a| {
+    let args = decl.inputs.iter().map(|a| {
         // span_to_snippet really shouldn't return None, so I hope the
         // unwrap is OK. Not sure we can do anything it is does in any case.
         cx.parse_tts(cm.span_to_snippet(a.pat.span).unwrap())
     });
-    
+
     let mut arg_toks = Vec::new();
     let mut first = true;
     for a in args {
