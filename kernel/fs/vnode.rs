@@ -6,7 +6,7 @@ use base::devices::*;
 use umem::mmobj::*;
 use ::InodeNum;
 use std::fmt;
-use base::errno::{self, KResult};
+use base::errno::{self, KResult, Errno};
 use mm::page;
 
 bitmask_create!(
@@ -29,31 +29,48 @@ bitmask_create!(
     }
 );
 
-pub trait VNode : MMObj + fmt::Show {
+impl Mode {
+    #[inline] fn stat_err(self) -> Errno { Errno::ENOTSUP }
+    #[inline] fn len_err(self) -> Errno { Errno::ENOTSUP }
+    #[inline] fn read_err(self) -> Errno { if self & Directory != Unused { Errno::EISDIR } else { Errno::ENOTSUP } }
+    #[inline] fn write_err(self) -> Errno { self.read_err() }
+    #[inline] fn truncate_err(self) -> Errno { self.read_err() }
+    #[inline] fn create_err(self) -> Errno { if self & Directory == Unused { Errno::ENOTDIR } else { Errno::ENOTSUP } }
+    #[inline] fn lookup_err(self) -> Errno { self.create_err() }
+    #[inline] fn mknod_err(self) -> Errno { if self & Directory != Unused { Errno::ENOTDIR } else { Errno::ENODEV } }
+    #[inline] fn link_err(self) -> Errno { self.create_err() }
+    #[inline] fn unlink_err(self) -> Errno { self.create_err() }
+    #[inline] fn mkdir_err(self) -> Errno { self.create_err() }
+    #[inline] fn rmdir_err(self) -> Errno { self.create_err() }
+    #[inline] fn readdir_err(self) -> Errno { self.create_err() }
+}
+
+pub trait VNode : fmt::Debug {
+    type Res: VNode;
     fn get_mode(&self) -> Mode;
     fn get_number(&self) -> InodeNum;
-    fn stat(&self) -> KResult<Stat>;
-    fn len(&self) -> KResult<usize>;
+    fn stat(&self) -> KResult<Stat> { Err(self.get_mode().stat_err()) }
+    fn len(&self) -> KResult<usize> { Err(self.get_mode().len_err()) }
 
-    fn read(&self, off: usize, buf: &mut [u8]) -> KResult<usize> { Err(errno::EISDIR) }
-    fn write(&self, off: usize, buf: &[u8]) -> KResult<usize> { Err(errno::EISDIR) }
-    fn truncate(&self, size: usize) -> KResult<usize> { Err(errno::EISDIR) }
+    fn read(&self, off: usize, buf: &mut [u8]) -> KResult<usize> { Err(self.get_mode().read_err()) }
+    fn write(&self, off: usize, buf: &[u8]) -> KResult<usize> { Err(self.get_mode().write_err()) }
+    fn truncate(&self, size: usize) -> KResult<usize> { Err(self.get_mode().truncate_err()) }
     // TODO Figure out the contract for mmap.
     //fn mmap(&self; .) -> KResult<?> { Err(errno::EINVAL) }
 
-    fn create(&self, name: &str) -> KResult<Self> { Err(errno::ENOTDIR) }
-    fn lookup(&self, name: &str) -> KResult<Self> { Err(errno::ENOTDIR) }
+    fn create(&self, name: &str) -> KResult<Self::Res> { Err(self.get_mode().create_err()) }
+    fn lookup(&self, name: &str) -> KResult<Self::Res> { Err(self.get_mode().lookup_err()) }
 
-    fn mknod(&self, name: &str, devid: DeviceId) -> KResult<()> { Err(errno::ENOTDIR) }
+    fn mknod(&self, name: &str, devid: DeviceId) -> KResult<()> { Err(self.get_mode().mknod_err()) }
     // TODO Maybe this should be &Self for from...
-    fn link(&self, from: &Self, to: &str) -> KResult<()> { Err(errno::ENOTDIR) }
-    fn unlink(&self, to: &str) -> KResult<()> { Err(errno::ENOTDIR) }
-    fn mkdir(&self, to: &str) -> KResult<()> { Err(errno::ENOTDIR) }
-    fn rmdir(&self, to: &str) -> KResult<()> { Err(errno::ENOTDIR) }
+    fn link(&self, from: &Self::Res, to: &str) -> KResult<()> { Err(self.get_mode().link_err()) }
+    fn unlink(&self, to: &str) -> KResult<()> { Err(self.get_mode().unlink_err()) }
+    fn mkdir(&self, to: &str) -> KResult<()> { Err(self.get_mode().mkdir_err()) }
+    fn rmdir(&self, to: &str) -> KResult<()> { Err(self.get_mode().rmdir_err()) }
     /// Given offset into directory returns the size of the dirent in the directory structure and
     /// the given dirent. If it returns EOK then we have read the whole directory. To read the next
     /// entry add the returned length to the offset.
-    fn readdir(&self, off: usize) -> KResult<(usize, DirEnt)> { Err(errno::ENOTDIR) }
+    fn readdir(&self, off: usize) -> KResult<(usize, DirEnt)> { Err(self.get_mode().readdir_err()) }
 
 //    fn fill_page(&self, pagenum: usize, page: &mut [u8; page::SIZE]) -> KResult<()>;
 //    fn clean_page(&self, pagenum: usize, page: &[u8; page::SIZE]) -> KResult<()>;
