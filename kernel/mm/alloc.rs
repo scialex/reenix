@@ -19,6 +19,8 @@ use slabmap::{SlabMap, DEFAULT_SLAB_MAP};
 use backup::{BackupAllocator, DEFAULT_BACKUP_ALLOCATOR};
 use page;
 
+const RC_OVERHEAD : size_t = 12;
+
 /// An allocator is a type that can allocate memory. It is currently a wrapper around C functions.
 struct Allocator {
     slabs : SlabMap,
@@ -193,6 +195,10 @@ pub fn requests_closed() -> bool { unsafe { REQUESTS_CLOSED } }
 #[postcond = "requests_closed()"]
 pub fn close_requests() { dbg!(debug::MM, "Requests closed"); unsafe { REQUESTS_CLOSED = true; (&mut BASE_ALLOCATOR).finish() } }
 
+#[inline]
+pub fn request_rc_slab_allocator(name: &'static str, size: size_t) {
+    request_slab_allocator(name, size + RC_OVERHEAD)
+}
 /// Request that a slab allocator be made to service requests of the given size.
 ///
 /// One should do this if it is known that there will be a lot of requests for a specific object.

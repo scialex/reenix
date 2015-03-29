@@ -1,31 +1,29 @@
 
 //! The RAMFS
 
+
 use FileSystem;
 use InodeNum;
-use vnode::{self, VNode, Stat, DirEnt};
-use mm::page;
-use umem::pframe::*;
-use base::errno::{self, KResult};
-use base::devices::DeviceId;
-use std::sync::atomic::AtomicUint;
-use std::sync::atomic::Ordering::{SeqCst, Relaxed};
-use std::{slice, mem, fmt};
-use std::cell::*;
 use base::cell::*;
-use std::slice::bytes::copy_memory;
-use umem::mmobj::{MMObjId, MMObj};
-use std::cmp::min;
-use std::rc::*;
-use std::borrow::*;
+use base::devices::DeviceId;
+use base::errno::{self, KResult};
+use mm::alloc::request_rc_slab_allocator;
+use mm::page;
 use procs::sync::Mutex;
+use std::borrow::*;
+use std::cell::*;
+use std::cmp::min;
 use std::collections::HashMap;
-use base::errno::Errno;
-
-use self::RVNode::*;
+use std::mem::{transmute, size_of};
+use std::rc::*;
+use std::slice::bytes::copy_memory;
+use std::{mem, fmt};
+use umem::mmobj::{MMObjId, MMObj};
+use umem::pframe::PFrame;
+use vnode::{self, VNode, Stat, DirEnt};
 
 /// The FS to use for a ramfs
-static mut FS : Option<*mut RamFS> = None;
+static mut FS : *mut RamFS = 0 as *mut RamFS;
 
 /// The deviceid for ramfs
 pub const RAMFS_DEVID : DeviceId = DeviceId_static!(4,0);
@@ -34,37 +32,58 @@ pub const RAMFS_DEVID : DeviceId = DeviceId_static!(4,0);
 pub const NAME_LEN : usize = 28;
 
 /// The number of files we will allow.
-pub const MAX_INODES : usize = 128;
+pub const MAX_INODES : InodeNum = 128;
+pub const ROOT_INODE_NUM : InodeNum = MAX_INODES - 1;
 
 const MAX_FILE_LEN : usize = page::SIZE;
 
-#[derive(Clone, Debug)]
+pub fn init_stage1() {
+    // Rc's have some overhead.
+    request_rc_slab_allocator("RVNode", size_of::<RVNode>() as u32);
+}
+
+pub fn init_stage2() { }
+pub fn init_stage3() {
+    unsafe {
+        let fs : Box<RamFS> = box mem::uninitialized();
+        RamFS::initialize(mem::transmute(&fs));
+        FS = mem::transmute(fs);
+    }
+}
+
+pub fn shutdown() {
+}
+
+#[derive(Debug)]
 pub enum RVNode {
-    Byte(Rc<ByteInode>),
-    Block(Rc<BlockInode>),
-    Regular(Rc<RegInode>),
-    Directory(Rc<DirInode>),
+    Byte(ByteInode),
+    Block(BlockInode),
+    Regular(RegInode),
+    Directory(DirInode),
 }
 
 impl RVNode {
-    fn get_inner(&self) -> &VNode<Res=RVNode> {
-        match *self { Byte(i) => &*i, Block(i) => &*i, Regular(i) => &*i, Directory(i) => &*i, }
+    fn get_inner(&self) -> &VNode<Real=RVNode, Res=Rc<RVNode>> {
+        use self::RVNode::*;
+        match *self { Byte(ref i) => i, Block(ref i) => i, Regular(ref i) => i, Directory(ref i) => i, }
     }
 }
 
 impl MMObj for RVNode {
-    fn get_id(&self) -> MMObjId { MMObjId::new(RAMFS_DEVID, self.get_number()) }
-    fn fill_page(&self,   pf: &mut PFrame) -> KResult<()> { dbg!(debug::VFS, "ramfs vnode used as mmobj!"); Err(errno::ENOTSUP) }
-    fn dirty_page(&self,  pf: &PFrame)     -> KResult<()> { dbg!(debug::VFS, "ramfs vnode used as mmobj!"); Err(errno::ENOTSUP) }
-    fn clean_page(&self,  pf: &PFrame)     -> KResult<()> { dbg!(debug::VFS, "ramfs vnode used as mmobj!"); Err(errno::ENOTSUP) }
+    fn get_id(&self) -> MMObjId { MMObjId::new(RAMFS_DEVID, self.get_number() as u32) }
+    fn fill_page(&self,   _pf: &mut PFrame) -> KResult<()> { dbg!(debug::VFS, "ramfs vnode used as mmobj!"); Err(errno::ENOTSUP) }
+    fn dirty_page(&self,  _pf: &PFrame)     -> KResult<()> { dbg!(debug::VFS, "ramfs vnode used as mmobj!"); Err(errno::ENOTSUP) }
+    fn clean_page(&self,  _pf: &PFrame)     -> KResult<()> { dbg!(debug::VFS, "ramfs vnode used as mmobj!"); Err(errno::ENOTSUP) }
     // TODO The next two maybe should panic?
     //fn dirty_page(&self, _pf: &PFrame)      -> KResult<()> { Ok(()) }
     //fn clean_page(&self, _pf: &PFrame)      -> KResult<()> { Ok(()) }
 }
 
 impl VNode for RVNode {
-    type Res = RVNode;
+    type Real = RVNode;
+    type Res = Rc<RVNode>;
     fn get_mode(&self) -> vnode::Mode {
+        use self::RVNode::*;
         match *self {
             Byte(_) => vnode::CharDev,
             Block(_) => vnode::BlockDev,
@@ -73,6 +92,7 @@ impl VNode for RVNode {
         }
     }
 
+    fn get_fs(&self) -> &FileSystem<Real=RVNode, Node=Rc<RVNode>> { self.get_inner().get_fs() }
     fn get_number(&self) -> InodeNum { self.get_inner().get_number() }
     fn stat(&self) -> KResult<Stat> { self.get_inner().stat() }
     fn len(&self) -> KResult<usize> { self.get_inner().len() }
@@ -83,12 +103,12 @@ impl VNode for RVNode {
     // TODO Figure out the contract for mmap.
     //fn mmap(&self, ...) -> KResult<?> { Err(errno::EINVAL) }
 
-    fn create(&self, name: &str) -> KResult<RVNode> { self.get_inner().create(name) }
-    fn lookup(&self, name: &str) -> KResult<RVNode> { self.get_inner().lookup(name) }
+    fn create(&self, name: &str) -> KResult<Rc<RVNode>> { self.get_inner().create(name) }
+    fn lookup(&self, name: &str) -> KResult<Rc<RVNode>> { self.get_inner().lookup(name) }
     fn mknod(&self, name: &str, devid: DeviceId) -> KResult<()> { self.get_inner().mknod(name, devid) }
 
     // TODO Maybe this should be &Self for from...
-    fn link(&self, from: &RVNode, to: &str) -> KResult<()> { self.get_inner().link(from, to) }
+    fn link(&self, from: &Rc<RVNode>, to: &str) -> KResult<()> { self.get_inner().link(from, to) }
     fn unlink(&self, to: &str) -> KResult<()> { self.get_inner().unlink(to) }
     fn mkdir(&self, to: &str) -> KResult<()> { self.get_inner().mkdir(to) }
     fn rmdir(&self, to: &str) -> KResult<()> { self.get_inner().rmdir(to) }
@@ -100,41 +120,45 @@ impl VNode for RVNode {
 
 #[derive(Clone, Debug)]
 pub struct ByteInode {
-    fs: Rc<RamFS>,
+    fs: &'static RamFS,
     num: InodeNum,
     dev: DeviceId,
 }
 impl ByteInode {
-    fn new(num: InodeNum, dev: DeviceId, fs: Rc<RamFS>) -> ByteInode {
+    fn new(num: InodeNum, dev: DeviceId, fs: &'static RamFS) -> ByteInode {
         ByteInode { num: num, fs: fs, dev: dev }
     }
 }
 impl VNode for ByteInode {
-    type Res = RVNode;
+    type Real = RVNode;
+    type Res = Rc<RVNode>;
+    fn get_fs(&self) -> &FileSystem<Real=RVNode, Node=Rc<RVNode>> { self.fs }
     fn get_mode(&self) -> vnode::Mode { vnode::CharDev }
     fn get_number(&self) -> InodeNum { self.num }
 }
 
 #[derive(Clone, Debug)]
 pub struct BlockInode {
-    fs: Rc<RamFS>,
+    fs: &'static RamFS,
     num: InodeNum,
     dev: DeviceId,
 }
 impl BlockInode {
-    fn new(num: InodeNum, dev: DeviceId, fs: Rc<RamFS>) -> BlockInode {
+    fn new(num: InodeNum, dev: DeviceId, fs: &'static RamFS) -> BlockInode {
         BlockInode { num: num, fs: fs, dev: dev }
     }
 }
 impl VNode for BlockInode {
-    type Res = RVNode;
+    type Real = RVNode;
+    type Res = Rc<RVNode>;
+    fn get_fs(&self) -> &FileSystem<Real=RVNode, Node=Rc<RVNode>> { self.fs }
     fn get_mode(&self) -> vnode::Mode { vnode::BlockDev }
     fn get_number(&self) -> InodeNum { self.num }
 }
 
 pub struct RegInode {
     num: InodeNum,
-    fs: Rc<RamFS>,
+    fs: &'static RamFS,
     data: SafeCell<Box<[u8;MAX_FILE_LEN]>>,
     len: Cell<usize>,
 }
@@ -146,10 +170,12 @@ impl fmt::Debug for RegInode {
 }
 
 impl VNode for RegInode {
-    type Res = RVNode;
+    type Real = RVNode;
+    type Res = Rc<RVNode>;
+    fn get_fs(&self) -> &FileSystem<Real=RVNode, Node=Rc<RVNode>> { self.fs }
     fn get_mode(&self) -> vnode::Mode { vnode::Regular }
     fn get_number(&self) -> InodeNum { self.num }
-    fn len(&self) -> KResult<usize> { self.len() }
+    fn len(&self) -> KResult<usize> { Ok(self.len.get()) }
     fn read(&self, off: usize, buf: &mut [u8]) -> KResult<usize> {
         let len = try!(self.len());
         if off > len { Err(errno::EFBIG) } else {
@@ -158,13 +184,12 @@ impl VNode for RegInode {
             Ok(end - off)
         }
     }
-    fn write(&self, off: usize, mut buf: &[u8]) -> KResult<usize> {
-        use std::slice::{bytes, from_raw_mut_buf};
+    fn write(&self, off: usize, buf: &[u8]) -> KResult<usize> {
         let len = try!(self.len());
         if off >= MAX_FILE_LEN { return Err(errno::ENOSPC); }
         if off > len { self.fill_zeros(off); }
         let buf = &buf[0..min(buf.len(), MAX_FILE_LEN - off)];
-        let data = self.data.get_mut();
+        let mut data = self.data.get_mut();
         copy_memory(&mut data[off..], buf);
         Ok(buf.len())
     }
@@ -175,12 +200,12 @@ impl VNode for RegInode {
 }
 
 impl RegInode {
-    fn new(num: InodeNum, fs: Rc<RamFS>) -> RegInode {
+    fn new(num: InodeNum, fs: &'static RamFS) -> RegInode {
         RegInode { num: num, fs: fs, data: SafeCell::new(box [0;MAX_FILE_LEN]), len: Cell::new(0) }
     }
     fn fill_zeros(&self, end: usize) {
         bassert!(end < MAX_FILE_LEN);
-        let data = self.data.get_mut();
+        let mut data = self.data.get_mut();
         let len = self.len().unwrap();
         for i in len..end {
             data[i] = 0;
@@ -191,8 +216,9 @@ impl RegInode {
 
 pub struct DirInode {
     num: InodeNum,
-    fs: Rc<RamFS>,
-    data: Mutex<HashMap<String, RVNode>>,
+    fs: &'static RamFS,
+    parent: Option<InodeNum>,
+    data: Mutex<HashMap<String, Rc<RVNode>>>,
 }
 
 impl fmt::Debug for DirInode {
@@ -204,75 +230,100 @@ impl fmt::Debug for DirInode {
 
 
 impl DirInode {
-    fn new(num: InodeNum, fs: Rc<RamFS>) -> DirInode {
-        DirInode { num: num, data: Mutex::new("dir inode mutex", HashMap::new()), fs: fs }
+    fn new(num: InodeNum, parent: Option<InodeNum>, fs: &'static RamFS) -> DirInode {
+        DirInode { num: num, parent: parent, data: Mutex::new("dir inode mutex", HashMap::new()), fs: fs }
     }
 }
 
 impl VNode for DirInode {
-    type Res = RVNode;
+    type Real = RVNode;
+    type Res = Rc<RVNode>;
 
+    fn get_fs(&self) -> &FileSystem<Real=RVNode, Node=Rc<RVNode>> { self.fs }
     fn get_mode(&self) -> vnode::Mode { vnode::Directory }
     fn get_number(&self) -> InodeNum { self.num }
-    fn len(&self) -> KResult<usize> { let c = try!(self.data.lock().map_err(|_| errno::EDEADLK)); Ok(c.len() + 1) }
+    fn len(&self) -> KResult<usize> { let c = try!(self.data.lock().map_err(|_| errno::EDEADLK)); Ok(c.len() + 2) }
 
     fn stat(&self) -> KResult<Stat> {
         // TODO
         kpanic!("not implemented");
     }
 
-    fn create(&self, name: &str) -> KResult<RVNode> {
+    fn create(&self, name: &str) -> KResult<Rc<RVNode>> {
         if name == "." { return Err(errno::EEXIST); }
-        let l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
-        let d = &*l;
+        let mut l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
+        let mut d = &mut *l;
         if d.contains_key(name) { return Err(errno::EEXIST); }
-        let new_node = try!(self.fs.alloc_reg());
+        let new_node = dbg_try!(self.fs.alloc_reg(), debug::VFS, "Unable to get new file inode for file {}", name);
         d.insert(name.to_owned(), new_node.clone());
         Ok(new_node)
     }
 
-    fn link(&self, from: &RVNode, name: &str ) -> KResult<()> {
+    fn link(&self, from: &Rc<RVNode>, name: &str ) -> KResult<()> {
         if from.get_mode() & vnode::Directory != vnode::Unused { return Err(errno::EISDIR); }
         if name == "." { return Err(errno::EEXIST); }
-        let l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
+        let mut l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
         let d = &mut *l;
-        if d.contains_key(name) { return Err(errno::EEXIST); }
+        if d.contains_key(name) {
+            dbg!(debug::VFS, "Could not create {} in {} because another vnode has that name", name, self);
+            return Err(errno::EEXIST);
+        }
         d.insert(name.to_owned(), from.clone());
         return Ok(());
     }
 
     fn mkdir(&self, name: &str) -> KResult<()> {
         if name == "." { return Err(errno::EEXIST); }
-        let l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
-        let d = &mut *l;
-        if d.contains_key(name) { return Err(errno::EEXIST); }
-        let new_node = try!(self.fs.alloc_dir());
+        let mut l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
+        let mut d = &mut *l;
+        if d.contains_key(name) {
+            dbg!(debug::VFS, "Could not mkdir {} in {} because another vnode has that name", name, self);
+            return Err(errno::EEXIST);
+        }
+        let new_node = dbg_try!(self.fs.alloc_dir(self.get_number()),
+                                debug::VFS, "Unable to create directory node for {} in {}", name, self);
         // TODO Link ..
         d.insert(name.to_owned(), new_node);
         Ok(())
     }
 
-    fn mknod(&self, name: &str, devid: DeviceId) -> KResult<()> {
+    fn mknod(&self, _name: &str, _devid: DeviceId) -> KResult<()> {
         // TODO How to tell byte and block apart.
         not_yet_implemented!("mknod");
         Err(errno::ENOTSUP)
     }
 
-    fn lookup(&self, name: &str) -> KResult<RVNode> {
-        // TODO WRONG
-        if name == "." { return self.fs.get_vnode(self.get_number()); }
-        let d = try!(self.data.lock().map_err(|_| errno::EDEADLK));
-        d.get(name).map(|x| x.clone()).ok_or(errno::ENOENT)
+    fn lookup(&self, name: &str) -> KResult<Rc<RVNode>> {
+        match name {
+            "." => self.fs.get_vnode(self.get_number()),
+            ".." => self.fs.get_vnode(self.parent.unwrap_or(self.get_number())),
+            _ => {
+                let d = try!(self.data.lock().map_err(|_| errno::EDEADLK));
+                d.get(name).map(|x| x.clone()).ok_or(errno::ENOENT)
+            }
+        }
     }
 
     fn readdir(&self, off: usize) -> KResult<(usize, DirEnt)> {
-        // TODO
+        let l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
+        if off >= try!(self.len()) {
+            Err(errno::EOK)
+        } else if off == 0 {
+            Ok((1, DirEnt { inode: self.get_number(), offset: off + 1, name: ".".to_string() }))
+        } else if off == 1 {
+            Ok((1, DirEnt { inode: self.parent.unwrap_or(self.get_number()), offset: off + 1, name: "..".to_string() }))
+        } else if let Some((name, vn)) = l.iter().nth(off - 2) {
+            Ok((1, DirEnt { inode: vn.get_number(), offset: off + 1, name: name.clone() }))
+        } else {
+            Err(errno::EOK)
+        }
     }
 }
 
 pub struct RamFS {
-    inodes: Mutex<[Option<RVNode>; MAX_INODES]>,
-    root_dir: Option<RVNode>,
+    inodes: Mutex<[Option<Weak<RVNode>>; MAX_INODES - 1]>,
+    root_dir: Option<Rc<RVNode>>,
+    last: Cell<usize>,
 }
 
 impl fmt::Debug for RamFS {
@@ -282,20 +333,66 @@ impl fmt::Debug for RamFS {
 }
 
 impl RamFS {
-    fn alloc_reg(&self) -> KResult<RVNode> {
-        // TODO
+    fn get_inode(&self) -> KResult<InodeNum> {
+        let l = try!(self.inodes.lock().map_err(|_| errno::EDEADLK));
+        let s = self.last.get();
+        let mut c = (s + 1) % l.len();
+        while c != s {
+            if l[c].as_ref().map(|x| x.upgrade()).is_none() {
+                return Ok(c);
+            }
+            c = (c + 1) % l.len();
+        }
+        Err(errno::ENOSPC)
     }
-    fn alloc_dir(&self) -> KResult<RVNode> {
-        // TODO
+    fn alloc_reg(&'static self) -> KResult<Rc<RVNode>> {
+        let mut l = try!(self.inodes.lock().map_err(|_| errno::EDEADLK));
+        let ni = try!(self.get_inode());
+        let out = Rc::new(RVNode::Regular(RegInode::new(ni, self)));
+        l[ni] = Some(out.downgrade());
+        Ok(out)
     }
-    fn get_vnode(&self, num: InodeNum) -> KResult<RVNode> {
-        // TODO
+    fn alloc_dir(&'static self, parent: InodeNum) -> KResult<Rc<RVNode>> {
+        let mut l = try!(self.inodes.lock().map_err(|_| errno::EDEADLK));
+        if self.get_vnode(parent).is_err() {
+            dbg!(debug::VFS, "parent of new directory does not exist");
+            return Err(errno::EBADF);
+        }
+        let ni = dbg_try!(self.get_inode(), debug::VFS, "Unable to allocate inode number!");
+        let out = Rc::new(RVNode::Directory(DirInode::new(ni, Some(parent), self)));
+        self.last.set(ni);
+        l[ni] = Some(out.downgrade());
+        Ok(out)
     }
-    fn create() -> Rc<RamFS> {
-        let mut out = RamFS { inodes: Mutex::new("ramfs mutex", inds), root_dir: None }
-        let mut inds = [None; MAX_INODES];
 
-        let root = RVNode::Directory(Rc::new)
+    fn get_vnode(&'static self, num: InodeNum) -> KResult<Rc<RVNode>> {
+        if num == ROOT_INODE_NUM {
+            self.root_dir.clone().ok_or_else(|| { panic!("Unable to get root dir, is None!"); })
+        } else if num < MAX_INODES {
+            let l = try!(self.inodes.lock().map_err(|_| errno::EDEADLK));
+            l[num].clone().ok_or(errno::EBADF).and_then(|x| x.upgrade().ok_or(errno::EBADF))
+        } else { Err(errno::EINVAL) }
+    }
+    unsafe fn initialize(this: &'static mut RamFS) {
+        // Wish specific enum variants could be marked copy.
+        let inodes = [None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                      None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                      None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                      None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                      None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                      None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                      None, None, None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                      None, None, None, None, None, None, None, None, None, None, None, None, None, None, None];
+        let root = Some(Rc::new(RVNode::Directory(DirInode::new(ROOT_INODE_NUM, None, this))));
+        mem::replace(this, RamFS { last: Cell::new(ROOT_INODE_NUM - 1), inodes: Mutex::new("ramfs mutex", inodes), root_dir : root });
     }
 }
 
+impl FileSystem for RamFS {
+    type Real = RVNode;
+    type Node = Rc<RVNode>;
+    fn get_type(&self) -> &'static str { "RamFS" }
+    fn get_fs_root<'a>(&'a self) -> Rc<RVNode> {
+        self.root_dir.clone().expect("root is null!")
+    }
+}

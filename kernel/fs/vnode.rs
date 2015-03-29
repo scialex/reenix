@@ -2,32 +2,37 @@
 //! than any real organizational reason. Some crates need this but don't really need to know much
 //! more about drivers.
 
+use ::FileSystem;
 use base::devices::*;
-use umem::mmobj::*;
 use ::InodeNum;
 use std::fmt;
-use base::errno::{self, KResult, Errno};
-use mm::page;
+use base::errno::{KResult, Errno};
+use std::borrow::Borrow;
 
-bitmask_create!(
-    #[doc = "The different types of fs objects"]
-    flags Mode : u8 {
-        #[doc = "an unused inode"]
-        default Unused,
-        #[doc = "A charecter special device"]
-        CharDev = 0,
-        #[doc = "A directory"]
-        Directory = 1,
-        #[doc = "A block device"]
-        BlockDev = 2,
-        #[doc = "A regular file"]
-        Regular = 3,
-        #[doc = "A symbolic link"]
-        Link = 4,
-        #[doc = "A fifo pipe"]
-        Pipe = 5
-    }
-);
+pub use self::_Mode::*;
+#[allow(non_upper_case_globals)]
+#[allow(non_snake_case)]
+mod _Mode {
+    bitmask_create!(
+        #[doc = "The different types of fs objects"]
+        flags Mode : u8 {
+            #[doc = "an unused inode"]
+            default Unused,
+            #[doc = "A charecter special device"]
+            CharDev = 0,
+            #[doc = "A directory"]
+            Directory = 1,
+            #[doc = "A block device"]
+            BlockDev = 2,
+            #[doc = "A regular file"]
+            Regular = 3,
+            #[doc = "A symbolic link"]
+            Link = 4,
+            #[doc = "A fifo pipe"]
+            Pipe = 5
+        }
+    );
+}
 
 impl Mode {
     #[inline] fn stat_err(self) -> Errno { Errno::ENOTSUP }
@@ -46,31 +51,37 @@ impl Mode {
 }
 
 pub trait VNode : fmt::Debug {
-    type Res: VNode;
+    /// This is only here so that the type system works out. Needed b/c no HKT
+    type Real: VNode;
+    /// What type of vnode operations will create/get. This must be clone.
+    /// We want to say it is borrow so that we can have this be a wrapper that deals with
+    /// ref-counting.
+    type Res: Borrow<Self::Real> + Clone;
+    fn get_fs(&self) -> &FileSystem<Real=Self::Real, Node=Self::Res>;
     fn get_mode(&self) -> Mode;
     fn get_number(&self) -> InodeNum;
     fn stat(&self) -> KResult<Stat> { Err(self.get_mode().stat_err()) }
     fn len(&self) -> KResult<usize> { Err(self.get_mode().len_err()) }
 
-    fn read(&self, off: usize, buf: &mut [u8]) -> KResult<usize> { Err(self.get_mode().read_err()) }
-    fn write(&self, off: usize, buf: &[u8]) -> KResult<usize> { Err(self.get_mode().write_err()) }
-    fn truncate(&self, size: usize) -> KResult<usize> { Err(self.get_mode().truncate_err()) }
+    fn read(&self, _off: usize, _buf: &mut [u8]) -> KResult<usize> { Err(self.get_mode().read_err()) }
+    fn write(&self, _off: usize, _buf: &[u8]) -> KResult<usize> { Err(self.get_mode().write_err()) }
+    fn truncate(&self, _size: usize) -> KResult<usize> { Err(self.get_mode().truncate_err()) }
     // TODO Figure out the contract for mmap.
     //fn mmap(&self; .) -> KResult<?> { Err(errno::EINVAL) }
 
-    fn create(&self, name: &str) -> KResult<Self::Res> { Err(self.get_mode().create_err()) }
-    fn lookup(&self, name: &str) -> KResult<Self::Res> { Err(self.get_mode().lookup_err()) }
+    fn create(&self, _name: &str) -> KResult<Self::Res> { Err(self.get_mode().create_err()) }
+    fn lookup(&self, _name: &str) -> KResult<Self::Res> { Err(self.get_mode().lookup_err()) }
 
-    fn mknod(&self, name: &str, devid: DeviceId) -> KResult<()> { Err(self.get_mode().mknod_err()) }
+    fn mknod(&self, _name: &str, _devid: DeviceId) -> KResult<()> { Err(self.get_mode().mknod_err()) }
     // TODO Maybe this should be &Self for from...
-    fn link(&self, from: &Self::Res, to: &str) -> KResult<()> { Err(self.get_mode().link_err()) }
-    fn unlink(&self, to: &str) -> KResult<()> { Err(self.get_mode().unlink_err()) }
-    fn mkdir(&self, to: &str) -> KResult<()> { Err(self.get_mode().mkdir_err()) }
-    fn rmdir(&self, to: &str) -> KResult<()> { Err(self.get_mode().rmdir_err()) }
+    fn link(&self, _from: &Self::Res, _to: &str) -> KResult<()> { Err(self.get_mode().link_err()) }
+    fn unlink(&self, _to: &str) -> KResult<()> { Err(self.get_mode().unlink_err()) }
+    fn mkdir(&self, _to: &str) -> KResult<()> { Err(self.get_mode().mkdir_err()) }
+    fn rmdir(&self, _to: &str) -> KResult<()> { Err(self.get_mode().rmdir_err()) }
     /// Given offset into directory returns the size of the dirent in the directory structure and
     /// the given dirent. If it returns EOK then we have read the whole directory. To read the next
     /// entry add the returned length to the offset.
-    fn readdir(&self, off: usize) -> KResult<(usize, DirEnt)> { Err(self.get_mode().readdir_err()) }
+    fn readdir(&self, _off: usize) -> KResult<(usize, DirEnt)> { Err(self.get_mode().readdir_err()) }
 
 //    fn fill_page(&self, pagenum: usize, page: &mut [u8; page::SIZE]) -> KResult<()>;
 //    fn clean_page(&self, pagenum: usize, page: &[u8; page::SIZE]) -> KResult<()>;

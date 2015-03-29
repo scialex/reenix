@@ -48,10 +48,10 @@ impl SMutex {
     fn wait(&self) -> Result<(),()> {
         block_interrupts!({
             dbg!(debug::SCHED, "{:?} going to sleep on mutex {:?} with queue {:?}", current_proc!(), self.inner, self.wqueue);
-            self.unlock();
+            let x = self.inner.unlock_all();
             let res = self.wqueue.wait();
             // Even if we failed this lock still needs to be valid.
-            self.inner.lock_nocancel();
+            self.inner.relock_all(x);
             res
         })
     }

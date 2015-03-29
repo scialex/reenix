@@ -71,6 +71,7 @@ fn do_run(single: bool) -> (usize, usize) {
     basic_test!(kill_other, 4);
     basic_test!(kill_other, 8);
     basic_test!(uncontested_mutex);
+    basic_test!(reentrant_locks);
     if single {
         basic_test!(contested_mutex, 1);
         basic_test!(contested_mutex, 2);
@@ -207,6 +208,32 @@ extern "C" fn kill_other(n: i32, _: *mut c_void) -> *mut c_void {
     }
 }
 
+extern "C" fn reentrant_locks(_: i32, _: *mut c_void) -> *mut c_void {
+    dbg!(debug::TEST, "Attempting to create a mutex and lock it.");
+    let x = KMutex::new("test a mutex");
+    if x.lock() {
+        dbg!(debug::TEST, "locking of mutex succeeded");
+        if x.lock() {
+            dbg!(debug::TEST, "locking a second time worked");
+            x.unlock();
+        }
+        if x.lock() {
+            dbg!(debug::TEST, "locking a third time worked");
+            x.unlock();
+        }
+        x.unlock();
+        if x.lock() {
+            dbg!(debug::TEST, "locking a fourth time worked");
+            x.unlock();
+        }
+        dbg!(debug::TEST, "unlocking of mutex succeeded");
+        return GOOD;
+    } else {
+        dbg!(debug::TEST, "Locking of mutex failed.");
+        return BAD;
+    }
+}
+
 extern "C" fn uncontested_mutex(_: i32, _: *mut c_void) -> *mut c_void {
     dbg!(debug::TEST, "Attempting to create a mutex and lock it.");
     let x = KMutex::new("test a mutex");
@@ -268,7 +295,7 @@ extern "C" fn contested_mutex(n : i32, _: *mut c_void) -> *mut c_void {
 extern "C" fn better_mutex(n : i32, _: *mut c_void) -> *mut c_void {
     let x = Rc::new(Mutex::<i32>::new("contested mutex test", 0));
 
-    let high : i32 = 200;
+    let high : i32 = 20000;
 
     for _ in 0..n {
         // TODO How to make this say which number they are?
@@ -312,6 +339,26 @@ extern "C" fn better_counter(h: i32, v : *mut c_void) -> *mut c_void {
             c += 1;
             if c % 5 == 0 {
                 kthread::kyield();
+            } else if c % 7 == 0 {
+                c += do_counter(7, h, &*x) as usize;
+            }
+        }
+    }
+}
+
+fn do_counter(num: i32, stop: i32, dat: &Mutex<i32>) -> i32 {
+    let mut c = 0;
+    let mut v = (*dat).force_lock();
+    loop {
+        if c == num || *v == stop {
+            return c;
+        } else {
+            c += 1;
+            *v += 1;
+            if c % 2 == 0 {
+                kthread::kyield();
+            } else if c % 5 == 0 {
+                c += do_counter(num - c, stop, dat);
             }
         }
     }

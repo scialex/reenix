@@ -41,6 +41,13 @@ macro_rules! dbg {
     })
 }
 
+#[macro_export]
+macro_rules! dbg_try {
+    ($f:expr, $d:expr, $fmt:expr, $($a:expr),*) => ({
+        try!($f.map_err(|x| { dbg!($d, concat!("{:?} - ",$fmt), $($a),*); x }))
+    })
+}
+
 /// Send a full panic, this will fully stop the kernel.
 #[macro_export]
 macro_rules! kpanic {

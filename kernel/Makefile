@@ -30,7 +30,7 @@ CFLAGS  += -D__KERNEL__
 ###
 
 # Crates for the kernel. they are in <name>/
-REENIX_CRATES  := main base mm startup procs drivers util umem #fs
+REENIX_CRATES  := main base mm startup procs drivers util umem fs
 
 # Crates from the Rust standard library
 BUILTIN_CRATES := alloc arena core collections unicode rand
