@@ -2,7 +2,7 @@
 #![crate_name="startup"]
 #![crate_type="rlib"]
 #![feature(asm, concat_idents, lang_items, intrinsics, collections)]
-#![feature(core)]
+#![feature(core, libc)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
 
@@ -103,7 +103,7 @@ pub mod tsd {
         pub fn get_slot_mut(&mut self, i: usize) -> Option<&mut Box<Any>> { self.data.get_mut(&i) }
 
         pub fn set_open_slot(&mut self, v: Box<Any>) -> usize {
-            for i in range(0, self.data.len() + 1) {
+            for i in 0..(self.data.len() + 1) {
                 if self.data.contains_key(&i) {
                     assert!(self.data.insert(i, v).is_none());
                     return i;
@@ -131,7 +131,6 @@ pub mod tsd {
 // TODO I should move this to rust.
 pub mod gdt {
     use libc::{c_void, c_int};
-    use std::ptr::*;
     pub const ZERO        : u16 = 0;
     pub const KERNEL_TEXT : u16 = 0x08;
     pub const KERNEL_DATA : u16 = 0x10;

@@ -59,8 +59,8 @@ impl Screen {
 
     #[allow(dead_code)]
     pub unsafe fn put_buf(&self, buf: &[[u8; UINT_DISPLAY_WIDTH]; UINT_DISPLAY_HEIGHT]) {
-        for y in range(0, DISPLAY_HEIGHT) {
-            for x in range(0, DISPLAY_WIDTH) {
+        for y in 0..DISPLAY_HEIGHT {
+            for x in 0..DISPLAY_WIDTH {
                 self.put_char(buf[y as usize][x as usize], x, y);
             }
         }
@@ -68,7 +68,7 @@ impl Screen {
 
     pub unsafe fn put_line(&self, l: &[u8; UINT_DISPLAY_WIDTH], off: u8) {
         assert!(off < DISPLAY_HEIGHT);
-        for x in range(0, DISPLAY_WIDTH) {
+        for x in 0..DISPLAY_WIDTH {
             self.put_char(l[x as usize], x, off);
         }
     }
@@ -82,8 +82,8 @@ impl Screen {
 
     #[allow(dead_code)]
     pub unsafe fn clear(&self) {
-        for y in range(0, DISPLAY_HEIGHT) {
-            for x in range(0, DISPLAY_WIDTH) {
+        for y in 0..DISPLAY_HEIGHT {
+            for x in 0..DISPLAY_WIDTH {
                 self.put_char(DEFAULT_CHAR, x, y);
             }
         }

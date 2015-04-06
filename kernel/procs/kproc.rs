@@ -53,7 +53,7 @@ pub struct KProc {
     status   : ProcStatus,                  /* Our exit status */
     state    : ProcState,                   /* running/sleeping/etc. */
     parent   : Option<Weak<ProcRefCell<KProc>>>,/* Our parent */
-    pagedir  : Box<PageDir>,
+    pagedir  : PageDir,
 
     wait : WQueue,
 
@@ -101,19 +101,20 @@ pub fn start_idle_proc(init_main : ContextFunc, arg1: i32, arg2: *mut c_void) ->
 
     let pid = KProc::new("IDLE PROCESS".to_string(), init_main, arg1, arg2).ok().expect("Unable to allocate idle proc!");
 
+    dbg!(debug::CORE, "made idel proc");
     assert!(pid == IDLE_PID);
     dbg!(debug::CORE, "Starting idle process {:?} now!", pid);
 
     context::initial_ctx_switch();
 }
 
-#[derive(Copy)]
+#[derive(Copy, Debug)]
 pub enum WaitProcId { Any, Pid(ProcId) }
 pub type WaitOps = u32;
 
 impl KProc {
     pub fn get_pagedir<'a>(&'a self) -> &'a PageDir {
-        &*self.pagedir
+        &self.pagedir
     }
     /// Perform the waitpid syscall. This simply passes the call along to the current process. It
     /// returns Ok((killed_PID,status)) on success and Err(errno) on failure.
@@ -299,7 +300,7 @@ impl KProc {
             status : 0,
             state : ProcState::RUNNING,
             parent : None,
-            pagedir : try!(alloc!(try box PageDir::new())),
+            pagedir : PageDir::new(),
             wait : try!(alloc!(try WQueue::new())),
         })
     }
@@ -318,7 +319,6 @@ impl KProc {
             Ok(t) => t,
             Err(s) => { dbg!(debug::PROC|debug::THR, "Unable to allocate kthread."); return Err(s); }
         };
-
 
         let hash = hash::hash::<KThread, hash::SipHasher>(&*init_thread);
         let pid = (*rcp).borrow_mut().pid.clone();

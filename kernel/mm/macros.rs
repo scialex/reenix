@@ -15,10 +15,12 @@ macro_rules! alloc {
         use $crate::alloc;
         use ::std::mem;
         if alloc::is_memory_low() {
+            dbg!(debug::CORE|debug::MM, "memory low before: {}", stringify!($f));
             Err(alloc::AllocError)
         } else {
             let x = $f;
             if alloc::is_memory_low() {
+                dbg!(debug::CORE|debug::MM, "memory low after: {}", stringify!($f));
                 mem::drop(x);
                 Err(alloc::AllocError)
             } else {
@@ -30,11 +32,13 @@ macro_rules! alloc {
         use $crate::alloc;
         use ::std::mem;
         if alloc::is_memory_low() {
+            dbg!(debug::CORE|debug::MM, "memory low before: {}", stringify!($e));
             Err(alloc::AllocError)
         } else {
             let x = box $e;
 
             if alloc::is_memory_low() {
+                dbg!(debug::CORE|debug::MM, "memory low after: {}", stringify!($e));
                 mem::drop(x);
                 Err(alloc::AllocError)
             } else {

@@ -13,6 +13,7 @@
 
 #![feature(asm, unsafe_destructor, plugin, box_syntax)]
 #![feature(core)]
+#![feature(libc)]
 #![feature(alloc)]
 #![feature(hash)]
 #![feature(unsafe_no_drop_flag)]
@@ -56,7 +57,7 @@ mod procs {
     pub use super::kproc;
     pub use super::kthread;
     pub use super::interrupt;
-    pub use super::kqueue;
+    //pub use super::kqueue;
     pub use super::pcell;
 }
 pub mod pcell;

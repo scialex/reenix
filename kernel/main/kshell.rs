@@ -135,10 +135,10 @@ impl<'a> KShell<'a> {
     }
 
     pub fn add_normal_functions(&mut self) {
-        self.funcs.extend(NFUNCS.iter().map(|&: v| (v.name, v)))
+        self.funcs.extend(NFUNCS.iter().map(|v| (v.name, v)))
     }
 
-    #[allow(unused)]
+    #[allow(dead_code)]
     pub fn add_function(&'a mut self, f: &'a KFunction<'a>) -> bool {
         let n : &'a str = f.name;
         self.funcs.insert(n, f).is_none()
@@ -163,7 +163,7 @@ impl<'a> KShell<'a> {
                     continue;
                 },
             };
-            match self.run_command(&cmd.split(' ').filter(|&: s: & &str| -> bool { (*s).len() != 0 }).collect::<Vec<&str>>()[..]) {
+            match self.run_command(&cmd.split(' ').filter(|s: & &str| -> bool { (*s).len() != 0 }).collect::<Vec<&str>>()[..]) {
                 Ok(_) => {},
                 Err(e) => { dbg!(debug::KSHELL, "recieved {:?}", e); },
             }
@@ -504,7 +504,7 @@ fn do_repeat<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
     }
     match FromStr::from_str(argv[1]) {
         Ok(c) => {
-            for _ in range(0, c) {
+            for _ in 0..c {
                 sh.run_command(&argv[2..]);
             }
             Ok(())

@@ -36,9 +36,11 @@ static mut BOOTSTRAP_FUNC_CTX : *mut Context = 0 as *mut Context;
 pub fn enter_bootstrap_func(f: ContextFunc, i: i32, v: *mut c_void) -> ! {
     dbg!(debug::CORE, "Entering bootstrap");
     unsafe {
+        let temp_init_pagedir = box pagetable::get_temp_init_pagedir();
         let bstack = page::alloc_n::<u8>(4).unwrap_or_else(|_| {kpanic!("Unable to allocate stack for bootstrap function") });
-        let ctx = box Context::new(f, i, v, bstack, 4 * page::SIZE, transmute(pagetable::current));
+        let ctx = box Context::new(f, i, v, bstack, 4 * page::SIZE, transmute(temp_init_pagedir));
         BOOTSTRAP_FUNC_CTX = transmute_copy(&ctx);
+        dbg!(debug::CORE, "enter bootstrap");
         ctx.make_active();
     }
 }
@@ -209,8 +211,7 @@ impl Context {
     /// calling thread.
     pub unsafe fn new(f : ContextFunc, arg1 : i32, arg2 : *mut c_void,
                       kstack : *mut u8, stack_size : usize,
-                      pd: *mut pagetable::PageDir) -> Context {
-        assert!(pd != null_mut());
+                      pd: &pagetable::PageDir) -> Context {
         assert!(page::aligned(kstack as *const u8));
 
         let shigh= kstack.offset(stack_size as isize);
@@ -242,7 +243,7 @@ impl Context {
                           },
             kstack      : kstack as usize,
             kstack_size : stack_size,
-            pd          : pd,
+            pd          : transmute(pd),
             tsd         : box temp_tsd,
         }
     }

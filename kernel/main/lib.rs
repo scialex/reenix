@@ -8,6 +8,7 @@
 #![feature(plugin, asm, unsafe_destructor, lang_items, box_syntax)]
 #![feature(alloc)]
 #![feature(core)]
+#![feature(libc)]
 #![feature(collections)]
 
 #![plugin(bassert)]
@@ -104,6 +105,7 @@ pub extern "C" fn bootstrap(_: i32, _: *mut c_void) -> *mut c_void {
     dbg!(debug::CORE, "  bss:  {:p}-{:p}", &kernel::start_bss, &kernel::end_bss);
 
     pagetable::template_init();
+    interrupt::register(interrupt::PAGE_FAULT, page_fault_temp);
     kproc::start_idle_proc(idle_proc_run, 0, 0 as *mut c_void);
 }
 
@@ -121,7 +123,6 @@ fn finish_init() {
     procs::init_stage3();
     umem::init_stage3();
     drivers::init_stage3();
-    interrupt::register(interrupt::PAGE_FAULT, page_fault_temp);
     interrupt::enable();
     interrupt::set_ipl(interrupt::LOW);
     unsafe { IS_PROCS_UP = true; }
@@ -151,10 +152,11 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     let pgd = KProc::get_proc(&pageoutd_id).expect("Pageoutd was reaped!?");
     pgd.borrow_mut().kill(0);
     drop(pgd);
-    match KProc::waitpid(Pid(pageoutd_id), 0) {
-        Ok((pid, pst)) => { dbg!(debug::CORE, "pagetoutd Returned {:?}, 0x{:x}", pid, pst); },
-        Err(errno) => {kpanic!("pageoutd returned errno {:?}", errno); }
-    }
+    // match KProc::waitpid(Pid(pageoutd_id), 0) {
+    //     Ok((pid, pst)) => { dbg!(debug::CORE, "pagetoutd Returned {:?}, 0x{:x}", pid, pst); },
+    //     Err(errno) => {kpanic!("pageoutd returned errno {:?}", errno); }
+    // }
+    panic!("hi");
     shutdown();
 }
 

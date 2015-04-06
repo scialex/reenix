@@ -192,7 +192,8 @@ impl BackupAllocator {
         while c.is_some() {
             let cur = c.expect("Isn't null");
             if cur.is_free() {
-                best = cur.get_page_aligned_part(pgs).map(|v| { (cur as *mut Tag, v) }).or(best);
+                let cp = cur as *mut Tag;
+                best = cur.get_page_aligned_part(pgs).map(|v| { (cp, v) }).or(best);
             }
             c = self.read_tag(cur.next());
         }

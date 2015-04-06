@@ -44,9 +44,9 @@ extern "C" {
 pub fn halt() -> ! {
     ::gdb::shutdown_hook();
     unsafe {
-        asm!("cli; hlt");
+        asm!("cli; hlt;");
+        loop {}
     }
-    loop {}
 }
 
 extern "C" {

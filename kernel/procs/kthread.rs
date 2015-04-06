@@ -95,12 +95,12 @@ impl hash::Hash for KThread {
 }
 
 impl KThread {
-    pub fn new(pdir: &Box<PageDir>, main: ContextFunc, arg1 : i32, arg2 : *mut c_void) -> Allocation<KThread> {
+    pub fn new(pdir: &PageDir, main: ContextFunc, arg1 : i32, arg2 : *mut c_void) -> Allocation<KThread> {
         let kstack = try!(KStack::new());
         Ok(KThread {
             ctx       : unsafe { Context::new(main, arg1, arg2, kstack.ptr() as *mut u8,
                                               page::num_to_addr::<u8>(kstack.num_pages()) as usize,
-                                              transmute_copy(pdir)) },
+                                              pdir) },
             kstack    : kstack,
             retval    : ptr::null_mut(),
             errno     : None,
