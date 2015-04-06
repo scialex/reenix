@@ -4,6 +4,7 @@ macro_rules! add_file {
     ($s:expr) => ({ concat!(file!(),":",line!()," ", $s) })
 }
 
+// TODO Many of these should be functions really.
 #[macro_export]
 macro_rules! current_thread{
     () => ({

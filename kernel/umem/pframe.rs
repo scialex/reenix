@@ -86,8 +86,11 @@ pub mod pageout {
     /// Get the Pageoutd
     fn get_pageoutd() -> &'static PageOutD { unsafe { PAGEOUTD.as_ref().expect("pageoutd is null!") } }
 
+    /// is pageoutd needed.
+    // TODO  BETTER WAY
+    pub fn needed() -> bool { true }
     /// Wakeup the pageoutd.
-    pub fn pageoutd_wakeup() { dbg!(debug::PCACHE, "pageoutd being signaled by {:?}", current_thread!()); get_pageoutd().queue.signal(); }
+    pub fn wakeup() { dbg!(debug::PCACHE, "pageoutd being signaled by {:?}", current_thread!()); get_pageoutd().queue.signal(); }
     pub extern "C" fn pageoutd_run(_: i32, _: *mut c_void) -> *mut c_void {
         // TODO This might be totally bad.
         while !(current_thread!()).cancelled {
@@ -158,16 +161,40 @@ impl PFrame {
         get_cache().get(&PFrameId::new(mmo.clone(), page_num))
     }
 
+    /**
+     * Find and return the pframe representing the page identified by the object
+     * and page number. If the page is already resident in memory, then we return
+     * the existing page. Otherwise, we allocate a new page and fill it (in which
+     * case this routine may block). After allocating the new pframe, we check to
+     * see if we need to call pageoutd and wake it up if necessary.
+     *
+     * If the page is found (resident) but busy, then we will wait for it to become
+     * unbusy and then try again (since it may have been freed after that). Thus,
+     * as long as this routine returns successfully, the returned page will be a
+     * non-busy page that will be guaranteed to remain resident until the calling
+     * context blocks without first pinning the page.
+     *
+     * This routine may block at the mmobj operation level.
+     */
     pub fn get(mmo: Rc<Box<MMObj + 'static>>, pagenum: usize) -> KResult<PinnedValue<'static, PFrameId, PFrame>> {
-        let key = &PFrameId::new(mmo.clone(), pagenum);
-        get_cache().add_or_get(key.clone()).map_err(|e| {
-            match e {
-                InsertError::MemoryError(_)     => { dbg!(debug::PFRAME, "Unable to add {:?} to cache, oom", key); errno::ENOMEM },
-                InsertError::SysError(Some(er)) => { dbg!(debug::PFRAME, "unable to add {:?} to cache because of {:?}", key, er); er },
-                InsertError::KeyPresent         => { kpanic!("illegal state of pframe cache, concurrency error!"); },
-                _                               => { kpanic!("unknown SysError occured!"); }
+        loop {
+            let key = &PFrameId::new(mmo.clone(), pagenum);
+            let res = try!(get_cache().add_or_get(key.clone()).map_err(|e| {
+                match e {
+                    InsertError::MemoryError(_)     => { dbg!(debug::PFRAME, "Unable to add {:?} to cache, oom", key); errno::ENOMEM },
+                    InsertError::SysError(Some(er)) => { dbg!(debug::PFRAME, "unable to add {:?} to cache because of {:?}", key, er); er },
+                    InsertError::KeyPresent         => { kpanic!("illegal state of pframe cache, concurrency error!"); },
+                    _                               => { kpanic!("unknown SysError occured!"); }
+                }
+            }));
+            // TODO This isn't the best. Really should add a 'atomic unpin & call' function to
+            // PinnedValue.
+            if res.is_busy() {
+                res.wait_busy();
+            } else {
+                return res;
             }
-        })
+        }
     }
 
     /// Gets a mutable view of the page. This can ONLY be called from within an `MMObj`'s
@@ -191,6 +218,9 @@ impl PFrame {
                 queue : WQueue::new(),
             };
             try!(res.fill(&**mmo).map_err(|v| Sys(v)));
+            if pageoutd::needed() {
+                pageoutd::wakeup();
+            }
             res
         })
     }
@@ -230,7 +260,7 @@ impl PFrame {
     /// Wait for the given pframe to stop being busy. This procedure will block if the pframe is
     /// currently busy.
     pub fn wait_busy(&self) -> Result<(),()> {
-        while self.flags.get() & pfstate::BUSY != pfstate::NORMAL {
+        while self.is_busy() {
             try!(self.queue.wait());
         }
         Ok(())
