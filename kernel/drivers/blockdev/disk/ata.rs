@@ -176,7 +176,7 @@ pub fn init_stage2() {
     // totally stolen from weenix
     unsafe {
         assert!(NDISKS <= NUM_CHANNELS);
-        for i in range(0, NDISKS) {
+        for i in 0..NDISKS {
             // TODO
             let mut c = DEFAULT_CHANNELS[i].clone();
             // Choose drive. In this case always master since no slave support.
@@ -371,7 +371,7 @@ impl RDeviceMut<[u8; page::SIZE]> for ATADisk {
     /// Read buf.len() objects from the device starting at offset. Returns the number of objects
     /// read from the stream, or errno if it fails.
     fn read_from(&mut self, offset: usize, buf: &mut [[u8; page::SIZE]]) -> KResult<usize> {
-        for i in range(0, buf.len()) {
+        for i in 0..buf.len() {
             try!(self.read_single(offset + i, &mut buf[i]));
         }
         Ok(buf.len())
@@ -382,7 +382,7 @@ impl WDeviceMut<[u8; page::SIZE]> for ATADisk {
     /// Write the buffer to the device, starting at the given offset from the start of the device.
     /// Returns the number of bytes written or errno if an error happens.
     fn write_to(&mut self, offset: usize, buf: &[[u8; page::SIZE]]) -> KResult<usize> {
-        for i in range(0, buf.len()) {
+        for i in 0..buf.len() {
             dbg!(debug::DISK, "starting write of page {} to block {}", i, offset + i);
             try!(self.write_single(offset + i, &buf[i]));
         }

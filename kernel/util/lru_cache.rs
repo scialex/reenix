@@ -147,7 +147,7 @@ impl<K: Ord, V> LruCache<K, V> {
 
     /// Remove the 'cnt' least recently used items from this cache.
     pub fn trim_off(&mut self, cnt: usize) {
-        for _ in range(0, cnt) { self.pop_lru(); }
+        for _ in 0..cnt { self.pop_lru(); }
     }
 
     /// Remove the most recently used item and return it, along with it's key.
@@ -267,37 +267,37 @@ impl<K: Ord, V> LruCache<K, V> {
     /// Gets a lazy iterator over the keys in the map in an undefined order.
     /// Note this does not count as a use of the keys for the purposes of the cache.
     pub fn keys<'a>(&'a self) -> Keys<'a, K, V> {
-        self.iter().map(LruCache::key as fn((&'a K, &'a V)) -> &'a K)
+        self.iter().map(LruCache::key)
     }
 
     /// Gets a lazy iterator over the keys in the map in an least to most recently used order.
     /// Note this does not count as a use of the keys for the purposes of the cache.
     pub fn keys_least<'a>(&'a self) -> LTMKeys<'a, K, V> {
-        self.iter_least().map(LruCache::key as fn((&'a K, &'a V)) -> &'a K)
+        self.iter_least().map(LruCache::key)
     }
 
     /// Gets a lazy iterator over the keys in the map in an most to least recently used order.
     /// Note this does not count as a use of the keys for the purposes of the cache.
     pub fn keys_most<'a>(&'a self) -> MTLKeys<'a, K, V> {
-        self.iter_most().map(LruCache::key as fn((&'a K, &'a V)) -> &'a K)
+        self.iter_most().map(LruCache::key)
     }
 
     /// Gets a lazy iterator over the values in the map in an undefined order.
     /// Note this does not count as a use of the values for the purposes of the cache.
     pub fn values<'a>(&'a self) -> Values<'a, K, V> {
-        self.iter().map(LruCache::val as fn((&'a K, &'a V)) -> &'a V)
+        self.iter().map(LruCache::val)
     }
 
     /// Gets a lazy iterator over the values in the map in an least to most recently used order.
     /// Note this does not count as a use of the values for the purposes of the cache.
     pub fn values_least<'a>(&'a self) -> LTMValues<'a, K, V> {
-        self.iter_least().map(LruCache::val as fn((&'a K, &'a V)) -> &'a V)
+        self.iter_least().map(LruCache::val)
     }
 
     /// Gets a lazy iterator over the values in the map in an most to least recently used order.
     /// Note this does not count as a use of the values for the purposes of the cache.
     pub fn values_most<'a>(&'a self) -> MTLValues<'a, K, V> {
-        self.iter_most().map(LruCache::val as fn((&'a K, &'a V)) -> &'a V)
+        self.iter_most().map(LruCache::val)
     }
 
     /// An iterator of the keys and values in the iterator in an undefined order.
@@ -328,9 +328,9 @@ impl<K: Ord, V> LruCache<K, V> {
     pub fn iter_remove<'a>(&'a mut self) -> RemoveEntries<'a, K, V> { self.iter_remove_least() }
     /// Iterator that removes items from the cache as it goes. Order is least to most recently used.
     fn do_remove<'a>(v: ModifiableEntry<'a, K, V>) -> (K, V) { v.remove_entry() }
-    pub fn iter_remove_least<'a>(&'a mut self) -> LTMRemoveEntries<'a, K, V> { self.iter_modify_least().map(LruCache::do_remove as fn(ModifiableEntry<'a, K, V>) -> (K, V)) }
+    pub fn iter_remove_least<'a>(&'a mut self) -> LTMRemoveEntries<'a, K, V> { self.iter_modify_least().map(LruCache::do_remove) }
     /// Iterator that removes items from the cache as it goes. Order is most to least recently used.
-    pub fn iter_remove_most<'a>(&'a mut self) -> MTLRemoveEntries<'a, K, V> { self.iter_modify_most().map(LruCache::do_remove as fn(ModifiableEntry<'a, K, V>) -> (K, V)) }
+    pub fn iter_remove_most<'a>(&'a mut self) -> MTLRemoveEntries<'a, K, V> { self.iter_modify_most().map(LruCache::do_remove) }
 
     /// Iterator where you can choose to remove certain entries from the LRU cache.
     pub fn iter_modify<'a>(&'a mut self) -> ModifyEntries<'a, K, V> { self.iter_modify_least() }
@@ -348,15 +348,15 @@ impl<K: Ord, V> LruCache<K, V> {
     }
 }
 
-impl<K: Ord, V> ops::IndexMut<K> for LruCache<K, V> {
+impl<'b, K: Ord + 'b, V> ops::IndexMut<&'b K> for LruCache<K, V> {
     #[inline]
-    fn index_mut<'a>(&'a mut self, i: &K) -> &'a mut V { self.get_mut(i).expect("no entry found in lru_cache") }
+    fn index_mut<'a>(&'a mut self, i: &'b K) -> &'a mut V { self.get_mut(i).expect("no entry found in lru_cache") }
 }
 
-impl<K: Ord, V> ops::Index<K> for LruCache<K, V> {
+impl<'b, K: Ord + 'b, V> ops::Index<&'b K> for LruCache<K, V> {
     type Output = V;
     #[inline]
-    fn index<'a>(&'a self, i: &K) -> &'a V { self.get(i).expect("no entry found in lru_cache") }
+    fn index<'a>(&'a self, i: &'b K) -> &'a V { self.get(i).expect("no entry found in lru_cache") }
 }
 
 impl<K: Clone + Ord, V: Clone> Clone for LruCache<K, V> {

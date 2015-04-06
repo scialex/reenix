@@ -71,7 +71,7 @@ const NUM_TTYS : u8 = 3;
 static mut CUR_TTY_ID : u8 = 0;
 static mut TTYS : [*mut TTY; (NUM_TTYS as usize)] = [0 as *mut TTY; (NUM_TTYS as usize)];
 fn create_ttys() {
-    for i in range(0, NUM_TTYS) {
+    for i in 0..NUM_TTYS {
         let t = box SafeCell::new(TTY::create(box virtterm::VirtualTerminal::create(), box ldisc::LineDiscipline::create()));
         unsafe { TTYS[i as usize] = (&*t.get_ref()) as *const TTY as *mut TTY; }
         super::register(::DeviceId::create(TTY_MAJOR, i), t);

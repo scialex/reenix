@@ -144,6 +144,7 @@ pub type InterruptHandler = extern "Rust" fn(&mut Registers);
 
 #[allow(unused_unsafe)]
 #[no_stack_check]
+#[inline(never)]
 pub extern "Rust" fn unhandled_intr(r: &mut Registers) {
     kpanic!("Unhandled interrupt 0x{:X}.\nRegisters were {:?}\nProcess was {:?}\nThread was {:?}",
            r.intr, r, current_proc!(), current_thread!());

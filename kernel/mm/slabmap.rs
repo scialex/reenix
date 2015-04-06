@@ -53,7 +53,7 @@ impl SlabMap {
     pub fn finish(&mut self) {
         sort(&mut self.vals, 0, self.cnt);
         let mut prev = 0;
-        for i in range(0, self.len()) {
+        for i in 0..self.len() {
             let size = self.vals[i].expect("shouldn't be null").get_size();
             if size <= prev {
                 kpanic!("repeated items or out of order slab map. prev {}, cur {}, index {}", prev, size, i);
@@ -76,7 +76,7 @@ impl SlabMap {
     }
 
     fn brute_check(&self, k: usize) -> bool {
-        for i in range(0, self.cnt) {
+        for i in 0..self.cnt {
             match self.vals[i] {
                 None => { kpanic!("Should not have nulls in allocated region"); },
                 Some(sa) => { if sa.get_size() as usize == k { return true; } },
@@ -93,7 +93,7 @@ impl SlabMap {
     }
 
     pub fn find_smallest(&self, key: usize) -> Option<SlabAllocator> {
-        match self.vals[..self.cnt].binary_search_by(|&:v| -> cmp::Ordering { (v.expect("should have value").get_size() as usize).cmp(&key) }) {
+        match self.vals[..self.cnt].binary_search_by(|v| -> cmp::Ordering { (v.expect("should have value").get_size() as usize).cmp(&key) }) {
             Ok(v)  => Some(self.vals[v].expect("should have value")),
             Err(v) => if v == self.cnt { None } else { Some(self.vals[v].expect("should have value")) },
         }

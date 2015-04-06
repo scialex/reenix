@@ -43,8 +43,11 @@ macro_rules! dbg {
 
 #[macro_export]
 macro_rules! dbg_try {
+    ($f:expr, $d:expr, $fmt:expr) => ({
+        try!($f.map_err(|x| { dbg!($d, concat!(stringify!($f), " - ", $fmt)); x }))
+    });
     ($f:expr, $d:expr, $fmt:expr, $($a:expr),*) => ({
-        try!($f.map_err(|x| { dbg!($d, concat!("{:?} - ",$fmt), $($a),*); x }))
+        try!($f.map_err(|x| { dbg!($d, concat!(stringify!($f), " - ", $fmt), $($a),*); x }))
     })
 }
 

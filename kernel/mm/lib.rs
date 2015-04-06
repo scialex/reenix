@@ -9,10 +9,9 @@
 #![allow(non_camel_case_types)]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(plugin, asm, core, no_std, unsafe_no_drop_flag)]
+#![feature(plugin, asm, core, no_std, unsafe_no_drop_flag, libc)]
 #![no_std]
 
-#![plugin(hoare)]
 #![plugin(bassert)]
 #![plugin(enabled)]
 #[no_link] #[macro_use] extern crate bassert;
@@ -74,8 +73,8 @@ pub mod user {
 
 pub mod pointer {
     use core::usize;
-    pub const SIZE : usize = usize::BYTES;
-    pub const MASK : usize = usize::BYTES - 1;
+    pub const SIZE : usize = (usize::BYTES as usize);
+    pub const MASK : usize = ((usize::BYTES - 1) as usize);
 }
 
 pub mod memman {
@@ -101,7 +100,6 @@ pub mod memman {
 
 pub mod tlb {
     use libc::c_void;
-    use core::iter::range;
     pub fn init_stage1() {}
     pub fn init_stage2() {}
 
@@ -113,7 +111,7 @@ pub mod tlb {
     pub unsafe fn flush_range(vaddr: *mut c_void, pages: usize) {
         use super::page;
         let mut uv = vaddr as usize;
-        for i in range(0, pages) {
+        for i in 0..pages {
             flush(uv as *mut c_void);
             uv += page::SIZE;
         }

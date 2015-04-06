@@ -10,36 +10,52 @@
 #![crate_type="rlib"]
 #![doc(html_logo_url = "https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=large",
        html_favicon_url="https://avatars.io/gravatar/d0ad9c6f37bb5aceac2d7ac95ba82607?size=small")]
-#![feature(unsafe_destructor, int_uint, box_syntax)]
-#![feature(optin_builtin_traits)]
-#![feature(unique)]
-#![feature(core)]
+
+#![allow(unused_features)]
+
+#![feature(debug_builders)]
 #![feature(alloc)]
-#![feature(unicode)]
+#![feature(box_syntax)]
 #![feature(collections)]
+#![feature(core)]
+#![feature(lang_items)]
+#![feature(libc)]
+#![feature(linkage, thread_local, asm)]
+#![feature(optin_builtin_traits)]
 #![feature(rand)]
-#![feature(hash)]
+#![feature(staged_api)]
+#![feature(unboxed_closures)]
+#![feature(unicode)]
+#![feature(unsafe_destructor)]
+#![feature(unsafe_no_drop_flag, filling_drop)]
 #![feature(macro_reexport)]
-#![feature(no_std)]
-#![feature(asm)]
-#![feature(unsafe_no_drop_flag)]
-#![no_std]
+#![feature(unique)]
+#![feature(convert)]
+#![feature(allow_internal_unstable)]
+#![feature(str_char)]
+#![feature(into_cow)]
+#![feature(slice_patterns)]
+#![feature(std_misc)]
 // For rust rand
 #![allow(deprecated)]
+
+// Don't link to std. We are std.
+#![feature(no_std)]
+#![no_std]
 
 #[macro_reexport(assert, assert_eq, debug_assert, write, writeln)]
 #[macro_use] extern crate core;
 #[macro_reexport(vec)]
-#[macro_use] extern crate "collections" as core_collections;
-extern crate "rand" as rrand;
+#[macro_use] extern crate collections as core_collections;
+extern crate rand as rrand;
 extern crate alloc;
 extern crate unicode;
 
 pub use alloc::{boxed, rc};
-pub use core::{any, cell, clone, cmp, default, error};
-pub use core::{f32, f64, finally, hash, i16, i32, i64, i8, int, intrinsics};
+pub use core::{any, cell, clone, cmp, convert, default, error};
+pub use core::{f32, f64, finally, hash, i16, i32, i64, i8, intrinsics};
 pub use core::{isize, iter, marker, mem, num, ops, option, ptr, raw};
-pub use core::{result, simd, u16, u32, u64, u8, uint, usize};
+pub use core::{result, simd, u16, u32, u64, u8, usize};
 pub use core_collections::{str, string, slice, vec, fmt, borrow};
 pub use unicode::char;
 
@@ -64,7 +80,6 @@ pub mod rand {
     static mut base_seed : [u32; 256] = [0; 256];
     /// Get an rng
     pub fn thread_rng() -> ThreadRng {
-        use ::slice::*;
         let mut rng = IsaacRng::new_unseeded();
         rng.reseed(unsafe { &base_seed });
         let bs : &'static mut [u32] = unsafe { &mut base_seed };
@@ -105,21 +120,19 @@ pub mod prelude {
         pub use ops::{Drop, Fn, FnMut, FnOnce};
         pub use mem::drop;
         pub use boxed::Box;
-        pub use char::CharExt;
         pub use clone::Clone;
         pub use cmp::{PartialEq, PartialOrd, Eq, Ord};
+        pub use convert::{AsRef, AsMut, Into, From};
         pub use iter::DoubleEndedIterator;
         pub use iter::ExactSizeIterator;
-        pub use iter::{Iterator, IteratorExt, Extend};
+        pub use iter::{Iterator, Extend};
         pub use option::Option::{self, Some, None};
-        pub use ptr::{PtrExt, MutPtrExt};
         pub use result::Result::{self, Ok, Err};
-        pub use slice::AsSlice;
-        pub use slice::{SliceExt, SliceConcatExt};
-        pub use str::{Str, StrExt};
+        pub use slice::{SliceConcatExt, AsSlice};
+        pub use str::Str;
         pub use string::{String, ToString};
         pub use vec::Vec;
-        pub use iter::range;
+        pub use num::wrapping::{Wrapping, WrappingOps};
     }
 }
 

@@ -105,7 +105,7 @@ impl RDeviceMut<u8> for LineDiscipline {
             try!(t.wait().or_else(|_| Err(errno::EINTR)));
         }
 
-        for i in range(0, b.len()) {
+        for i in 0..b.len() {
             if self.rhead == self.ckd_tail { return Ok(i); }
 
             let c = self.buf[self.rhead];

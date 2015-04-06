@@ -19,7 +19,7 @@ struct CacheItem<K, V> {
     /// The key/value pair in this cache.
     val : (K, V),
     /// The pin count for the value this is holding.
-    pcnt: AtomicUint,
+    pcnt: AtomicUsize,
 }
 
 impl<K, V> Make<K> for Allocation<Box<CacheItem<K, V>>> where K: Ord, V: RefMake<K> + Cacheable {
@@ -31,7 +31,7 @@ impl<K, V> Make<K> for Allocation<Box<CacheItem<K, V>>> where K: Ord, V: RefMake
 
 impl<K: Ord, V: Cacheable> CacheItem<K, V> {
     pub fn new(key: K, val: V) -> Allocation<Box<CacheItem<K,V>>> {
-        alloc!(try_box CacheItem { val: (key, val), pcnt: AtomicUint::new(1), })
+        alloc!(try_box CacheItem { val: (key, val), pcnt: AtomicUsize::new(1), })
     }
     /// increment the pincount
     pub fn pin(&self) {
@@ -250,7 +250,7 @@ impl<'a, K, V:'a> PinnableCache<K, V> where K: Ord + Clone, V: TryMake<K, Errno>
     }
 }
 
-pub struct PinnedValue<'a, K: Ord + 'a, V: 'a> {
+pub struct PinnedValue<'a, K: Ord + 'a, V: Cacheable + 'a> {
     cache : &'a PinnableCache<K, V>,
     value : &'a CacheItem<K, V>,
     // TODO

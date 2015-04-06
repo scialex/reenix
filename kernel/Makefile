@@ -30,7 +30,7 @@ CFLAGS  += -D__KERNEL__
 ###
 
 # Crates for the kernel. they are in <name>/
-REENIX_CRATES  := main base mm startup procs drivers util umem fs
+REENIX_CRATES  := main base mm startup procs drivers util umem #fs
 
 # Crates from the Rust standard library
 BUILTIN_CRATES := alloc arena core collections unicode rand
@@ -42,7 +42,7 @@ PATCHED_CRATES := libc
 OTHER_CRATES   := basicstd
 
 # Plugins these are in plugins/<name>
-HOST_CRATES    := enabled hoare bassert
+HOST_CRATES    := enabled bassert
 TARGET_CRATES  := $(REENIX_CRATES) $(BUILTIN_CRATES) $(PATCHED_CRATES) $(OTHER_CRATES)
 CRATES         := $(HOST_CRATES) $(TARGET_CRATES)
 
@@ -136,7 +136,7 @@ $(eval $(call crate-rule,      mm,          $(BASIC_REQS) core))
 $(eval $(call crate-rule,      alloc,       core mm))
 $(eval $(call crate-rule,      collections, core libc alloc unicode))
 $(eval $(call crate-rule,      basicstd,    core alloc collections rand unicode))
-$(eval $(call std-crate-rule,  arena,       ,                                 basicstd))
+#$(eval $(call std-crate-rule,  arena,       ,                                 basicstd))
 $(eval $(call std-crate-rule,  startup,     $(BASIC_REQS),                    basicstd))
 $(eval $(call std-crate-rule,  util,        $(BASIC_REQS),                    basicstd))
 $(eval $(call std-crate-rule,  procs,       $(BASIC_REQS) util startup,       basicstd))
