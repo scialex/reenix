@@ -52,8 +52,8 @@ extern crate alloc;
 extern crate unicode;
 
 pub use alloc::{boxed, rc};
-pub use core::{any, cell, clone, cmp, convert, default, error};
-pub use core::{f32, f64, finally, hash, i16, i32, i64, i8, intrinsics};
+pub use core::{any, cell, clone, cmp, convert, default};
+pub use core::{f32, f64, hash, i16, i32, i64, i8, intrinsics};
 pub use core::{isize, iter, marker, mem, num, ops, option, ptr, raw};
 pub use core::{result, simd, u16, u32, u64, u8, usize};
 pub use core_collections::{str, string, slice, vec, fmt, borrow};
@@ -66,6 +66,8 @@ pub use unicode::char;
 pub mod ascii;
 #[path = "../../../external/rust/src/libstd/collections/mod.rs"]
 pub mod collections;
+#[path = "../../../external/rust/src/libstd/error.rs"]
+pub mod error;
 
 pub mod rand {
     pub use rrand::*;
@@ -107,10 +109,10 @@ pub mod rt {
     pub use alloc::heap;
 
     pub fn begin_unwind(msg: &str, fl: &(&'static str, usize)) -> ! {
-        ::core::panicking::panic_fmt(format_args!("{}", msg), &(fl.0, fl.1 as u32))
+        ::core::panicking::panic_fmt(format_args!("{}", msg), unsafe { ::mem::transmute(fl) })
     }
     pub fn begin_unwind_fmt(msg: ::fmt::Arguments, file_line: &(&'static str, usize)) -> ! {
-        ::core::panicking::panic_fmt(msg, &(file_line.0, file_line.1 as u32))
+        ::core::panicking::panic_fmt(msg, unsafe { ::mem::transmute(file_line) })
     }
 }
 
@@ -132,7 +134,6 @@ pub mod prelude {
         pub use str::Str;
         pub use string::{String, ToString};
         pub use vec::Vec;
-        pub use num::wrapping::{Wrapping, WrappingOps};
     }
 }
 

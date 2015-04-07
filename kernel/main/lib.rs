@@ -138,20 +138,20 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
         Ok(v) => { kpanic!("Unable to create init proc at {:?}, got one at {:?} instead", ProcId(1), v); },
         x => { kpanic!("Unable to create init proc {:?}", x); }
     }
-    let pageoutd_id = match KProc::new("PageOutD".to_string(), umem::pageoutd_run, 0, 0 as *mut c_void) {
-        Ok(v) => v,
-        Err(_) => { kpanic!("Unable to make pageoutd!"); }
-    };
-    dbg!(debug::CORE, "pageoutd is {:?}", pageoutd_id);
+    // let pageoutd_id = match KProc::new("PageOutD".to_string(), umem::pageoutd_run, 0, 0 as *mut c_void) {
+    //     Ok(v) => v,
+    //     Err(_) => { kpanic!("Unable to make pageoutd!"); }
+    // };
+    // dbg!(debug::CORE, "pageoutd is {:?}", pageoutd_id);
 
     match KProc::waitpid(Pid(ProcId(1)), 0) {
         Ok((pid, pst)) => { dbg!(debug::CORE, "init Returned {:?}, 0x{:x}", pid, pst); },
         Err(errno) => {dbg!(debug::CORE, "init returned errno {:?}", errno);}
     }
 
-    let pgd = KProc::get_proc(&pageoutd_id).expect("Pageoutd was reaped!?");
-    pgd.borrow_mut().kill(0);
-    drop(pgd);
+    // let pgd = KProc::get_proc(&pageoutd_id).expect("Pageoutd was reaped!?");
+    // pgd.borrow_mut().kill(0);
+    // drop(pgd);
     // match KProc::waitpid(Pid(pageoutd_id), 0) {
     //     Ok((pid, pst)) => { dbg!(debug::CORE, "pagetoutd Returned {:?}, 0x{:x}", pid, pst); },
     //     Err(errno) => {kpanic!("pageoutd returned errno {:?}", errno); }

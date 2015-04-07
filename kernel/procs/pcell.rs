@@ -5,7 +5,7 @@ use std::ops::{Deref, DerefMut};
 
 type Borrowed = usize;
 const UNUSED : Borrowed = 0;
-const WRITING : Borrowed = -1;
+const WRITING : Borrowed = !0;
 /// A cell data structure that lets you borrow things 'silently'. This is used because the data in
 /// these is associated with a single thread. Within the thread it is basically 'static and may be
 /// treated as such. Outside the thread it is normal data with lifetimes and so on that could be

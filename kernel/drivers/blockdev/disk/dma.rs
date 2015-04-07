@@ -39,7 +39,7 @@ impl Prd {
             // This might well be the ugliest hack I've ever written...
             let mut pbuf = self.buf.as_mut_ptr();
             while (pbuf as usize) % 32 != 0 { pbuf = pbuf.offset(1); }
-            copy_nonoverlapping(pbuf as *mut u8, (self as *mut Prd) as *const u8, 8);
+            copy_nonoverlapping((self as *mut Prd) as *mut u8, pbuf as *mut u8, 8);
             // Set the address of the prd.
             io::outl(busmaster_addr + (register::PRD as u16), pd.virt_to_phys(pbuf as usize) as u32);
             // allow all chanels of dma on this busmaster by setting the status register

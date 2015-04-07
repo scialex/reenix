@@ -12,7 +12,7 @@
 
 use core::prelude::*;
 use core::cmp::min;
-use core::intrinsics::transmute;
+use core::intrinsics::{transmute, write_bytes};
 use core::{fmt, mem, ptr};
 use libc::{size_t, c_void, c_int};
 use slabmap::{SlabMap, DEFAULT_SLAB_MAP};
@@ -51,7 +51,7 @@ static mut BASE_ALLOCATOR : Allocator = Allocator {
 };
 
 /// A type representing that we had an error allocating. We might put more in this eventually.
-#[derive(Copy)]
+#[derive(Clone,Copy)]
 pub struct AllocError;
 impl fmt::Debug for AllocError {
     fn fmt(&self, w: &mut fmt::Formatter) -> fmt::Result {
@@ -267,7 +267,7 @@ impl Allocator {
 
     pub unsafe fn allocate(&self, size: usize, align: usize) -> *mut u8 {
         let res = if is_enabled!(TEST -> LOW_MEMORY) { 0 as *mut u8 } else { self.do_allocate(size, align) };
-        if res.is_null() {
+        let out = if res.is_null() {
             dbg!(debug::BACKUP_MM|debug::MM, "Unable to allocate from normal allocators. Trying to use backup");
             let out = self.backup.allocate(size, align);
             if out.is_null() {
@@ -279,7 +279,9 @@ impl Allocator {
         } else {
             dbg!(debug::MM, "Allocated {:p} of size {}", res, size);
             res
-        }
+        };
+        write_bytes(out, 0, size);
+        out
     }
 
     #[inline]
@@ -329,7 +331,7 @@ impl Allocator {
             dbg!(debug::MM, "manually reallocating {:p} of size {} to size {}", ptr, old_size, size);
             let new_ptr = self.allocate(size, align);
             if !new_ptr.is_null() {
-                copy_nonoverlapping(new_ptr, ptr as *const u8, min(size, old_size));
+                copy_nonoverlapping(ptr, new_ptr, min(size, old_size));
                 self.deallocate(ptr, old_size, align);
             } else {
                 dbg!(debug::MM, "Unable to allocate memory for realloc of {:p} from {} to {} bytes", ptr, old_size, size);

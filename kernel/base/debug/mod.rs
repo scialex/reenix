@@ -53,7 +53,7 @@ pub fn dbg_pid() -> MaybePid {
 }
 
 #[doc(hidden)]
-#[derive(Copy)]
+#[derive(Clone,Copy)]
 pub struct MaybePid(Option<::pid::ProcId>);
 
 impl fmt::Debug for MaybePid {

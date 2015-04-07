@@ -11,7 +11,7 @@ macro_rules! dbg_modes {
             $(#[doc = $ex ] $n = $v),+
         });
         #[doc="All the errors at once"]
-        pub const ALL : DbgMode = DbgMode(-1);
+        pub const ALL : DbgMode = DbgMode(!0);
         impl DbgMode {
             #[allow(dead_code)]
             pub fn get_color(&self) -> &'static str {

@@ -14,7 +14,7 @@ use util::pinnable_cache::*;
 // Cheating to get a uuid by just incrementing a counter. This is not really good in general but we
 // have 48 bits, which means we will probably never really run out...
 // There has got to be a better way but this is just easier for now.
-#[derive(Copy, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub struct MMObjId(DeviceId, u32);
 //const FAKE_DEVICE : DeviceId = DeviceId_static!(0xFF,0x00);
 //static mut NEXT_ID : MMObjId = MMObjId(FAKE_DEVICE,0);

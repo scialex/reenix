@@ -5,11 +5,11 @@
 #[allow(private_no_mangle_fns)]
 #[inline(never)]
 #[lang="panic_fmt"]
-pub extern fn rust_begin_unwind(msg: &::std::fmt::Arguments,
+pub extern fn rust_begin_unwind(msg: ::std::fmt::Arguments,
                                 file: &'static str,
                                 line: usize) -> ! {
     use base::kernel;
-    dbg!(debug::PANIC, "Failed at {}:{} -> {}", file, line, *msg);
+    dbg!(debug::PANIC, "Failed at {}:{} -> {}", file, line, msg);
     kernel::halt();
 }
 

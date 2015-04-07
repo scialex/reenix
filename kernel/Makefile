@@ -120,7 +120,7 @@ $(eval $(call add-flags, basicstd, --cfg feature=\"spin\"))
 # Plugins
 $(eval $(call plugin-rule, bassert,))
 $(eval $(call plugin-rule, enabled,))
-$(eval $(call plugin-rule, hoare  ,))
+#$(eval $(call plugin-rule, hoare  ,))
 
 # The `main` crate dependencies.
 MAIN_REQS := $(filter-out main, $(CRATES)) morestack compiler-rt

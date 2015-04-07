@@ -22,12 +22,12 @@ struct CacheItem<K, V> {
     pcnt: AtomicUsize,
 }
 
-impl<K, V> Make<K> for Allocation<Box<CacheItem<K, V>>> where K: Ord, V: RefMake<K> + Cacheable {
-    fn make(k: K) -> Allocation<Box<CacheItem<K, V>>> {
-        let val = RefMake::make_from(&k);
-        CacheItem::new(k, val)
-    }
-}
+// impl<K, V> Make<K> for Allocation<Box<CacheItem<K, V>>> where K: Ord, V: RefMake<K> + Cacheable {
+//     fn make(k: K) -> Allocation<Box<CacheItem<K, V>>> {
+//         let val = RefMake::make_from(&k);
+//         CacheItem::new(k, val)
+//     }
+// }
 
 impl<K: Ord, V: Cacheable> CacheItem<K, V> {
     pub fn new(key: K, val: V) -> Allocation<Box<CacheItem<K,V>>> {
@@ -36,7 +36,7 @@ impl<K: Ord, V: Cacheable> CacheItem<K, V> {
     /// increment the pincount
     pub fn pin(&self) {
         let old_val = self.pcnt.fetch_add(1, Ordering::SeqCst);
-        assert!(old_val != -1);
+        assert!(old_val != !(0 as usize));
     }
 
     /// decrement the pincount and notify the cache if nessecary.
@@ -74,7 +74,7 @@ impl<K: Ord, V:Cacheable> Cacheable for CacheItem<K, V> {
 }
 
 /// The states a value in the cache can have.
-#[derive(Eq, PartialEq, Copy)]
+#[derive(Eq, PartialEq, Clone, Copy)]
 pub enum State {
     Pinned(usize),
     Unpinned,
@@ -82,7 +82,7 @@ pub enum State {
 }
 
 /// The errors that can happen when we try to insert a value into the cache.
-#[derive(Debug, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum InsertError {
     /// There is already a key with that value in the cache.
     KeyPresent,
@@ -285,6 +285,13 @@ impl<'a, K: Ord, V: Cacheable> Clone for PinnedValue<'a, K, V> {
     #[inline]
     fn clone(&self) -> PinnedValue<'a, K, V> { self.pin() }
 }
+
+impl<'b, K: Ord, V: Cacheable> ops::Deref for PinnedValue<'b, K, V> {
+    type Target = V;
+    fn deref<'a>(&'a self) -> &'a V { &(&*self.value).1 }
+}
+
+
 
 #[unsafe_destructor]
 impl<'a, K: Ord, V: Cacheable> Drop for PinnedValue<'a, K, V> {

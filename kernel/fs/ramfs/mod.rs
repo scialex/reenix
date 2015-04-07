@@ -180,7 +180,7 @@ impl VNode for RegInode {
         let len = try!(self.len());
         if off > len { Err(errno::EFBIG) } else {
             let end = min(off + buf.len(), len);
-            copy_memory(buf, &self.data.get_ref()[off..end]);
+            copy_memory(&self.data.get_ref()[off..end], buf);
             Ok(end - off)
         }
     }
@@ -190,7 +190,7 @@ impl VNode for RegInode {
         if off > len { self.fill_zeros(off); }
         let buf = &buf[0..min(buf.len(), MAX_FILE_LEN - off)];
         let mut data = self.data.get_mut();
-        copy_memory(&mut data[off..], buf);
+        copy_memory(buf, &mut data[off..]);
         Ok(buf.len())
     }
     fn stat(&self) -> KResult<Stat> {

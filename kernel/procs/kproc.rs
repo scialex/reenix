@@ -1,6 +1,6 @@
 // TODO Copyright Header
 
-use std::{num, hash, fmt};
+use std::{hash, fmt};
 use std::rc::{self, Rc, Weak};
 use base::errno;
 use std::collections::HashMap;
@@ -41,7 +41,7 @@ fn get_pid() -> Option<ProcId> {
 /// Notify that we are done with a pid.
 fn drop_pid(i: &ProcId) { unsafe { &mut *PID_GEN }.destroy(i); }
 
-#[derive(Debug, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum ProcState { RUNNING, DEAD }
 pub type ProcStatus = isize;
 
@@ -108,7 +108,7 @@ pub fn start_idle_proc(init_main : ContextFunc, arg1: i32, arg2: *mut c_void) ->
     context::initial_ctx_switch();
 }
 
-#[derive(Copy, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum WaitProcId { Any, Pid(ProcId) }
 pub type WaitOps = u32;
 
@@ -371,7 +371,7 @@ impl KProc {
     /// This is called to have a process cancel all of its threads.
     pub fn kill(&mut self, status: ProcStatus) {
         dbg!(debug::PROC, "proc::kill(status = {:?} {:?}) called on {:?}. Called by {:?}",
-             status, num::from_int::<errno::Errno>(status), self, current_proc!());
+             status, errno::Errno::from(status as usize), self, current_proc!());
         for (_, thr) in self.threads.iter_mut() {
             if !thr.is_current_thread() { thr.exit(status as *mut c_void); }
             if cfg!(MTP) {
@@ -410,16 +410,15 @@ impl KProc {
         if pref.get_pid() != IDLE_PID {
             drop(pref);
             let init = init_proc!();
-            for (pid, child) in self.children.iter() {
+            for (pid, child) in self.children.drain() {
                 dbg!(debug::PROC, "moving {:?} to init proc", pid);
-                (**child).borrow_mut().parent = Some(init.clone().downgrade());
-                init.borrow_mut().children.insert(pid.clone(), child.clone());
+                child.borrow_mut().parent = Some(init.clone().downgrade());
+                init.borrow_mut().children.insert(pid, child);
             }
-        } else {
-            bassert!(self.children.len() == 0);
         }
+        bassert!(self.children.len() == 0);
         // get rid of our ref's to the children.
-        self.children.clear();
+        //self.children.clear();
 
         // TODO VFS CLOSE ALL FILES
         // TODO VFS CLOSE CWD

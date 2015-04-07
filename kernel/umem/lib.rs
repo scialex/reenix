@@ -21,7 +21,7 @@
 extern crate startup;
 extern crate libc;
 
-pub use pframe::pageout::{pageoutd_wakeup, pageoutd_run};
+pub use pframe::pageout::{wakeup, pageoutd_run};
 
 // TODO We should have a MaybePinnedList that uses a LRUCache under the hood...
 pub mod mmobj;

@@ -3,7 +3,6 @@
 
 use std::ops::{Add, Deref};
 use std::cell::*;
-use std::num::Int;
 use std::collections::BTreeSet;
 use mm::Allocation;
 
@@ -26,7 +25,7 @@ pub trait Id : Clone + Ord + Eq {
 }
 
 impl<T> Id for T where T: Clone + Ord + Eq + Add<usize, Output = T> {
-    #[inline] fn successor(&mut self) { *self = self.clone().add(Int::one()) }
+    #[inline] fn successor(&mut self) { *self = self.clone().add(1) }
 }
 
 // TODO Make it use this.

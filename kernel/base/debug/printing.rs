@@ -6,7 +6,7 @@ use core::prelude::*;
 use io;
 
 /// The struct which can print to the io port we look at for debug information.
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub struct DbgWriter;
 
 pub static PORT : u16 = 0x3f8;

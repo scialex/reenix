@@ -9,6 +9,7 @@ USAGE="Usage: $0 [OPTION]...
 -d --debug <arg>     Run with debugging support. 'gdb' is the only
                      valid argument.
 -n --new-disk        Use a fresh copy of the hard disk image.
+-t --timestamp       Put timestamps on the log.
 "
 
 # XXX hardcoding these temporarily -- should be read from the makefiles
@@ -42,13 +43,14 @@ MEMORY=256
 
 cd $(dirname $0)
 
-TEMP=$(getopt -o hcm:d:n --long help,check,machine:,debug:,new-disk -n "$0" -- "$@")
+TEMP=$(getopt -o htcm:d:n --long help,timestamp,check,machine:,debug:,new-disk -n "$0" -- "$@")
 if [ $? != 0 ] ; then
 	exit 2
 fi
 
 machine=qemu
 dbgmode="run"
+timestamp=
 newdisk=
 memcheck=
 eval set -- "$TEMP"
@@ -59,6 +61,7 @@ while true ; do
 		-n|--new-disk) newdisk=1 ; shift ;;
 		-m|--machine) machine="$2" ; shift 2 ;;
 		-d|--debug) dbgmode="$2" ; shift 2 ;;
+		-t|--timestamp) timestamp=1 ; shift ;;
 		--) shift ; break ;;
 		*) echo "Argument error." >&2 ; exit 2 ;;
 	esac
@@ -81,6 +84,15 @@ do
 	echo "source $file" >> "$GDB_COMM_INIT"
 done
 
+OUTPUT="/proc/self/fd/1"
+if [[ -n "$timestamp" ]]
+then
+    OUTPUT=`mktemp --tmpdir=/tmp -d weenix.XXXXXXXX`/weenix_io
+    trap "rm $OUTPUT" 0
+    mkfifo $OUTPUT
+    cat $OUTPUT | ts %.s &
+fi
+
 case $machine in
 	qemu)
 		if [[ -n "$newdisk" || ! ( -f disk0.img ) ]]; then
@@ -89,7 +101,7 @@ case $machine in
 
 		case $dbgmode in
 			run)
-				$QEMU $QEMU_FLAGS -m "$MEMORY" -cdrom "$KERN_DIR/$ISO_IMAGE" -hda disk0.img -serial stdio
+				$QEMU $QEMU_FLAGS -m "$MEMORY" -cdrom "$KERN_DIR/$ISO_IMAGE" -hda disk0.img -serial stdio > $OUTPUT
 				;;
 			gdb)
 				# Build the gdb initialization script

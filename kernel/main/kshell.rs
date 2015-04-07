@@ -409,7 +409,7 @@ fn do_bdwrite(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
     for _ in 0..blks {
         use std::slice::bytes::copy_memory;
         let mut out : [u8; page::SIZE] = [0; page::SIZE];
-        copy_memory(&mut out, &example);
+        copy_memory(&example, &mut out);
         buf.push(out);
     }
     let disk = blockdev::lookup(DeviceId::create(1,0)).expect("should have disk 0");
@@ -468,9 +468,8 @@ fn do_parallel<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
         } else if cmd[0] == "hard-exit" {
             twriteln!(sh.get_tty(), "Will not call hard-exit parallel, will cause memory leaks");
         }
-        let args = Instr { ksh: unsafe { transmute(sh) }, line: unsafe { transmute(cmd) } };
         let pa = unsafe {
-            match ProcArgs::new(args) {
+            match ProcArgs::new(Instr { ksh: transmute(sh), line: transmute(cmd) }) {
                 Ok(v) => v,
                 Err(_) => { continue; },
             }.to_arg()
@@ -484,8 +483,9 @@ fn do_parallel<'a>(sh: &KShell<'a>, argv: &[&str]) -> KResult<()> {
         }
     }
     // TODO Wait on everything.
-    for pid in pids.iter() {
-        let x = KProc::waitpid(kproc::Pid(*pid), 0);
+    for pid in pids.drain() {
+        dbg!(debug::CORE, "waiting on pid {:?}", pid);
+        let x = KProc::waitpid(kproc::Pid(pid), 0);
         match x {
             Ok((_, _)) => {},
             Err(errno) => {

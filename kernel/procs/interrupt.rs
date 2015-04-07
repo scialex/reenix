@@ -110,7 +110,7 @@ impl Drop for IPLWatchdog { fn drop(&mut self) { dbg!(debug::INTR, "reseting ipl
 
 #[unsafe_no_drop_flag]
 #[repr(C, packed)]
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 struct InterruptDescription {
     baselo   : u16,
     selector : u16,

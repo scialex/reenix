@@ -4,6 +4,7 @@
 
 use core::default::Default;
 use core::result::Result;
+use core::convert::From;
 
 pub use errno::Errno::*;
 /// A KResult is a common type of return value for a kernel operation, where it either succeeds or
@@ -21,6 +22,16 @@ macro_rules! errnos {
             )*
         }
 
+        impl From<usize> for Errno {
+            fn from(t: usize) -> Errno {
+                match t {
+                    $(
+                        $v => $n,
+                    )*
+                        _ => EUNKNOWN,
+                }
+            }
+        }
         impl Errno {
             /// Get the explanation of what the given `errno` represents.
             pub fn to_explanation(&self) -> &'static str {

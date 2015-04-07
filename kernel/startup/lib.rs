@@ -122,7 +122,6 @@ pub mod tsd {
         }
     }
 
-    #[derive(Copy)]
     #[repr(C, packed)]
     pub struct InitialTSDInfo { vlow : [u8; 0x30], stack_high : u32}
     pub static INITIAL_TSD : InitialTSDInfo = InitialTSDInfo { vlow: [0; 0x30], stack_high: 0};

@@ -150,7 +150,7 @@ pub struct PFrame {
     queue : WQueue,
 }
 
-#[derive(Copy)]
+#[derive(Clone, Copy)]
 pub enum PFError { Alloc(AllocError), Sys(errno::Errno), }
 impl PFrame {
     /**
@@ -190,9 +190,9 @@ impl PFrame {
             // TODO This isn't the best. Really should add a 'atomic unpin & call' function to
             // PinnedValue.
             if res.is_busy() {
-                res.wait_busy();
+                if let Err(_) = res.wait_busy() { dbg!(debug::PFRAME, "pframe found was busy"); continue; }
             } else {
-                return res;
+                return Ok(res);
             }
         }
     }
@@ -218,8 +218,8 @@ impl PFrame {
                 queue : WQueue::new(),
             };
             try!(res.fill(&**mmo).map_err(|v| Sys(v)));
-            if pageoutd::needed() {
-                pageoutd::wakeup();
+            if pageout::needed() {
+                pageout::wakeup();
             }
             res
         })

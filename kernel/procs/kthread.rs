@@ -4,9 +4,9 @@
 use mm::{alloc, page};
 use libc::c_void;
 use base::errno;
-use std::{cmp, hash, fmt, num};
+use std::{cmp, hash, fmt};
 use context;
-use std::mem::{size_of, transmute_copy};
+use std::mem::size_of;
 use std::ptr::{self, copy_nonoverlapping};
 use kqueue::KQueue;
 use context::{Context, ContextFunc};
@@ -39,7 +39,7 @@ impl KStack {
         let &mut KStack(msize, mptr) = self;
         let &KStack(osize, optr) = other;
         let size = cmp::min(msize, osize);
-        unsafe { copy_nonoverlapping(mptr, optr as *const u8, size); }
+        unsafe { copy_nonoverlapping(mptr, optr, size); }
     }
 
     pub fn num_pages(&self) -> usize {
@@ -63,10 +63,10 @@ impl Drop for KStack {
     }
 }
 
-#[derive(Debug, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Mode { USER, KERNEL }
 
-#[derive(Debug, Eq, PartialEq, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum State { NOSTATE, RUN, SLEEP, SLEEPCANCELLABLE, EXITED }
 
 pub struct KThread {
@@ -155,7 +155,7 @@ impl KThread {
         //assert!(transmute(self) == gdt::get_tsd().cur_thr);
         assert!(self.state == State::RUN);
         dbg!(debug::THR, "Thread {:?} of process {:?} ended with a status of 0x{:x} ({:?})",
-             self, current_proc!(), v as usize, num::from_uint::<errno::Errno>(v as usize));
+             self, current_proc!(), v as usize, errno::Errno::from(v as usize));
         (current_proc_mut!()).thread_exited(v);
         self.state = State::EXITED;
         context::die();
