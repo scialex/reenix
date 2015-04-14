@@ -33,7 +33,7 @@ CFLAGS  += -D__KERNEL__
 REENIX_CRATES  := main base mm startup procs drivers util umem #fs
 
 # Crates from the Rust standard library
-BUILTIN_CRATES := alloc arena core collections unicode rand
+BUILTIN_CRATES := alloc core collections unicode rand
 
 # Crates from the Rust standard library that have been patched. They are in rustlibs/lib<name>/
 PATCHED_CRATES := libc
