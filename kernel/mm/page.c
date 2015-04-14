@@ -11,8 +11,6 @@
 #include "util/debug.h"
 #include "util/string.h"
 
-#include "vm/shadowd.h"
-
 GDB_DEFINE_HOOK(page_alloc, void *addr, int npages)
 GDB_DEFINE_HOOK(page_free, void *addr, int npages)
 
@@ -210,11 +208,6 @@ _page_split(int order)
                 dbg(DBG_PAGEALLOC, "WARNING, cannot allocate order=%u\n", order);
                 /* We have run out of kernel memory. Lets try and collapse some
                    shadow trees, and then retry */
-#ifdef __SHADOWD__
-                dbg(DBG_PAGEALLOC, "waking up shadowd\n");
-                shadowd_wakeup();
-                shadowd_alloc_sleep();
-#endif
                 int num_freed = slab_allocators_reclaim(0);
                 dbg(DBG_MM, "reclaimed %d pages from slab allocator.\n", num_freed);
         } while (num_retrys-- > 0);

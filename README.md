@@ -3,7 +3,7 @@
 This is the start of a unix like operating system written in [Rust].  It is
 based on the [Weenix] Operating system written for [Brown's CS167/9].  At the
 moment it supports a basic kernel shell, mutiple processes with waitpid, and
-writing to disk.  This was written as part of my [CS Senior Thesis] (To be posted
+writing to disk.  This was written as part of my [CS Senior Thesis]. (To be posted soon)
 soon).
 
 [Rust]: https://github.com/rust-lang/rust/

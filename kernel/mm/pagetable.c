@@ -5,20 +5,15 @@
 #include "limits.h"
 #include "globals.h"
 
-#include "main/interrupt.h"
-
 #include "mm/mm.h"
 #include "mm/page.h"
 #include "mm/pagetable.h"
 #include "mm/phys.h"
 #include "mm/tlb.h"
-#include "mm/pframe.h"
 
 #include "util/debug.h"
 #include "util/string.h"
 #include "util/printf.h"
-
-#include "vm/pagefault.h"
 
 #include "boot/config.h"
 
