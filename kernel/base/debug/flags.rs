@@ -74,6 +74,7 @@ dbg_modes!{
     (USER,        38, color::BYELLOW, "user land"),
     (PCACHE,      39, color::BMAGENTA,"pinnable cache system"),
     (KSHELL,      40, color::BBLUE   ,"Kshell messages"),
+    (TIME,        41, color::NORMAL,  "Timing message"),
 
     (DANGER,      62, color::RED,     "A likely very dangerous operation"),
 
@@ -82,6 +83,7 @@ dbg_modes!{
 }
 
 /// The colors we can have
+#[cfg(COLORS)]
 pub mod color {
     pub static NORMAL   : &'static str = "\x1b[0m";
     pub static BLACK    : &'static str = "\x1b[30;47m";
@@ -99,4 +101,24 @@ pub mod color {
     pub static BMAGENTA : &'static str = "\x1b[1;35;40m";
     pub static BCYAN    : &'static str = "\x1b[1;36;40m";
     pub static BWHITE   : &'static str = "\x1b[1;37;40m";
+}
+
+#[cfg(not(COLORS))]
+pub mod color {
+    pub static NORMAL   : &'static str = "";
+    pub static BLACK    : &'static str = "";
+    pub static RED      : &'static str = "";
+    pub static GREEN    : &'static str = "";
+    pub static YELLOW   : &'static str = "";
+    pub static BLUE     : &'static str = "";
+    pub static MAGENTA  : &'static str = "";
+    pub static CYAN     : &'static str = "";
+    pub static WHITE    : &'static str = "";
+    pub static BRED     : &'static str = "";
+    pub static BGREEN   : &'static str = "";
+    pub static BYELLOW  : &'static str = "";
+    pub static BBLUE    : &'static str = "";
+    pub static BMAGENTA : &'static str = "";
+    pub static BCYAN    : &'static str = "";
+    pub static BWHITE   : &'static str = "";
 }

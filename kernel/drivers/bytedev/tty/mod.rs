@@ -26,12 +26,12 @@ pub fn init_stage2() {
 
 #[allow(unused_must_use)]
 pub fn init_stage3() {
-    get_current_tty().write_to(0, "WEENIX STARTED TTY!\n".as_bytes());
+    get_current_tty().write_to(0, "REENIX STARTED TTY!\n".as_bytes());
 }
 
 #[allow(unused_must_use)]
 pub fn shutdown() {
-    get_current_tty().write_to(0, "\nWEENIX IS SHUTTING DOWN.\nYou may now shut off your computer\n".as_bytes());
+    get_current_tty().write_to(0, "\nREENIX IS SHUTTING DOWN.\nYou may now shut off your computer\n".as_bytes());
 }
 
 enum ScrollDirection { UP, DOWN, }

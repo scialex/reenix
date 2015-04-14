@@ -123,6 +123,7 @@ static NFUNCS : &'static [KFunction<'static>] = &[
     KFunc!("mem-stats", "prints memory statistics", do_memstats),
     KFunc!("pid", "prints current pid", do_pid),
     KFunc!("cancel", "cancels a pid", do_cancel),
+    KFunc!("time-mutex", "runs mutex time comparison", do_time_mutex),
 ];
 
 impl<'a> KShell<'a> {
@@ -209,6 +210,19 @@ fn do_memstats(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {
     twriteln!(io, "{:?}", Showwer(alloc::get_stats()));
     alloc::stats_print();
     Ok(())
+}
+
+fn do_time_mutex(io: &mut Device<u8>, argv: &[&str]) -> KResult<()> {
+    if argv.len() == 3 {
+        if let Ok(high) = FromStr::from_str(argv[1]) {
+            if let Ok(thrs) = FromStr::from_str(argv[2]) {
+                super::proctest::time_mutex(high, thrs);
+                return Ok(());
+            }
+        }
+    }
+    twriteln!(io, "Usage: time-mutex [reps] [threads]");
+    return Ok(());
 }
 
 fn do_pid(io: &mut Device<u8>, _: &[&str]) -> KResult<()> {

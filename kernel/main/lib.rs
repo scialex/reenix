@@ -156,14 +156,37 @@ extern "C" fn idle_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     //     Ok((pid, pst)) => { dbg!(debug::CORE, "pagetoutd Returned {:?}, 0x{:x}", pid, pst); },
     //     Err(errno) => {kpanic!("pageoutd returned errno {:?}", errno); }
     // }
-    panic!("hi");
     shutdown();
 }
 
+// extern "C" fn fake_proc(_: i32, _: *mut c_void) -> *mut c_void { 0 as *mut c_void }
+// extern "C" fn run_test(_: i32, _: *mut c_void) -> *mut c_void {
+//     // for _ in 0..10 { proctest::time_mutex(100,2); }
+//     // for _ in 0..10 { proctest::time_mutex(100,10); }
+//     // for _ in 0..10 { proctest::time_mutex(100,100); }
+//     // for _ in 0..10 { proctest::time_mutex(10000,2); }
+//     // for _ in 0..10 { proctest::time_mutex(10000,10); }
+//     // for _ in 0..10 { proctest::time_mutex(10000,100); }
+//     for _ in 0..1000 {
+//         let pid = KProc::new("test_proc".to_string(), fake_proc, 0, 0 as *mut c_void).unwrap();
+//         dbg!(debug::TIME, "START waitpid noyield");
+//         assert!(KProc::waitpid(kproc::Pid(pid), 0).is_ok());
+//         dbg!(debug::TIME, "END waitpid noyield");
+//     }
+//     for _ in 0..1000 {
+//         let pid = KProc::new("test_proc".to_string(), fake_proc, 0, 0 as *mut c_void).unwrap();
+//         procs::kthread::kyield();
+//         dbg!(debug::TIME, "START waitpid yield");
+//         assert!(KProc::waitpid(kproc::Pid(pid), 0).is_ok());
+//         dbg!(debug::TIME, "END waitpid yield");
+//     }
+//     return 0 as *mut c_void;
+// }
 extern "C" fn init_proc_run(_: i32, _: *mut c_void) -> *mut c_void {
     interrupt::enable();
     dbg!(debug::CORE, "got into process {:?} and thread {:?}", current_proc!(), current_thread!());
 
+    //KProc::new("test_proc".to_string(), run_test, 0, 0 as *mut c_void).unwrap();
     kshell::start(0);
     loop {
         let x = KProc::waitpid(kproc::Any, 0);

@@ -36,6 +36,39 @@ pub fn run() -> (usize, usize) {
     do_run(false)
 }
 
+extern "C" fn speed_test_fn(high: i32, mtx: *mut c_void) -> *mut c_void {
+    let mtx : &Mutex<i32> = unsafe { transmute(mtx) };
+    let mut breakit = false;
+    loop {
+        if breakit {
+            kthread::kyield();
+            breakit = false;
+        }
+        let mut val = mtx.lock().unwrap();
+        if *val == high { return 0 as *mut c_void; }
+        *val += 1;
+        if *val % 4 == 0 { kthread::kyield(); }
+        else if *val % 3 == 0 { breakit = true; }
+    }
+}
+
+pub fn time_mutex(high: i32, thrs: usize) {
+    dbg!(debug::TIME, "START speedmutex high: {}, cnt: {}", high, thrs);
+    let mut pids = Vec::with_capacity(thrs);
+    let mtx = Mutex::<i32>::new("speed mutex", 0);
+    for _ in 0..thrs {
+        pids.push(kproc::KProc::new("speed test".to_string(), speed_test_fn, high, unsafe { transmute(&mtx) }).unwrap_or_else(
+                |_| { panic!("Unable to make proc") }));
+    }
+    kthread::kyield();
+    for pid in pids.drain() {
+        assert!(kproc::KProc::waitpid(kproc::Pid(pid), 0).is_ok());
+    }
+    let val = mtx.lock().unwrap();
+    assert!(*val == high);
+    dbg!(debug::TIME, "END speedmutex high: {}, cnt: {}", high, thrs);
+}
+
 fn do_run(single: bool) -> (usize, usize) {
     // TODO Embarrassing. This is not thread safe...
     let mut total : usize = 0;

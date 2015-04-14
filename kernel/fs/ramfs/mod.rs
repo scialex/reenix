@@ -2,7 +2,7 @@
 //! The RAMFS
 
 
-use FileSystem;
+use ::vfs::FileSystem;
 use InodeNum;
 use base::cell::*;
 use base::devices::DeviceId;
@@ -265,7 +265,7 @@ impl VNode for DirInode {
         let mut l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
         let d = &mut *l;
         if d.contains_key(name) {
-            dbg!(debug::VFS, "Could not create {} in {} because another vnode has that name", name, self);
+            dbg!(debug::VFS, "Could not create {} in {:?} because another vnode has that name", name, self);
             return Err(errno::EEXIST);
         }
         d.insert(name.to_owned(), from.clone());
@@ -277,11 +277,11 @@ impl VNode for DirInode {
         let mut l = try!(self.data.lock().map_err(|_| errno::EDEADLK));
         let mut d = &mut *l;
         if d.contains_key(name) {
-            dbg!(debug::VFS, "Could not mkdir {} in {} because another vnode has that name", name, self);
+            dbg!(debug::VFS, "Could not mkdir {} in {:?} because another vnode has that name", name, self);
             return Err(errno::EEXIST);
         }
         let new_node = dbg_try!(self.fs.alloc_dir(self.get_number()),
-                                debug::VFS, "Unable to create directory node for {} in {}", name, self);
+                                debug::VFS, "Unable to create directory node for {} in {:?}", name, self);
         // TODO Link ..
         d.insert(name.to_owned(), new_node);
         Ok(())

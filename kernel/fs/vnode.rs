@@ -2,7 +2,7 @@
 //! than any real organizational reason. Some crates need this but don't really need to know much
 //! more about drivers.
 
-use ::FileSystem;
+use vfs::FileSystem;
 use base::devices::*;
 use ::InodeNum;
 use std::fmt;

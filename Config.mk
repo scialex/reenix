@@ -74,6 +74,7 @@ DEFAULT_CRATE_OPT := 2
              MTP=0 # multiple kernel threads per process
            PIPES=0 # pipe(2) functionality
          SHADOWD=0 # shadow page cleanup
+          COLORS=1 # Should debug messages have colors
 
 # These are some options that can be used for stress testing stuff
        SMALL_PID=0 # Make a process id be a u8, so it will overflow and run out quickly.
@@ -101,6 +102,7 @@ DEFAULT_CRATE_OPT := 2
 							 SLAB_CHECK_FREE \
 							 REAL_SPIN_ONCE \
 							 TEST_LOW_MEMORY \
+							 COLORS \
 							 SMALL_PID
 
 # As above, but not booleans

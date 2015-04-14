@@ -1,12 +1,13 @@
 
 //! The VFS trait/interface
 
-use vnode::*;
+use vnode::VNode;
 use base::errno;
 use std::borrow::Borrow;
+use base::errno::{KResult};
 
 pub trait FileSystem {
-    type Real: VNode;
+    type Real: VNode<Real=Self::Real, Res=Self::Node>;
     type Node: Borrow<Self::Real> + Clone;
     fn get_type(&self) -> &'static str;
     fn get_fs_root(&self) -> Self::Node;
@@ -20,28 +21,28 @@ pub trait FileSystem {
             _ if name.starts_with("/") => self.dir_namev(&name[1..], self.get_fs_root()),
             _ => {
                 // This goes on the end so we take trailing '/' as '/.'
-                let end = if name.ends_with("/") { Some(".") } else { None };
+                let end = if name.ends_with("/") { Some("." as &'a str) } else { None };
                 let mut cp = base;
                 let mut next = name;
                 // We go through the split up name, which might have '.' appended to it.
-                for n in name.split("/").chain(end.iter()) {
-                    match cur {
+                for n in name.split("/").chain(end.into_iter()) {
+                    match n {
                         "" => {}, // A repeated '/', ignore it
-                        "." => {}, // A './' ignore it.
+                        "." => { next = n; }, // A './' ignore it.
                         _ => {
-                            cp = dbg_try!(cp.lookup(next),
-                                          debug::VFS, "Could not find folder {} when finding namev for {}", next, name);
-                            next = cur;
+                            cp = try!({let x : &Self::Real = cp.borrow(); x.lookup(next)});
+                            next = n;
                         },
                     }
                 }
+                Ok((cp, next))
             }
         }
-            let add_dot = name.ends_with("/");
     }
     fn open_namev(&self, name: &str, create: bool, mut base: Self::Node) -> KResult<Self::Node> {
         let (parent, fname) = try!(self.dir_namev(name, base));
-        parent.lookup(fname).or_else(|err| { if err == ENOENT && create { parent.create(fname) } })
+        let parent : &Self::Real = parent.borrow();
+        parent.lookup(fname).or_else(|err| { if err == errno::ENOENT && create { parent.create(fname) } else { Err(err) } })
     }
 }
 
@@ -49,10 +50,10 @@ pub trait FileSystem {
 fn trim_name(n: &str) -> &str {
     let mut name = n;
     // 's:/+$:/:'
-    while name.ends_with("//") { name = name[..name.len() - 1]; }
+    while name.ends_with("//") { name = &name[..name.len() - 1]; }
     // 's:^/+:/:'
-    while name.starts_with("//") { name = name[1..]; }
+    while name.starts_with("//") { name = &name[1..]; }
     // 's:^(\./+)+::'
-    while name.starts_with("./") { name = name[1..].trim_left_matches("/"); }
+    while name.starts_with("./") { name = &name[1..].trim_left_matches("/"); }
     return name;
 }
