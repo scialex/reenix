@@ -8,7 +8,7 @@ writing to disk.  This was written as part of my [CS Senior Thesis]. (To be post
 [Rust]: https://github.com/rust-lang/rust/
 [Weenix]: http://cs.brown.edu/courses/cs167/docs/weenix.pdf
 [Brown's CS167/9]: http://cs.brown.edu/courses/cs167/
-<!--[CS Senior Thesis]: -->
+[CS Senior Thesis]: http://scialex.github.io/reenix.pdf
 
 ## Building
 
